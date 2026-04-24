@@ -529,7 +529,7 @@ function answerCoachQuestion(text: string) {
 function shouldGeneratePlan(text: string) {
   const lower = text.toLowerCase();
 
-  return (
+  const planWords =
     lower.includes("จัด") ||
     lower.includes("สร้าง") ||
     lower.includes("ทำตาราง") ||
@@ -538,8 +538,66 @@ function shouldGeneratePlan(text: string) {
     lower.includes("program") ||
     lower.includes("plan") ||
     lower.includes("routine") ||
-    lower.includes("schedule") ||
-    lower.includes("วัน")
+    lower.includes("schedule");
+
+  const dayWords =
+    lower.includes("3 วัน") ||
+    lower.includes("4 วัน") ||
+    lower.includes("5 วัน") ||
+    lower.includes("3 day") ||
+    lower.includes("4 day") ||
+    lower.includes("5 day");
+
+  return planWords || (dayWords && (lower.includes("อยาก") || lower.includes("ขอ") || lower.includes("ทำ")));
+}
+
+
+
+function getVolumeJudgement(muscle: string, sets: number) {
+  if (sets < 6) return `${muscle}: ${sets} sets/week — น้อยไปสำหรับ hypertrophy ส่วนใหญ่`;
+  if (sets < 10) return `${muscle}: ${sets} sets/week — พอได้ถ้าเป็นกล้ามรองหรือ recovery ต่ำ แต่ถ้าอยากโตควรเพิ่ม`;
+  if (sets <= 20) return `${muscle}: ${sets} sets/week — อยู่ในโซนสมเหตุสมผล`;
+  return `${muscle}: ${sets} sets/week — อาจเยอะไป ถ้าคุณเริ่มล้า/แรงตก/ฟอร์มพังควรลด`;
+}
+
+function formatPlanVolumeAnalysis(plan: DayPlan[]) {
+  const summary = getWeeklyVolumeSummary(plan);
+
+  if (summary.length === 0) {
+    return "ยังไม่มีตารางให้วิเคราะห์ ลองเลือก Preset หรือสร้าง Custom plan ก่อน";
+  }
+
+  const lines = summary.map(([muscle, sets]) => getVolumeJudgement(muscle, sets));
+
+  return `วิเคราะห์ volume ของตารางปัจจุบัน:\n\n${lines.join("\n")}\n\nหลักที่ใช้: ดู direct hard sets ต่อสัปดาห์ก่อน แล้วค่อยคิด indirect volume เพิ่ม เช่น press ช่วย triceps, row/pulldown ช่วย biceps. ถ้ากล้ามไหนต่ำกว่า 10 sets/week และเป็น priority ควรเพิ่มท่าหรือเพิ่ม sets.`;
+}
+
+function detectPlanAnalysisRequest(text: string) {
+  const lower = text.toLowerCase();
+
+  return (
+    lower.includes("วิเคราะห์") ||
+    lower.includes("เช็ค") ||
+    lower.includes("ตรวจ") ||
+    lower.includes("ดูตาราง") ||
+    lower.includes("ตารางนี้") ||
+    lower.includes("น้อยไปไหม") ||
+    lower.includes("เยอะไปไหม") ||
+    lower.includes("volume") ||
+    lower.includes("พอไหม")
+  );
+}
+
+function detectModificationRequest(text: string) {
+  const lower = text.toLowerCase();
+
+  return (
+    lower.includes("เพิ่ม") ||
+    lower.includes("ลด") ||
+    lower.includes("แก้") ||
+    lower.includes("ปรับ") ||
+    lower.includes("เน้น") ||
+    lower.includes("priority")
   );
 }
 
@@ -750,7 +808,7 @@ export default function Page() {
         id: makeId("msg"),
         role: "assistant",
         content:
-          "พิมพ์ได้ 2 แบบ: ถามตรงๆ เช่น “Pec Deck ควรกี่เซต” หรือสั่งจัดตาราง เช่น “จัด 4 วัน เน้นอกหลัง แขนไม่เบา” ถ้าเป็นตารางจะมีปุ่ม Save Plan ให้บันทึกเข้า Custom",
+          "Smart Coach ฟรี ไม่ใช้ API: ถาม set/volume/warmup/ท่าสำรองได้ หรือสั่งจัดตารางแล้วกด Save Plan เข้า Custom",
       },
     ])
   );
@@ -964,8 +1022,11 @@ export default function Page() {
 
     const userMessage: ChatMessage = { id: makeId("msg"), role: "user", content: text };
     const directAnswer = answerCoachQuestion(text);
+    const wantsPlan = shouldGeneratePlan(text);
+    const wantsAnalysis = detectPlanAnalysisRequest(text);
+    const wantsModification = detectModificationRequest(text);
 
-    if (directAnswer && !shouldGeneratePlan(text)) {
+    if (directAnswer && !wantsPlan) {
       const response: ChatMessage = {
         id: makeId("msg"),
         role: "assistant",
@@ -977,11 +1038,49 @@ export default function Page() {
       return;
     }
 
-    if (directAnswer && shouldGeneratePlan(text) && !text.toLowerCase().includes("จัด")) {
+    if (wantsAnalysis && !wantsPlan && !wantsModification) {
       const response: ChatMessage = {
         id: makeId("msg"),
         role: "assistant",
-        content: directAnswer.content,
+        content: formatPlanVolumeAnalysis(activePlan),
+      };
+
+      setChatMessages((old) => [...old, userMessage, response]);
+      setChatInput("");
+      return;
+    }
+
+    if (wantsModification && !wantsPlan) {
+      const groups = inferGroupsFromText(text);
+      const generatedPlan: CustomPlan = {
+        id: makeId("plan"),
+        name: `AI Adjusted ${groups.join(" + ")}`,
+        days:
+          mode === "custom" && selectedCustomPlan
+            ? selectedCustomPlan.days.map((dayItem) => {
+                const shouldAdjust = groups.some((group) => dayItem.focus.includes(group));
+                if (!shouldAdjust) return dayItem;
+
+                const additions = recommendForGroups(groups).slice(0, 2);
+                const existing = new Set(dayItem.exercises.map((exercise) => exercise.name));
+                const cleanAdditions = additions.filter((exercise) => !existing.has(exercise.name));
+
+                return {
+                  ...dayItem,
+                  id: makeId("day"),
+                  subtitle: "Adjusted by HA IT Smart Coach",
+                  exercises: [...dayItem.exercises, ...cleanAdditions].slice(0, 8),
+                };
+              })
+            : buildCoachPlanFromText(text).days,
+      };
+
+      const response: ChatMessage = {
+        id: makeId("msg"),
+        role: "assistant",
+        content:
+          `ผมทำเวอร์ชันปรับจากคำขอให้แล้ว: ${groups.join(", ")}\n\n${summarizePlan(generatedPlan)}\n\nกด Save Plan เพื่อบันทึกเป็น Custom plan ใหม่ได้เลย`,
+        plan: generatedPlan,
       };
 
       setChatMessages((old) => [...old, userMessage, response]);
@@ -1243,7 +1342,7 @@ export default function Page() {
               </div>
               <div>
                 <h3 className="text-xl font-black">HA IT Coach</h3>
-                <p className="text-sm text-zinc-400">Ask questions or generate a plan.</p>
+                <p className="text-sm text-zinc-400">Ask, analyze or generate a plan.</p>
               </div>
             </div>
 
@@ -1268,7 +1367,8 @@ export default function Page() {
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {[
                   "Pec Deck ควรกี่เซต",
-                  "ทำไม RDL แค่ 2 sets",
+                  "วิเคราะห์ตารางนี้ให้หน่อย",
+                  "เพิ่มแขนให้ตารางนี้",
                   "จัด 4 วัน เน้น hypertrophy แขนไม่เบา",
                 ].map((prompt) => (
                   <button key={prompt} onClick={() => setChatInput(prompt)} className="min-w-fit rounded-full bg-zinc-950 px-3 py-2 text-xs font-bold text-zinc-300">

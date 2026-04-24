@@ -81,3 +81,15 @@ Keep postcss.config.mjs.
 - It can answer set/volume/warmup/substitution questions without forcing a new plan.
 - It only generates a plan when the message looks like a plan request.
 - Added direct exercise prescription answers for mentioned exercise names.
+
+## Free Smart Coach upgrade
+- Still no paid API.
+- Better intent routing:
+  - Direct set questions
+  - Warmup questions
+  - Substitution questions
+  - Volume analysis
+  - Plan generation
+  - Simple plan adjustment requests
+- Can analyze current selected plan using weekly hard set summary.
+- Can create an adjusted plan and save it to Custom.
