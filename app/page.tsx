@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
+  Bot,
   CalendarDays,
   Check,
   ChevronDown,
@@ -10,6 +11,7 @@ import {
   Dumbbell,
   Flame,
   Library,
+  MessageCircle,
   MinusCircle,
   Pencil,
   PlayCircle,
@@ -17,13 +19,14 @@ import {
   RotateCcw,
   Save,
   Search,
+  Send,
   Sparkles,
   Trash2,
   Trophy,
 } from "lucide-react";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
-type AppMode = "preset" | "custom";
+type AppMode = "preset" | "custom" | "coach";
 
 type Exercise = {
   name: string;
@@ -73,6 +76,13 @@ type LogSet = {
   date: string;
 };
 
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  plan?: CustomPlan;
+};
+
 type PersistedUiState = {
   mode: AppMode;
   days: 3 | 4 | 5;
@@ -85,9 +95,10 @@ type PersistedUiState = {
   selectedCustomDay: number;
 };
 
-const UI_STATE_KEY = "haitUiStateV4";
-const SET_INPUTS_KEY = "haitSetInputsV4";
-const CUSTOM_PLANS_KEY = "haitCustomPlansV1";
+const UI_STATE_KEY = "haitUiStateV5";
+const SET_INPUTS_KEY = "haitSetInputsV5";
+const CUSTOM_PLANS_KEY = "haitCustomPlansV2";
+const CHAT_KEY = "haitCoachChatV1";
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -111,9 +122,7 @@ function writeSessionJson<T>(key: string, value: T) {
 
   try {
     window.sessionStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // app still works without storage
-  }
+  } catch {}
 }
 
 function writeLocalJson<T>(key: string, value: T) {
@@ -121,9 +130,7 @@ function writeLocalJson<T>(key: string, value: T) {
 
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // app still works without storage
-  }
+  } catch {}
 }
 
 const exerciseLibrary: Exercise[] = [
@@ -153,13 +160,13 @@ const exerciseLibrary: Exercise[] = [
   { name: "Weighted Pull Up", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S" },
   { name: "Wide Grip Cable Row", group: "Back", movement: "row", muscles: ["Upper back", "Rear delts"], tier: "A" },
   { name: "Widegrip Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "A" },
+  { name: "DB Pullovers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
 
   { name: "45° Back Extension", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
   { name: "45° Leg Press", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
   { name: "45° Leg Press High Foot", group: "Legs", movement: "glute press", muscles: ["Glutes", "Hamstrings", "Quads"], tier: "A" },
   { name: "Barbell Back Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
   { name: "Bulgarian Split Squat", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "S" },
-  { name: "DB Pullovers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
   { name: "Deadlift", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
   { name: "Front Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
   { name: "Hack Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S+" },
@@ -218,73 +225,21 @@ function getPrescription(exercise: Exercise) {
   const movement = exercise.movement;
   const name = exercise.name.toLowerCase();
 
-  if (exercise.group === "Arms") {
-    return {
-      sets: 4,
-      reps: "10 to 15",
-      warmup: false,
-    };
-  }
-
-  if (exercise.group === "Abs & Calves") {
-    return {
-      sets: 3,
-      reps: movement === "calves" ? "8 to 15" : "10 to 15",
-      warmup: false,
-    };
-  }
-
-  if (movement === "hinge") {
-    return {
-      sets: 2,
-      reps: name.includes("deadlift") && !name.includes("romanian") ? "3 to 6" : "6 to 10",
-      warmup: true,
-    };
-  }
-
+  if (exercise.group === "Arms") return { sets: 4, reps: "10 to 15", warmup: false };
+  if (exercise.group === "Abs & Calves") return { sets: 3, reps: movement === "calves" ? "8 to 15" : "10 to 15", warmup: false };
+  if (movement === "hinge") return { sets: 2, reps: name.includes("deadlift") && !name.includes("romanian") ? "3 to 6" : "6 to 10", warmup: true };
   if (movement.includes("flye") || movement.includes("isolation") || movement.includes("curl") || movement.includes("raise") || movement.includes("rear delt")) {
-    return {
-      sets: 3,
-      reps: movement.includes("raise") || movement.includes("rear delt") || movement.includes("glute isolation") ? "12 to 20" : "10 to 15",
-      warmup: false,
-    };
+    return { sets: 3, reps: movement.includes("raise") || movement.includes("rear delt") || movement.includes("glute isolation") ? "12 to 20" : "10 to 15", warmup: false };
   }
-
-  if (movement === "single leg") {
-    return {
-      sets: 3,
-      reps: "8 to 12 each leg",
-      warmup: false,
-    };
-  }
-
-  if (movement === "lat isolation") {
-    return {
-      sets: 3,
-      reps: "12 to 15",
-      warmup: false,
-    };
-  }
-
-  if (movement === "vertical pull" && name.includes("weighted")) {
-    return {
-      sets: 3,
-      reps: "5 to 8",
-      warmup: true,
-    };
-  }
-
-  return {
-    sets: 3,
-    reps: movement.includes("incline") || movement.includes("row") || movement.includes("vertical pull") || movement.includes("glute bridge") ? "8 to 12" : "6 to 10",
-    warmup: true,
-  };
+  if (movement === "single leg") return { sets: 3, reps: "8 to 12 each leg", warmup: false };
+  if (movement === "lat isolation") return { sets: 3, reps: "12 to 15", warmup: false };
+  if (movement === "vertical pull" && name.includes("weighted")) return { sets: 3, reps: "5 to 8", warmup: true };
+  return { sets: 3, reps: movement.includes("incline") || movement.includes("row") || movement.includes("vertical pull") || movement.includes("glute bridge") ? "8 to 12" : "6 to 10", warmup: true };
 }
 
 function toPlanExercise(name: string): PlanExercise {
   const exercise = findExercise(name);
   const prescription = getPrescription(exercise);
-
   return {
     id: makeId("ex"),
     name: exercise.name,
@@ -298,13 +253,7 @@ function toPlanExercise(name: string): PlanExercise {
 }
 
 function makeDay(title: string, subtitle: string, focus: MuscleGroup[], exerciseNames: string[]): DayPlan {
-  return {
-    id: makeId("day"),
-    title,
-    subtitle,
-    focus,
-    exercises: exerciseNames.map(toPlanExercise),
-  };
+  return { id: makeId("day"), title, subtitle, focus, exercises: exerciseNames.map(toPlanExercise) };
 }
 
 function makePresetPlans() {
@@ -342,42 +291,89 @@ function makeFiveDayLegOncePlan() {
 
 function recommendForGroups(groups: MuscleGroup[]) {
   const names: string[] = [];
-
-  if (groups.includes("Chest")) {
-    names.push("Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye");
-  }
-
-  if (groups.includes("Back")) {
-    names.push("Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers");
-  }
-
-  if (groups.includes("Legs")) {
-    names.push("Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust");
-  }
-
+  if (groups.includes("Chest")) names.push("Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye");
+  if (groups.includes("Back")) names.push("Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers");
+  if (groups.includes("Legs")) names.push("Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust");
   if (groups.includes("Shoulders")) {
     names.push("Cable Lat Raise", "Reverse Pec Deck");
     if (!groups.includes("Chest")) names.unshift("Machine Shoulder Press");
   }
-
-  if (groups.includes("Arms")) {
-    names.push("Face Away Bayesian Curl", "Overhead Cable Ext");
-  }
-
-  if (groups.includes("Abs & Calves")) {
-    names.push("Cable Crunch", "Front Calf Muscle");
-  }
-
+  if (groups.includes("Arms")) names.push("Face Away Bayesian Curl", "Overhead Cable Ext");
+  if (groups.includes("Abs & Calves")) names.push("Cable Crunch", "Front Calf Muscle");
   return Array.from(new Set(names)).map(toPlanExercise);
+}
+
+function inferGroupsFromText(text: string): MuscleGroup[] {
+  const lower = text.toLowerCase();
+  const groups: MuscleGroup[] = [];
+  const add = (group: MuscleGroup) => {
+    if (!groups.includes(group)) groups.push(group);
+  };
+
+  if (lower.includes("chest") || lower.includes("อก") || lower.includes("push")) add("Chest");
+  if (lower.includes("back") || lower.includes("pull") || lower.includes("หลัง") || lower.includes("lat")) add("Back");
+  if (lower.includes("leg") || lower.includes("ขา") || lower.includes("quad") || lower.includes("hamstring") || lower.includes("glute")) add("Legs");
+  if (lower.includes("shoulder") || lower.includes("ไหล่") || lower.includes("delt")) add("Shoulders");
+  if (lower.includes("arm") || lower.includes("แขน") || lower.includes("bicep") || lower.includes("tricep")) add("Arms");
+  if (lower.includes("abs") || lower.includes("core") || lower.includes("calf") || lower.includes("หน้าท้อง") || lower.includes("น่อง")) add("Abs & Calves");
+
+  if (groups.length === 0) return ["Chest", "Back"];
+  return groups;
+}
+
+function inferDayCountFromText(text: string) {
+  const lower = text.toLowerCase();
+  if (lower.includes("5") || lower.includes("five")) return 5;
+  if (lower.includes("3") || lower.includes("three")) return 3;
+  return 4;
+}
+
+function buildCoachPlanFromText(text: string) {
+  const lower = text.toLowerCase();
+  const dayCount = inferDayCountFromText(text);
+  const planName = lower.includes("ลดเวลา") || lower.includes("busy") || lower.includes("short") ? "AI Short Hypertrophy Split" : "AI Recommended Split";
+
+  if (dayCount === 3) {
+    return {
+      id: makeId("plan"),
+      name: planName,
+      days: [
+        makeDay("AI Full Body A", "Press, pull, squat, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Hack Squat", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+        makeDay("AI Full Body B", "Hinge, row, chest isolation, glutes, calves", ["Legs", "Back", "Chest", "Abs & Calves"], ["Romanian Deadlift RDL", "Chest Supported Row", "Seated Cable Pec Flye", "Machine Hip Thrust", "Front Calf Muscle"]),
+        makeDay("AI Full Body C", "Quad isolation, incline chest, hamstring, rear delt, core", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["Leg Extension", "Incline DB Press", "Seated Hamstring Curl", "Reverse Pec Deck", "Cable Crunch"]),
+      ],
+    } satisfies CustomPlan;
+  }
+
+  if (dayCount === 5 && (lower.includes("1 leg") || lower.includes("leg 1") || lower.includes("ขา 1") || lower.includes("ขาวันเดียว"))) {
+    return { id: makeId("plan"), name: "AI 5 Day One Leg Split", days: makeFiveDayLegOncePlan().map((day) => ({ ...day, id: makeId("day") })) } satisfies CustomPlan;
+  }
+
+  if (dayCount === 5) {
+    return { id: makeId("plan"), name: "AI 5 Day Hypertrophy Split", days: makePresetPlans()[5].map((day) => ({ ...day, id: makeId("day") })) } satisfies CustomPlan;
+  }
+
+  return {
+    id: makeId("plan"),
+    name: planName,
+    days: makePresetPlans()[4].map((day) => ({ ...day, id: makeId("day") })),
+  } satisfies CustomPlan;
+}
+
+function summarizePlan(plan: CustomPlan) {
+  return `${plan.name}\n${plan.days
+    .map((day, index) => {
+      const exercises = day.exercises.map((exercise) => `${exercise.name} ${exercise.sets}x${exercise.reps}`).join(", ");
+      return `Day ${index + 1}: ${day.title}\n${exercises}`;
+    })
+    .join("\n\n")}`;
 }
 
 function createStarterCustomPlan() {
   return {
     id: makeId("plan"),
     name: "My Custom Split",
-    days: [
-      makeDay("Custom Day 1", "Choose target muscles then press Recommend", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row"]),
-    ],
+    days: [makeDay("Custom Day 1", "Choose target muscles then press Recommend", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row"])],
   } satisfies CustomPlan;
 }
 
@@ -391,7 +387,6 @@ function roundToFive(value: number) {
 
 function getWarmupSets(bestWeight?: number) {
   if (!bestWeight || bestWeight <= 0) return [];
-
   return [
     { label: "Warmup 1", weight: roundToFive(bestWeight * 0.4), reps: "8 to 10" },
     { label: "Warmup 2", weight: roundToFive(bestWeight * 0.6), reps: "5 to 6" },
@@ -400,11 +395,7 @@ function getWarmupSets(bestWeight?: number) {
 }
 
 function createDefaultSetInputs(sets: number): SetInput[] {
-  return Array.from({ length: sets }, () => ({
-    weightLbs: "",
-    reps: "",
-    done: false,
-  }));
+  return Array.from({ length: sets }, () => ({ weightLbs: "", reps: "", done: false }));
 }
 
 function isWithinLastDays(dateIso: string, daysBack: number) {
@@ -415,12 +406,7 @@ function isWithinLastDays(dateIso: string, daysBack: number) {
 }
 
 function formatShortDate(dateIso: string) {
-  return new Intl.DateTimeFormat("th-TH", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(dateIso));
+  return new Intl.DateTimeFormat("th-TH", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(dateIso));
 }
 
 function getAlternatives(exercise: PlanExercise) {
@@ -499,6 +485,17 @@ export default function Page() {
   const [selectedCustomDay, setSelectedCustomDay] = useState(initialUiState.selectedCustomDay);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exerciseGroupFilter, setExerciseGroupFilter] = useState<MuscleGroup | "All">("All");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() =>
+    readJson<ChatMessage[]>(CHAT_KEY, [
+      {
+        id: makeId("msg"),
+        role: "assistant",
+        content:
+          "พิมพ์เป้าหมายมาได้เลย เช่น “จัด 4 วัน เน้นอกหลัง แขนไม่เบา” หรือ “ทำ 5 วัน แต่ขาแค่วันเดียว” แล้วกด Save Plan เพื่อบันทึกตารางจากแชทได้ทันที",
+      },
+    ])
+  );
+  const [chatInput, setChatInput] = useState("");
 
   const presetPlans = useMemo(() => makePresetPlans(), []);
   const fiveDayLegOncePlan = useMemo(() => makeFiveDayLegOncePlan(), []);
@@ -539,13 +536,9 @@ export default function Page() {
     });
   }, [mode, days, selectedDay, fiveDayMode, showHistory, showLibrary, selectedCustomPlan?.id, selectedCustomDay]);
 
-  useEffect(() => {
-    writeSessionJson(SET_INPUTS_KEY, inputs);
-  }, [inputs]);
-
-  useEffect(() => {
-    writeLocalJson(CUSTOM_PLANS_KEY, customPlans);
-  }, [customPlans]);
+  useEffect(() => writeSessionJson(SET_INPUTS_KEY, inputs), [inputs]);
+  useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
+  useEffect(() => writeSessionJson(CHAT_KEY, chatMessages), [chatMessages]);
 
   useEffect(() => {
     const saveScroll = () => {
@@ -560,17 +553,12 @@ export default function Page() {
         selectedCustomPlanId: selectedCustomPlan?.id ?? null,
         selectedCustomDay,
       });
-
-      writeSessionJson<PersistedUiState>(UI_STATE_KEY, {
-        ...current,
-        scrollY: window.scrollY,
-      });
+      writeSessionJson<PersistedUiState>(UI_STATE_KEY, { ...current, scrollY: window.scrollY });
     };
 
     window.addEventListener("pagehide", saveScroll);
     window.addEventListener("visibilitychange", saveScroll);
     window.addEventListener("beforeunload", saveScroll);
-
     return () => {
       saveScroll();
       window.removeEventListener("pagehide", saveScroll);
@@ -581,7 +569,6 @@ export default function Page() {
 
   useEffect(() => {
     if (hasRestoredScroll) return;
-
     const saved = readJson<PersistedUiState>(UI_STATE_KEY, {
       mode,
       days,
@@ -611,28 +598,16 @@ export default function Page() {
       const current = best[log.exerciseName];
       const score = log.weightLbs * log.reps;
       const currentScore = current ? current.weightLbs * current.reps : -1;
-
-      if (!current || score > currentScore || (score === currentScore && log.weightLbs > current.weightLbs)) {
-        best[log.exerciseName] = log;
-      }
+      if (!current || score > currentScore || (score === currentScore && log.weightLbs > current.weightLbs)) best[log.exerciseName] = log;
     }
     return best;
   }, [logs]);
 
-  const recentLogs = useMemo(() => {
-    return logs
-      .filter((item) => isWithinLastDays(item.date, 14))
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [logs]);
+  const recentLogs = useMemo(() => logs.filter((item) => isWithinLastDays(item.date, 14)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [logs]);
 
   const recentLogsByDate = useMemo(() => {
     return recentLogs.reduce<Record<string, LogSet[]>>((acc, item) => {
-      const key = new Intl.DateTimeFormat("th-TH", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      }).format(new Date(item.date));
-
+      const key = new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric" }).format(new Date(item.date));
       acc[key] = acc[key] ?? [];
       acc[key].push(item);
       return acc;
@@ -644,24 +619,14 @@ export default function Page() {
   const filteredLibrary = useMemo(() => {
     const keyword = librarySearch.trim().toLowerCase();
     if (!keyword) return exerciseLibrary;
-    return exerciseLibrary.filter(
-      (item) =>
-        item.name.toLowerCase().includes(keyword) ||
-        item.group.toLowerCase().includes(keyword) ||
-        item.movement.toLowerCase().includes(keyword)
-    );
+    return exerciseLibrary.filter((item) => item.name.toLowerCase().includes(keyword) || item.group.toLowerCase().includes(keyword) || item.movement.toLowerCase().includes(keyword));
   }, [librarySearch]);
 
   const filteredExercisePicker = useMemo(() => {
     const keyword = exerciseSearch.trim().toLowerCase();
     return exerciseLibrary.filter((item) => {
       const groupMatch = exerciseGroupFilter === "All" || item.group === exerciseGroupFilter;
-      const keywordMatch =
-        !keyword ||
-        item.name.toLowerCase().includes(keyword) ||
-        item.movement.toLowerCase().includes(keyword) ||
-        item.group.toLowerCase().includes(keyword);
-
+      const keywordMatch = !keyword || item.name.toLowerCase().includes(keyword) || item.movement.toLowerCase().includes(keyword) || item.group.toLowerCase().includes(keyword);
       return groupMatch && keywordMatch;
     });
   }, [exerciseSearch, exerciseGroupFilter]);
@@ -670,10 +635,7 @@ export default function Page() {
     setInputs((old) => {
       const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
       const updated = current.map((set, index) => (index === setIndex ? { ...set, [field]: value } : set));
-      return {
-        ...old,
-        [exerciseId]: updated,
-      };
+      return { ...old, [exerciseId]: updated };
     });
   }
 
@@ -691,13 +653,8 @@ export default function Page() {
       .filter((item) => item.weightLbs > 0 && item.reps > 0);
 
     if (validSets.length === 0) return;
-
     setLogs((old) => [...old, ...validSets]);
-
-    setInputs((old) => ({
-      ...old,
-      [exercise.id]: createDefaultSetInputs(exercise.sets),
-    }));
+    setInputs((old) => ({ ...old, [exercise.id]: createDefaultSetInputs(exercise.sets) }));
   }
 
   function clearHistory() {
@@ -711,6 +668,50 @@ export default function Page() {
     setSelectedCustomPlanId(plan.id);
     setSelectedCustomDay(0);
     setMode("custom");
+  }
+
+  function savePlanFromChat(plan: CustomPlan) {
+    const savedPlan = {
+      ...plan,
+      id: makeId("plan"),
+      name: plan.name,
+      days: plan.days.map((dayItem) => ({
+        ...dayItem,
+        id: makeId("day"),
+        exercises: dayItem.exercises.map((exercise) => ({ ...exercise, id: makeId("ex") })),
+      })),
+    };
+
+    setCustomPlans((old) => [...old, savedPlan]);
+    setSelectedCustomPlanId(savedPlan.id);
+    setSelectedCustomDay(0);
+    setMode("custom");
+
+    const confirmation: ChatMessage = {
+      id: makeId("msg"),
+      role: "assistant",
+      content: `Saved: ${savedPlan.name}. เปิดไปที่ Custom แล้วเลือกตารางนี้ได้เลย`,
+    };
+    setChatMessages((old) => [...old, confirmation]);
+  }
+
+  function sendCoachMessage() {
+    const text = chatInput.trim();
+    if (!text) return;
+
+    const userMessage: ChatMessage = { id: makeId("msg"), role: "user", content: text };
+    const generatedPlan = buildCoachPlanFromText(text);
+    const targetGroups = inferGroupsFromText(text);
+    const response: ChatMessage = {
+      id: makeId("msg"),
+      role: "assistant",
+      content:
+        `จัดให้แล้วจากเป้าหมาย: ${targetGroups.join(", ")}\n\n${summarizePlan(generatedPlan)}\n\nกด Save Plan เพื่อบันทึกตารางนี้เข้า Custom ได้เลย`,
+      plan: generatedPlan,
+    };
+
+    setChatMessages((old) => [...old, userMessage, response]);
+    setChatInput("");
   }
 
   function updateCustomPlanName(name: string) {
@@ -727,7 +728,6 @@ export default function Page() {
       setSelectedCustomDay(0);
       return;
     }
-
     const nextPlans = customPlans.filter((plan) => plan.id !== selectedCustomPlan.id);
     setCustomPlans(nextPlans);
     setSelectedCustomPlanId(nextPlans[0]?.id ?? null);
@@ -736,113 +736,63 @@ export default function Page() {
 
   function addCustomDay() {
     if (!selectedCustomPlan) return;
-
     const newDay = makeDay(`Custom Day ${selectedCustomPlan.days.length + 1}`, "Choose target muscles then press Recommend", ["Chest"], []);
-    setCustomPlans((old) =>
-      old.map((plan) => (plan.id === selectedCustomPlan.id ? { ...plan, days: [...plan.days, newDay] } : plan))
-    );
+    setCustomPlans((old) => old.map((plan) => (plan.id === selectedCustomPlan.id ? { ...plan, days: [...plan.days, newDay] } : plan)));
     setSelectedCustomDay(selectedCustomPlan.days.length);
   }
 
   function updateCustomDay(dayId: string, updater: (day: DayPlan) => DayPlan) {
     if (!selectedCustomPlan) return;
-
     setCustomPlans((old) =>
       old.map((plan) =>
-        plan.id === selectedCustomPlan.id
-          ? {
-              ...plan,
-              days: plan.days.map((item) => (item.id === dayId ? updater(item) : item)),
-            }
-          : plan
+        plan.id === selectedCustomPlan.id ? { ...plan, days: plan.days.map((item) => (item.id === dayId ? updater(item) : item)) } : plan
       )
     );
   }
 
   function deleteCustomDay(dayId: string) {
     if (!selectedCustomPlan) return;
-
     const nextDays = selectedCustomPlan.days.filter((item) => item.id !== dayId);
     const safeDays = nextDays.length > 0 ? nextDays : [makeDay("Custom Day 1", "Choose target muscles then press Recommend", ["Chest"], [])];
-
-    setCustomPlans((old) =>
-      old.map((plan) => (plan.id === selectedCustomPlan.id ? { ...plan, days: safeDays } : plan))
-    );
+    setCustomPlans((old) => old.map((plan) => (plan.id === selectedCustomPlan.id ? { ...plan, days: safeDays } : plan)));
     setSelectedCustomDay(0);
   }
 
   function toggleDayFocus(group: MuscleGroup) {
     if (!day) return;
-
     updateCustomDay(day.id, (current) => {
       const exists = current.focus.includes(group);
       const nextFocus = exists ? current.focus.filter((item) => item !== group) : [...current.focus, group];
-
-      return {
-        ...current,
-        focus: nextFocus.length > 0 ? nextFocus : [group],
-      };
+      return { ...current, focus: nextFocus.length > 0 ? nextFocus : [group] };
     });
   }
 
   function recommendIntoCurrentDay() {
     if (!day || mode !== "custom") return;
-
-    const recommended = recommendForGroups(day.focus);
-
-    updateCustomDay(day.id, (current) => ({
-      ...current,
-      subtitle: "Recommended from Jeff-inspired movement order",
-      exercises: recommended,
-    }));
+    updateCustomDay(day.id, (current) => ({ ...current, subtitle: "Recommended from Jeff-inspired movement order", exercises: recommendForGroups(day.focus) }));
   }
 
   function addExerciseToCurrentDay(name: string) {
     if (!day || mode !== "custom") return;
-
     const exercise = toPlanExercise(name);
-    updateCustomDay(day.id, (current) => ({
-      ...current,
-      exercises: [...current.exercises, exercise],
-    }));
+    updateCustomDay(day.id, (current) => ({ ...current, exercises: [...current.exercises, exercise] }));
   }
 
   function removeExerciseFromCurrentDay(exerciseId: string) {
     if (!day || mode !== "custom") return;
-
-    updateCustomDay(day.id, (current) => ({
-      ...current,
-      exercises: current.exercises.filter((item) => item.id !== exerciseId),
-    }));
+    updateCustomDay(day.id, (current) => ({ ...current, exercises: current.exercises.filter((item) => item.id !== exerciseId) }));
   }
 
   function updateCustomExercise(exerciseId: string, patch: Partial<PlanExercise>) {
     if (!day || mode !== "custom") return;
-
-    updateCustomDay(day.id, (current) => ({
-      ...current,
-      exercises: current.exercises.map((item) => (item.id === exerciseId ? { ...item, ...patch } : item)),
-    }));
+    updateCustomDay(day.id, (current) => ({ ...current, exercises: current.exercises.map((item) => (item.id === exerciseId ? { ...item, ...patch } : item)) }));
   }
 
   function substituteExercise(currentExercise: PlanExercise, newName: string) {
     const next = toPlanExercise(newName);
-
     if (mode === "custom") {
-      updateCustomExercise(currentExercise.id, {
-        name: next.name,
-        group: next.group,
-        movement: next.movement,
-        muscles: next.muscles,
-        reps: next.reps,
-        sets: next.sets,
-        warmup: next.warmup,
-      });
-      return;
+      updateCustomExercise(currentExercise.id, { name: next.name, group: next.group, movement: next.movement, muscles: next.muscles, reps: next.reps, sets: next.sets, warmup: next.warmup });
     }
-
-    // preset substitution is session-only
-    currentExercise.name = next.name;
   }
 
   return (
@@ -860,16 +810,10 @@ export default function Page() {
           </div>
 
           <div className="flex gap-2">
-            <button
-              onClick={() => setShowHistory((value) => !value)}
-              className="rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold"
-            >
+            <button onClick={() => setShowHistory((value) => !value)} className="rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold">
               History
             </button>
-            <button
-              onClick={() => setShowLibrary((value) => !value)}
-              className="rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold"
-            >
+            <button onClick={() => setShowLibrary((value) => !value)} className="rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold">
               Library
             </button>
           </div>
@@ -877,43 +821,33 @@ export default function Page() {
       </section>
 
       <section className="mx-auto max-w-5xl px-4 py-4">
-        <div className="grid gap-3 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 md:grid-cols-[1fr_0.7fr]">
+        <div className="grid gap-3 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 md:grid-cols-[1fr_0.75fr]">
           <div>
-            <p className="text-sm text-zinc-400">Preset splits + custom builder</p>
+            <p className="text-sm text-zinc-400">Preset + Custom + AI Coach</p>
             <h2 className="mt-1 text-2xl font-black">Build your own split</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Use preset 3/4/5 day splits or create custom days, choose exercises yourself, and use Recommend to auto build from Jeff-inspired movement order.
+              Use preset splits, custom builder, or chat with HA IT Coach to generate a plan and save it directly.
             </p>
           </div>
 
           <div className="grid gap-2">
-            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-zinc-950 p-2">
-              <button
-                onClick={() => setMode("preset")}
-                className={`rounded-2xl py-3 text-sm font-black ${mode === "preset" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}
-              >
-                Preset
-              </button>
-              <button
-                onClick={() => setMode("custom")}
-                className={`rounded-2xl py-3 text-sm font-black ${mode === "custom" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}
-              >
-                Custom
-              </button>
+            <div className="grid grid-cols-3 gap-2 rounded-2xl bg-zinc-950 p-2">
+              {[
+                ["preset", "Preset"],
+                ["custom", "Custom"],
+                ["coach", "Coach"],
+              ].map(([key, label]) => (
+                <button key={key} onClick={() => setMode(key as AppMode)} className={`rounded-2xl py-3 text-sm font-black ${mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+                  {label}
+                </button>
+              ))}
             </div>
 
             {mode === "preset" ? (
               <div className="rounded-2xl bg-zinc-950 p-3">
                 <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Training days</label>
                 <div className="relative">
-                  <select
-                    value={days}
-                    onChange={(event) => {
-                      setDays(Number(event.target.value) as 3 | 4 | 5);
-                      setSelectedDay(0);
-                    }}
-                    className="w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-black outline-none"
-                  >
+                  <select value={days} onChange={(event) => { setDays(Number(event.target.value) as 3 | 4 | 5); setSelectedDay(0); }} className="w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-black outline-none">
                     <option value={3}>3 days Full Body</option>
                     <option value={4}>4 days Upper / Lower</option>
                     <option value={5}>5 days Split</option>
@@ -921,57 +855,83 @@ export default function Page() {
                   <ChevronDown className="pointer-events-none absolute right-4 top-4 text-zinc-400" size={20} />
                 </div>
               </div>
-            ) : (
+            ) : mode === "custom" ? (
               <div className="rounded-2xl bg-zinc-950 p-3">
                 <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Custom plan</label>
                 <div className="relative">
-                  <select
-                    value={selectedCustomPlan?.id ?? ""}
-                    onChange={(event) => {
-                      setSelectedCustomPlanId(event.target.value);
-                      setSelectedCustomDay(0);
-                    }}
-                    className="w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-black outline-none"
-                  >
-                    {customPlans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name}
-                      </option>
-                    ))}
+                  <select value={selectedCustomPlan?.id ?? ""} onChange={(event) => { setSelectedCustomPlanId(event.target.value); setSelectedCustomDay(0); }} className="w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-black outline-none">
+                    {customPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
                   </select>
                   <ChevronDown className="pointer-events-none absolute right-4 top-4 text-zinc-400" size={20} />
                 </div>
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-zinc-950 p-3">
+                <p className="text-xs font-bold uppercase text-emerald-300">HA IT Coach</p>
+                <p className="mt-1 text-sm text-zinc-400">Generate a plan from chat, then save to Custom.</p>
               </div>
             )}
           </div>
         </div>
 
+        {mode === "coach" && (
+          <div className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-2xl bg-emerald-400 p-3 text-zinc-950">
+                <Bot size={22} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black">HA IT Coach</h3>
+                <p className="text-sm text-zinc-400">Rule-based AI coach inside the app. It can generate and save plans without an API key.</p>
+              </div>
+            </div>
+
+            <div className="max-h-[520px] space-y-3 overflow-y-auto rounded-3xl bg-zinc-950 p-3">
+              {chatMessages.map((message) => (
+                <div key={message.id} className={`rounded-3xl p-3 ${message.role === "user" ? "ml-8 bg-emerald-400 text-zinc-950" : "mr-8 bg-zinc-900 text-zinc-100"}`}>
+                  <p className="mb-1 flex items-center gap-2 text-xs font-black uppercase opacity-70">
+                    {message.role === "assistant" ? <Bot size={14} /> : <MessageCircle size={14} />}
+                    {message.role === "assistant" ? "HA IT Coach" : "You"}
+                  </p>
+                  <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
+                  {message.plan && (
+                    <button onClick={() => savePlanFromChat(message.plan!)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-zinc-950">
+                      <Save size={16} /> Save Plan to Custom
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-3 grid gap-2">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {[
+                  "จัด 4 วัน เน้น hypertrophy แขนไม่เบา",
+                  "ทำ 5 วัน แต่ขาแค่วันเดียว",
+                  "จัด 3 วัน full body เล่นไม่เกิน 1 ชั่วโมง",
+                ].map((prompt) => (
+                  <button key={prompt} onClick={() => setChatInput(prompt)} className="min-w-fit rounded-full bg-zinc-950 px-3 py-2 text-xs font-bold text-zinc-300">
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-end gap-2">
+                <textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="พิมพ์เป้าหมาย เช่น จัด 4 วัน เน้นอกหลัง แขนไม่เบา" className="min-h-[56px] flex-1 rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none focus:border-emerald-400" />
+                <button onClick={sendCoachMessage} className="rounded-2xl bg-emerald-400 p-4 text-zinc-950">
+                  <Send size={20} />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {mode === "preset" && days === 5 && (
           <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
             <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
             <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => {
-                  setFiveDayMode("twoLegDays");
-                  setSelectedDay(0);
-                }}
-                className={`rounded-2xl px-3 py-3 text-sm font-black ${
-                  fiveDayMode === "twoLegDays" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
-                }`}
-              >
-                2 Leg Days
-              </button>
-              <button
-                onClick={() => {
-                  setFiveDayMode("oneLegDay");
-                  setSelectedDay(0);
-                }}
-                className={`rounded-2xl px-3 py-3 text-sm font-black ${
-                  fiveDayMode === "oneLegDay" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
-                }`}
-              >
-                1 Leg Day
-              </button>
+              <button onClick={() => { setFiveDayMode("twoLegDays"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "twoLegDays" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"}`}>2 Leg Days</button>
+              <button onClick={() => { setFiveDayMode("oneLegDay"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "oneLegDay" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"}`}>1 Leg Day</button>
             </div>
           </div>
         )}
@@ -980,27 +940,14 @@ export default function Page() {
           <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <h3 className="flex items-center gap-2 text-lg font-black">
-                  <ClipboardList size={18} /> History Log
-                </h3>
+                <h3 className="flex items-center gap-2 text-lg font-black"><ClipboardList size={18} /> History Log</h3>
                 <p className="mt-1 text-sm text-zinc-400">Temporary record from the last 14 days only.</p>
               </div>
-
-              {recentLogs.length > 0 && (
-                <button
-                  onClick={clearHistory}
-                  className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300"
-                  aria-label="Clear history"
-                >
-                  <Trash2 size={18} />
-                </button>
-              )}
+              {recentLogs.length > 0 && <button onClick={clearHistory} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Clear history"><Trash2 size={18} /></button>}
             </div>
 
             {recentLogs.length === 0 ? (
-              <div className="rounded-2xl bg-zinc-950 p-4 text-sm text-zinc-400">
-                No workout log yet. Save working sets first.
-              </div>
+              <div className="rounded-2xl bg-zinc-950 p-4 text-sm text-zinc-400">No workout log yet. Save working sets first.</div>
             ) : (
               <div className="max-h-[420px] space-y-4 overflow-y-auto pr-1">
                 {Object.entries(recentLogsByDate).map(([date, items]) => (
@@ -1014,9 +961,7 @@ export default function Page() {
                               <p className="font-bold leading-tight">{item.exerciseName}</p>
                               <p className="mt-1 text-xs text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
                             </div>
-                            <p className="whitespace-nowrap text-sm font-black text-emerald-300">
-                              {item.weightLbs} lbs × {item.reps}
-                            </p>
+                            <p className="whitespace-nowrap text-sm font-black text-emerald-300">{item.weightLbs} lbs × {item.reps}</p>
                           </div>
                         </div>
                       ))}
@@ -1032,33 +977,19 @@ export default function Page() {
           <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
             <div className="mb-4 flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-3 py-2">
               <Search size={18} className="text-zinc-500" />
-              <input
-                value={librarySearch}
-                onChange={(event) => setLibrarySearch(event.target.value)}
-                placeholder="Search exercise, movement or muscle"
-                className="w-full bg-transparent py-2 outline-none"
-              />
+              <input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Search exercise, movement or muscle" className="w-full bg-transparent py-2 outline-none" />
             </div>
 
             <div className="max-h-96 overflow-y-auto pr-1">
               {allGroups.map((group) => {
                 const names = filteredLibrary.filter((item) => item.group === group);
                 if (names.length === 0) return null;
-
                 return (
                   <div key={group} className="mb-5">
-                    <h3 className="mb-2 flex items-center gap-2 text-sm font-black text-emerald-300">
-                      <Library size={14} /> {group}
-                    </h3>
+                    <h3 className="mb-2 flex items-center gap-2 text-sm font-black text-emerald-300"><Library size={14} /> {group}</h3>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {names.map((item) => (
-                        <a
-                          key={item.name}
-                          href={youtubeSearch(`${item.name} proper form`)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-2xl bg-zinc-950 px-3 py-3 text-sm text-zinc-300"
-                        >
+                        <a key={item.name} href={youtubeSearch(`${item.name} proper form`)} target="_blank" rel="noreferrer" className="rounded-2xl bg-zinc-950 px-3 py-3 text-sm text-zinc-300">
                           <span className="font-bold">{item.name}</span>
                           <span className="ml-2 text-xs text-zinc-500">{item.movement}</span>
                         </a>
@@ -1076,97 +1007,53 @@ export default function Page() {
             <div className="mb-4 flex items-center justify-between gap-3">
               <div className="flex-1">
                 <label className="mb-2 block text-xs font-bold uppercase text-emerald-300">Custom builder</label>
-                <input
-                  value={selectedCustomPlan.name}
-                  onChange={(event) => updateCustomPlanName(event.target.value)}
-                  className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-base font-black outline-none"
-                />
+                <input value={selectedCustomPlan.name} onChange={(event) => updateCustomPlanName(event.target.value)} className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-base font-black outline-none" />
               </div>
-
-              <button
-                onClick={deleteCustomPlan}
-                className="mt-6 rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300"
-                aria-label="Delete plan"
-              >
-                <Trash2 size={18} />
-              </button>
+              <button onClick={deleteCustomPlan} className="mt-6 rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Delete plan"><Trash2 size={18} /></button>
             </div>
 
             <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={createNewCustomPlan}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-zinc-950 px-3 py-3 text-sm font-black text-zinc-300"
-              >
-                <Plus size={16} /> New Plan
-              </button>
-              <button
-                onClick={addCustomDay}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-3 py-3 text-sm font-black text-zinc-950"
-              >
-                <Plus size={16} /> Add Day
-              </button>
+              <button onClick={createNewCustomPlan} className="flex items-center justify-center gap-2 rounded-2xl bg-zinc-950 px-3 py-3 text-sm font-black text-zinc-300"><Plus size={16} /> New Plan</button>
+              <button onClick={addCustomDay} className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-3 py-3 text-sm font-black text-zinc-950"><Plus size={16} /> Add Day</button>
             </div>
           </div>
         )}
 
-        <div className="mt-4 flex snap-x gap-2 overflow-x-auto pb-2">
-          {activePlan.map((item, index) => (
-            <button
-              key={item.id}
-              onClick={() => (mode === "preset" ? setSelectedDay(index) : setSelectedCustomDay(index))}
-              className={`min-w-[180px] snap-start rounded-3xl px-4 py-3 text-left transition ${
-                activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"
-              }`}
-            >
-              <CalendarDays size={16} />
-              <p className="mt-2 font-black">{item.title}</p>
-              <p className="mt-1 text-xs opacity-80">{item.subtitle}</p>
-            </button>
-          ))}
-        </div>
+        {mode !== "coach" && (
+          <div className="mt-4 flex snap-x gap-2 overflow-x-auto pb-2">
+            {activePlan.map((item, index) => (
+              <button key={item.id} onClick={() => (mode === "preset" ? setSelectedDay(index) : setSelectedCustomDay(index))} className={`min-w-[180px] snap-start rounded-3xl px-4 py-3 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+                <CalendarDays size={16} />
+                <p className="mt-2 font-black">{item.title}</p>
+                <p className="mt-1 text-xs opacity-80">{item.subtitle}</p>
+              </button>
+            ))}
+          </div>
+        )}
 
-        {day && (
+        {mode !== "coach" && day && (
           <>
             <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
               {mode === "custom" ? (
                 <div className="mb-4 grid gap-3">
                   <div className="flex items-center gap-2">
                     <Pencil size={16} className="text-zinc-500" />
-                    <input
-                      value={day.title}
-                      onChange={(event) => updateCustomDay(day.id, (current) => ({ ...current, title: event.target.value }))}
-                      className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-xl font-black outline-none"
-                    />
-                    <button
-                      onClick={() => deleteCustomDay(day.id)}
-                      className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300"
-                      aria-label="Delete day"
-                    >
-                      <MinusCircle size={18} />
-                    </button>
+                    <input value={day.title} onChange={(event) => updateCustomDay(day.id, (current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-xl font-black outline-none" />
+                    <button onClick={() => deleteCustomDay(day.id)} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Delete day"><MinusCircle size={18} /></button>
                   </div>
 
                   <div>
                     <p className="mb-2 text-xs font-bold uppercase text-zinc-500">Target muscles</p>
                     <div className="flex flex-wrap gap-2">
                       {allGroups.map((group) => (
-                        <button
-                          key={group}
-                          onClick={() => toggleDayFocus(group)}
-                          className={`rounded-full px-3 py-2 text-xs font-bold ${
-                            day.focus.includes(group) ? "bg-emerald-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
-                          }`}
-                        >
+                        <button key={group} onClick={() => toggleDayFocus(group)} className={`rounded-full px-3 py-2 text-xs font-bold ${day.focus.includes(group) ? "bg-emerald-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
                           {group}
                         </button>
                       ))}
                     </div>
                   </div>
 
-                  <button
-                    onClick={recommendIntoCurrentDay}
-                    className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-4 text-base font-black text-zinc-950"
-                  >
+                  <button onClick={recommendIntoCurrentDay} className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-4 text-base font-black text-zinc-950">
                     <Sparkles size={18} /> Recommend from Jeff-inspired order
                   </button>
                 </div>
@@ -1179,9 +1066,7 @@ export default function Page() {
 
               <div className="mt-3 flex flex-wrap gap-2">
                 {day.focus.map((focus) => (
-                  <span key={focus} className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-300">
-                    {focus}
-                  </span>
+                  <span key={focus} className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-300">{focus}</span>
                 ))}
               </div>
             </div>
@@ -1207,47 +1092,24 @@ export default function Page() {
 
             {mode === "custom" && (
               <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-base font-black">
-                  <Plus size={16} /> Add exercise
-                </h3>
-
+                <h3 className="mb-3 flex items-center gap-2 text-base font-black"><Plus size={16} /> Add exercise</h3>
                 <div className="grid gap-2 sm:grid-cols-[0.8fr_1fr]">
-                  <select
-                    value={exerciseGroupFilter}
-                    onChange={(event) => setExerciseGroupFilter(event.target.value as MuscleGroup | "All")}
-                    className="rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm font-bold outline-none"
-                  >
+                  <select value={exerciseGroupFilter} onChange={(event) => setExerciseGroupFilter(event.target.value as MuscleGroup | "All")} className="rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm font-bold outline-none">
                     <option value="All">All groups</option>
-                    {allGroups.map((group) => (
-                      <option key={group} value={group}>
-                        {group}
-                      </option>
-                    ))}
+                    {allGroups.map((group) => <option key={group} value={group}>{group}</option>)}
                   </select>
-
                   <div className="flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-3 py-2">
                     <Search size={16} className="text-zinc-500" />
-                    <input
-                      value={exerciseSearch}
-                      onChange={(event) => setExerciseSearch(event.target.value)}
-                      placeholder="Search exercise"
-                      className="w-full bg-transparent py-2 text-sm outline-none"
-                    />
+                    <input value={exerciseSearch} onChange={(event) => setExerciseSearch(event.target.value)} placeholder="Search exercise" className="w-full bg-transparent py-2 text-sm outline-none" />
                   </div>
                 </div>
 
                 <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
                   {filteredExercisePicker.map((item) => (
-                    <button
-                      key={item.name}
-                      onClick={() => addExerciseToCurrentDay(item.name)}
-                      className="flex w-full items-center justify-between gap-3 rounded-2xl bg-zinc-950 px-3 py-3 text-left"
-                    >
+                    <button key={item.name} onClick={() => addExerciseToCurrentDay(item.name)} className="flex w-full items-center justify-between gap-3 rounded-2xl bg-zinc-950 px-3 py-3 text-left">
                       <span>
                         <span className="block font-bold">{item.name}</span>
-                        <span className="text-xs text-zinc-500">
-                          {item.group} · {item.movement} · {item.tier}
-                        </span>
+                        <span className="text-xs text-zinc-500">{item.group} · {item.movement} · {item.tier}</span>
                       </span>
                       <Plus size={18} className="text-emerald-300" />
                     </button>
@@ -1272,77 +1134,34 @@ export default function Page() {
                           <span className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-bold text-zinc-400">#{index + 1}</span>
                           <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">{exercise.group}</span>
                           <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">{exercise.movement}</span>
-                          {exercise.warmup ? (
-                            <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300">
-                              <Flame className="mr-1 inline" size={12} /> Warmup
-                            </span>
-                          ) : (
-                            <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">No warmup</span>
-                          )}
+                          {exercise.warmup ? <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300"><Flame className="mr-1 inline" size={12} /> Warmup</span> : <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">No warmup</span>}
                         </div>
 
                         <h3 className="mt-3 text-2xl font-black leading-tight">{exercise.name}</h3>
-                        <p className="mt-1 text-sm text-zinc-400">
-                          Target: {exercise.sets} hard working sets × {exercise.reps} reps
-                        </p>
+                        <p className="mt-1 text-sm text-zinc-400">Target: {exercise.sets} hard working sets × {exercise.reps} reps</p>
                       </div>
 
                       <div className="flex flex-col gap-2">
-                        <a
-                          href={youtubeSearch(`${exercise.name} proper form`)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-2xl bg-zinc-50 p-3 text-zinc-950"
-                          aria-label="Watch demo"
-                        >
-                          <PlayCircle size={22} />
-                        </a>
-
-                        {mode === "custom" && (
-                          <button
-                            onClick={() => removeExerciseFromCurrentDay(exercise.id)}
-                            className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300"
-                            aria-label="Remove exercise"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
+                        <a href={youtubeSearch(`${exercise.name} proper form`)} target="_blank" rel="noreferrer" className="rounded-2xl bg-zinc-50 p-3 text-zinc-950" aria-label="Watch demo"><PlayCircle size={22} /></a>
+                        {mode === "custom" && <button onClick={() => removeExerciseFromCurrentDay(exercise.id)} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Remove exercise"><Trash2 size={18} /></button>}
                       </div>
                     </div>
 
                     <div className="mb-4 flex flex-wrap gap-2">
-                      {exercise.muscles.map((muscle) => (
-                        <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">
-                          {muscle}
-                        </span>
-                      ))}
+                      {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
                     </div>
 
                     {mode === "custom" && (
                       <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-950 p-3">
                         <div>
                           <label className="mb-1 block text-xs font-bold text-zinc-500">Sets</label>
-                          <input
-                            inputMode="numeric"
-                            value={exercise.sets}
-                            onChange={(event) => updateCustomExercise(exercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })}
-                            className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none"
-                          />
+                          <input inputMode="numeric" value={exercise.sets} onChange={(event) => updateCustomExercise(exercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none" />
                         </div>
                         <div>
                           <label className="mb-1 block text-xs font-bold text-zinc-500">Reps</label>
-                          <input
-                            value={exercise.reps}
-                            onChange={(event) => updateCustomExercise(exercise.id, { reps: event.target.value })}
-                            className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none"
-                          />
+                          <input value={exercise.reps} onChange={(event) => updateCustomExercise(exercise.id, { reps: event.target.value })} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none" />
                         </div>
-                        <button
-                          onClick={() => updateCustomExercise(exercise.id, { warmup: !exercise.warmup })}
-                          className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${
-                            exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
-                          }`}
-                        >
+                        <button onClick={() => updateCustomExercise(exercise.id, { warmup: !exercise.warmup })} className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
                           Warmup
                         </button>
                       </div>
@@ -1350,23 +1169,10 @@ export default function Page() {
 
                     {alternatives.length > 0 && (
                       <div className="mb-4 rounded-2xl bg-zinc-950 p-3">
-                        <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
-                          <RotateCcw size={14} /> Same pattern substitutions
-                        </label>
-                        <select
-                          value={exercise.name}
-                          onChange={(event) => {
-                            if (mode === "custom") {
-                              substituteExercise(exercise, event.target.value);
-                            }
-                          }}
-                          disabled={mode !== "custom"}
-                          className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none disabled:opacity-60"
-                        >
+                        <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><RotateCcw size={14} /> Same pattern substitutions</label>
+                        <select value={exercise.name} onChange={(event) => { if (mode === "custom") substituteExercise(exercise, event.target.value); }} disabled={mode !== "custom"} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none disabled:opacity-60">
                           <option>{exercise.name}</option>
-                          {alternatives.map((name) => (
-                            <option key={name}>{name}</option>
-                          ))}
+                          {alternatives.map((name) => <option key={name}>{name}</option>)}
                         </select>
                         {mode !== "custom" && <p className="mt-2 text-xs text-zinc-500">Substitution editing is available in Custom mode.</p>}
                       </div>
@@ -1374,80 +1180,38 @@ export default function Page() {
 
                     <div className="mb-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
-                          <Trophy size={14} /> Current PR
-                        </p>
-                        <p className="mt-2 text-2xl font-black text-emerald-300">
-                          {pr ? `${pr.weightLbs} lbs × ${pr.reps}` : "No record"}
-                        </p>
+                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><Trophy size={14} /> Current PR</p>
+                        <p className="mt-2 text-2xl font-black text-emerald-300">{pr ? `${pr.weightLbs} lbs × ${pr.reps}` : "No record"}</p>
                       </div>
-
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
-                          <BarChart3 size={14} /> Warmup from PR
-                        </p>
+                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><BarChart3 size={14} /> Warmup from PR</p>
                         {exercise.warmup ? (
                           warmups.length > 0 ? (
                             <div className="mt-2 space-y-1 text-sm">
-                              {warmups.map((item) => (
-                                <p key={item.label}>
-                                  <span className="text-zinc-500">{item.label}:</span>{" "}
-                                  <span className="font-bold">{item.weight} lbs</span>{" "}
-                                  <span className="text-zinc-400">× {item.reps}</span>
-                                </p>
-                              ))}
+                              {warmups.map((item) => <p key={item.label}><span className="text-zinc-500">{item.label}:</span> <span className="font-bold">{item.weight} lbs</span> <span className="text-zinc-400">× {item.reps}</span></p>)}
                             </div>
-                          ) : (
-                            <p className="mt-2 text-sm text-zinc-400">Save a PR first</p>
-                          )
-                        ) : (
-                          <p className="mt-2 text-sm text-zinc-400">Skip specific warmup</p>
-                        )}
+                          ) : <p className="mt-2 text-sm text-zinc-400">Save a PR first</p>
+                        ) : <p className="mt-2 text-sm text-zinc-400">Skip specific warmup</p>}
                       </div>
                     </div>
 
                     <div className="rounded-2xl bg-zinc-950 p-3">
                       <div className="mb-3 grid grid-cols-[46px_1fr_1fr_42px] gap-2 text-xs font-bold uppercase text-zinc-500">
-                        <span>Set</span>
-                        <span>lbs</span>
-                        <span>Reps</span>
-                        <span>Done</span>
+                        <span>Set</span><span>lbs</span><span>Reps</span><span>Done</span>
                       </div>
-
                       <div className="space-y-2">
                         {setInputs.map((set, setIndex) => (
                           <div key={setIndex} className="grid grid-cols-[46px_1fr_1fr_42px] gap-2">
                             <div className="flex items-center font-black text-zinc-400">{setIndex + 1}</div>
-                            <input
-                              inputMode="decimal"
-                              value={set.weightLbs}
-                              onChange={(event) => updateSet(exercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)}
-                              className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400"
-                              placeholder={pr?.weightLbs ? String(pr.weightLbs) : "135"}
-                            />
-                            <input
-                              inputMode="numeric"
-                              value={set.reps}
-                              onChange={(event) => updateSet(exercise.id, setIndex, "reps", event.target.value, exercise.sets)}
-                              className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400"
-                              placeholder="8"
-                            />
-                            <button
-                              onClick={() => updateSet(exercise.id, setIndex, "done", !set.done, exercise.sets)}
-                              className={`rounded-2xl border ${
-                                set.done ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-700 bg-zinc-900 text-zinc-500"
-                              }`}
-                            >
+                            <input inputMode="decimal" value={set.weightLbs} onChange={(event) => updateSet(exercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={pr?.weightLbs ? String(pr.weightLbs) : "135"} />
+                            <input inputMode="numeric" value={set.reps} onChange={(event) => updateSet(exercise.id, setIndex, "reps", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder="8" />
+                            <button onClick={() => updateSet(exercise.id, setIndex, "done", !set.done, exercise.sets)} className={`rounded-2xl border ${set.done ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-700 bg-zinc-900 text-zinc-500"}`}>
                               <Check size={18} className="mx-auto" />
                             </button>
                           </div>
                         ))}
                       </div>
-
-                      <button
-                        onClick={() => saveAllSets(exercise)}
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-4 text-base font-black text-zinc-950 active:scale-[0.99]"
-                      >
+                      <button onClick={() => saveAllSets(exercise)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-4 text-base font-black text-zinc-950 active:scale-[0.99]">
                         <Save size={18} /> Save all working sets
                       </button>
                     </div>
@@ -1460,39 +1224,17 @@ export default function Page() {
       </section>
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
-        {mode === "preset" ? (
-          <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
-            {[3, 4, 5].map((item) => (
-              <button
-                key={item}
-                onClick={() => {
-                  setDays(item as 3 | 4 | 5);
-                  setSelectedDay(0);
-                }}
-                className={`rounded-2xl py-3 text-sm font-black ${
-                  days === item ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"
-                }`}
-              >
-                {item} Days
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-2">
-            <button
-              onClick={() => setMode("preset")}
-              className="rounded-2xl bg-zinc-900 py-3 text-sm font-black text-zinc-300"
-            >
-              Preset
+        <div className="mx-auto grid max-w-5xl grid-cols-3 gap-2">
+          {[
+            ["preset", "Preset"],
+            ["custom", "Custom"],
+            ["coach", "Coach"],
+          ].map(([key, label]) => (
+            <button key={key} onClick={() => setMode(key as AppMode)} className={`rounded-2xl py-3 text-sm font-black ${mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+              {label}
             </button>
-            <button
-              onClick={() => setMode("custom")}
-              className="rounded-2xl bg-emerald-400 py-3 text-sm font-black text-zinc-950"
-            >
-              Custom
-            </button>
-          </div>
-        )}
+          ))}
+        </div>
       </nav>
     </main>
   );

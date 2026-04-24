@@ -1,30 +1,23 @@
-# HA IT Full Custom Builder Update
+# HA IT AI Coach Update
 
 ## New
-- Full fresh Next.js project files
-- HA IT branding and favicon
-- Preset mode: 3 / 4 / 5 day splits
-- 5 day split can be 2 leg days or 1 leg day
-- Custom mode
-- Create multiple custom plans
-- Add/delete custom days
-- Select target muscle groups
-- Recommend button builds a day using Jeff-inspired movement order
-- Add exercises manually from the gym library
-- Edit sets, reps and warmup per custom exercise
-- Same-pattern substitution in custom mode
-- Multi-set logging
-- 14-day temporary history log
+- Full project files
+- Preset mode
+- Custom builder
+- Coach mode with local rule-based AI chat
+- Users can chat to generate a workout plan
+- Generated chat plan can be saved directly into Custom
+- No API key needed
 - PR tracking
-- Warmup calculator from previous best weight
+- Warmup calculator
+- 14-day history
 - Weekly hard set checker
-- Mobile-first UI
-- Screen state persistence with sessionStorage
+- HA IT branding and favicon
 
-## Upload to GitHub
-Replace your repo files with everything in this ZIP.
+## Important
+This is a local rule-based coach, not a real OpenAI API integration. It works on Vercel without server keys.
 
-Important:
-- Delete old postcss.config.js if it exists.
-- Keep only postcss.config.mjs.
-- Then commit and redeploy without cache on Vercel.
+## Upload
+Replace your repo with everything in this ZIP.
+Delete old postcss.config.js if it exists.
+Keep postcss.config.mjs.

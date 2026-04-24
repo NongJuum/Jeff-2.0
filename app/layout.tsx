@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "HA IT",
-  description: "HA IT workout tracker with preset splits, custom builder, recommendations, PRs, warmups and history.",
+  description: "HA IT workout tracker with preset splits, custom builder, AI coach, PRs, warmups and history.",
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [

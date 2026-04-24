@@ -1,7 +1,7 @@
 {
   "name": "HA IT",
   "short_name": "HA IT",
-  "description": "Mobile-first workout tracker with custom split builder, recommendations, PRs and history.",
+  "description": "Mobile-first workout tracker with custom split builder, AI coach, recommendations, PRs and history.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",
