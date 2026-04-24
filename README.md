@@ -93,3 +93,8 @@ Keep postcss.config.mjs.
   - Simple plan adjustment requests
 - Can analyze current selected plan using weekly hard set summary.
 - Can create an adjusted plan and save it to Custom.
+
+## Layout/CSS placement fix
+- Removed incorrect root-level layout.tsx if it contained CSS.
+- Ensured Tailwind import lives only in app/globals.css.
+- Ensured app/layout.tsx is valid TypeScript/React.
