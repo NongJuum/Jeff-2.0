@@ -1552,7 +1552,9 @@ export default function Page() {
                   </div>
 
                   <details className="rounded-2xl bg-zinc-950 p-3">
-                    <summary className="cursor-pointer text-sm font-black text-zinc-300">Day targets & recommendation</summary>
+                    <summary className="cursor-pointer text-sm font-black text-zinc-300">
+                      Day targets & recommendation
+                    </summary>
 
                     <div className="mt-3">
                       <p className="mb-2 text-xs font-bold uppercase text-zinc-500">Target muscles</p>
@@ -1579,7 +1581,7 @@ export default function Page() {
                     </div>
                   </details>
                 </div>
-              ) : () : (
+              ) : (
                 <>
                   <h2 className="text-xl font-black">{day.title}</h2>
                   <p className="mt-1 text-sm text-zinc-400">{day.subtitle}</p>
