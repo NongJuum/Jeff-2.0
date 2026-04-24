@@ -2,31 +2,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
-  Bot,
-  CalendarDays,
+  BarChart3,  CalendarDays,
   Check,
   ChevronDown,
   ClipboardList,
   Dumbbell,
   Flame,
-  Library,
-  MessageCircle,
-  MinusCircle,
+  Library,  MinusCircle,
   Pencil,
   PlayCircle,
   Plus,
   RotateCcw,
   Save,
-  Search,
-  Send,
-  Sparkles,
+  Search,  Sparkles,
   Trash2,
   Trophy,
 } from "lucide-react";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
-type AppMode = "today" | "preset" | "custom" | "coach" | "history" | "library";
+type AppMode = "today" | "preset" | "custom" | "history" | "library";
 
 type Exercise = {
   name: string;
@@ -98,7 +92,6 @@ type PersistedUiState = {
 const UI_STATE_KEY = "haitUiStateV5";
 const SET_INPUTS_KEY = "haitSetInputsV5";
 const CUSTOM_PLANS_KEY = "haitCustomPlansV2";
-const CHAT_KEY = "haitCoachChatV1";
 const SUBSTITUTE_KEY = "haitSubstitutionsV1";
 
 const isBrowser = () => typeof window !== "undefined";
@@ -428,220 +421,28 @@ function inferDayCountFromText(text: string) {
 }
 
 
-function findMentionedExercises(text: string) {
-  const lower = text.toLowerCase();
-  return exerciseLibrary.filter((exercise) => lower.includes(exercise.name.toLowerCase()));
-}
-
-function formatExercisePrescription(name: string) {
-  const exercise = findExercise(name);
-  const prescription = getPrescription(exercise);
-
-  return `${exercise.name}: ${prescription.sets} hard sets × ${prescription.reps} reps${prescription.warmup ? " · warmup recommended" : " · no specific warmup"}`;
-}
-
-function answerCoachQuestion(text: string) {
-  const lower = text.toLowerCase();
-  const mentionedExercises = findMentionedExercises(text);
-
-  const asksSet =
-    lower.includes("set") ||
-    lower.includes("เซต") ||
-    lower.includes("sets") ||
-    lower.includes("กี่เซต") ||
-    lower.includes("workout set") ||
-    lower.includes("working set");
-
-  const asksWarmup =
-    lower.includes("warm") ||
-    lower.includes("วอร์ม") ||
-    lower.includes("warmup") ||
-    lower.includes("warm up");
-
-  const asksSubstitution =
-    lower.includes("แทน") ||
-    lower.includes("สำรอง") ||
-    lower.includes("substitute") ||
-    lower.includes("alternative") ||
-    lower.includes("เครื่องไม่ว่าง");
-
-  const asksVolume =
-    lower.includes("volume") ||
-    lower.includes("เยอะไป") ||
-    lower.includes("น้อยไป") ||
-    lower.includes("พอไหม") ||
-    lower.includes("เพียงพอ") ||
-    lower.includes("ต่อสัปดาห์") ||
-    lower.includes("week");
-
-  const asksWhy =
-    lower.includes("ทำไม") ||
-    lower.includes("why") ||
-    lower.includes("หลัก") ||
-    lower.includes("jeff");
-
-  if (mentionedExercises.length > 0 && asksSet) {
-    return {
-      content:
-        `ได้ ควรดูเป็นรายท่า ไม่ใช่ set เท่ากันหมด\n\n${mentionedExercises
-          .map((exercise) => formatExercisePrescription(exercise.name))
-          .join("\n")}\n\nหลักที่ใช้คือ compound หนักใช้ set พอประมาณเพื่อคุม fatigue ส่วน isolation ที่ recovery ง่ายกว่า เช่น pec deck, lateral raise, curl, cable extension สามารถใช้ 3-4 hard sets ได้`,
-    };
-  }
-
-  if (mentionedExercises.length > 0 && asksSubstitution) {
-    const lines = mentionedExercises.map((exercise) => {
-      const planExercise = toPlanExercise(exercise.name);
-      const alternatives = getAlternatives(planExercise).slice(0, 5);
-      return `${exercise.name} แทนได้ด้วย: ${alternatives.join(", ") || "ไม่มีท่าใกล้เคียงพอใน library"}`;
-    });
-
-    return {
-      content:
-        `ท่าสำรองควรอยู่ movement ใกล้กันและกล้ามเนื้อหลักเดียวกัน\n\n${lines.join("\n")}`,
-    };
-  }
-
-  if (asksWarmup) {
-    return {
-      content:
-        "หลัก warmup ในแอพนี้คือทำเฉพาะท่าหนักหรือ compound ที่เสี่ยง fatigue/technical breakdown เช่น bench, press, squat, row, pulldown, RDL, hip thrust\n\nสูตร warmup จาก PR:\n40% × 8-10 reps\n60% × 5-6 reps\n80% × 2-3 reps\n\nIsolation เช่น pec deck, lateral raise, curl, pressdown ส่วนใหญ่ไม่ต้องมี warmup เฉพาะ แต่อาจทำ feeler set เบาๆ ได้ถ้าข้อต่อยังไม่พร้อม",
-    };
-  }
-
-  if (asksVolume || asksWhy) {
-    return {
-      content:
-        "ถ้าอิงหลัก hypertrophy แบบ Jeff-style ควรดู 3 อย่างพร้อมกัน:\n\n1. Weekly hard sets: กล้ามหลักประมาณ 10-20 sets/week เป็นกรอบกว้าง\n2. Per-session fatigue: อย่ายัดท่าเยอะจนท้าย session กลายเป็น junk volume\n3. Exercise type: compound หนักมัก 2-3 sets, isolation ฟื้นตัวง่ายกว่ามัก 3-4 sets\n\nดังนั้น pec deck 4 sets พอสมเหตุสมผลกว่า 2 sets ถ้าวันนั้นต้องการ chest isolation volume จริง ส่วน RDL/deadlift ไม่ควรดัน 4 sets ง่ายๆ เพราะ fatigue หลังล่างสูง",
-    };
-  }
-
-  if (asksSet) {
-    return {
-      content:
-        "โดยรวมใน HA IT ตอนนี้ใช้หลักนี้:\n\nCompound หลัก: 3 hard sets\nHinge หนัก เช่น RDL/Deadlift: 2 hard sets\nChest isolation เช่น Pec Deck / Seated Cable Pec Flye: 4 hard sets\nLateral raise หลัก: 4 hard sets\nBiceps/Triceps priority เช่น Bayesian Curl / Overhead Cable Ext: 4 hard sets\nArms ทั่วไป: 3 hard sets\nAbs/Calves: 3-4 hard sets\n\nถ้าบอกชื่อท่ามา ผมจะตอบ set/reps ของท่านั้นตรงๆ ได้",
-    };
-  }
-
-  return null;
-}
-
-function shouldGeneratePlan(text: string) {
-  const lower = text.toLowerCase();
-
-  const planWords =
-    lower.includes("จัด") ||
-    lower.includes("สร้าง") ||
-    lower.includes("ทำตาราง") ||
-    lower.includes("ตาราง") ||
-    lower.includes("split") ||
-    lower.includes("program") ||
-    lower.includes("plan") ||
-    lower.includes("routine") ||
-    lower.includes("schedule");
-
-  const dayWords =
-    lower.includes("3 วัน") ||
-    lower.includes("4 วัน") ||
-    lower.includes("5 วัน") ||
-    lower.includes("3 day") ||
-    lower.includes("4 day") ||
-    lower.includes("5 day");
-
-  return planWords || (dayWords && (lower.includes("อยาก") || lower.includes("ขอ") || lower.includes("ทำ")));
-}
 
 
 
-function getVolumeJudgement(muscle: string, sets: number) {
-  if (sets < 6) return `${muscle}: ${sets} sets/week — น้อยไปสำหรับ hypertrophy ส่วนใหญ่`;
-  if (sets < 10) return `${muscle}: ${sets} sets/week — พอได้ถ้าเป็นกล้ามรองหรือ recovery ต่ำ แต่ถ้าอยากโตควรเพิ่ม`;
-  if (sets <= 20) return `${muscle}: ${sets} sets/week — อยู่ในโซนสมเหตุสมผล`;
-  return `${muscle}: ${sets} sets/week — อาจเยอะไป ถ้าคุณเริ่มล้า/แรงตก/ฟอร์มพังควรลด`;
-}
-
-function formatPlanVolumeAnalysis(plan: DayPlan[]) {
-  const summary = getWeeklyVolumeSummary(plan);
-
-  if (summary.length === 0) {
-    return "ยังไม่มีตารางให้วิเคราะห์ ลองเลือก Preset หรือสร้าง Custom plan ก่อน";
-  }
-
-  const lines = summary.map(([muscle, sets]) => getVolumeJudgement(muscle, sets));
-
-  return `วิเคราะห์ volume ของตารางปัจจุบัน:\n\n${lines.join("\n")}\n\nหลักที่ใช้: ดู direct hard sets ต่อสัปดาห์ก่อน แล้วค่อยคิด indirect volume เพิ่ม เช่น press ช่วย triceps, row/pulldown ช่วย biceps. ถ้ากล้ามไหนต่ำกว่า 10 sets/week และเป็น priority ควรเพิ่มท่าหรือเพิ่ม sets.`;
-}
-
-function detectPlanAnalysisRequest(text: string) {
-  const lower = text.toLowerCase();
-
-  return (
-    lower.includes("วิเคราะห์") ||
-    lower.includes("เช็ค") ||
-    lower.includes("ตรวจ") ||
-    lower.includes("ดูตาราง") ||
-    lower.includes("ตารางนี้") ||
-    lower.includes("น้อยไปไหม") ||
-    lower.includes("เยอะไปไหม") ||
-    lower.includes("volume") ||
-    lower.includes("พอไหม")
-  );
-}
-
-function detectModificationRequest(text: string) {
-  const lower = text.toLowerCase();
-
-  return (
-    lower.includes("เพิ่ม") ||
-    lower.includes("ลด") ||
-    lower.includes("แก้") ||
-    lower.includes("ปรับ") ||
-    lower.includes("เน้น") ||
-    lower.includes("priority")
-  );
-}
 
 
-function buildCoachPlanFromText(text: string) {
-  const lower = text.toLowerCase();
-  const dayCount = inferDayCountFromText(text);
-  const planName = lower.includes("ลดเวลา") || lower.includes("busy") || lower.includes("short") ? "AI Short Hypertrophy Split" : "AI Recommended Split";
 
-  if (dayCount === 3) {
-    return {
-      id: makeId("plan"),
-      name: planName,
-      days: [
-        makeDay("AI Full Body A", "Press, pull, squat, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Hack Squat", "Seated Cable Pec Flye", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-        makeDay("AI Full Body B", "Hinge, row, chest isolation, glutes, calves", ["Legs", "Back", "Chest", "Abs & Calves"], ["Romanian Deadlift RDL", "Neutral Grip Lat Pull Down", "Incline DB Press", "Leg Extension", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
-        makeDay("AI Full Body C", "Quad isolation, incline chest, hamstring, rear delt, core", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["45° Leg Press", "Seated Cable Pec Flye", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
-      ],
-    } satisfies CustomPlan;
-  }
 
-  if (dayCount === 5 && (lower.includes("1 leg") || lower.includes("leg 1") || lower.includes("ขา 1") || lower.includes("ขาวันเดียว"))) {
-    return { id: makeId("plan"), name: "AI 5 Day One Leg Split", days: makeFiveDayLegOncePlan().map((day) => ({ ...day, id: makeId("day") })) } satisfies CustomPlan;
-  }
 
-  if (dayCount === 5) {
-    return { id: makeId("plan"), name: "AI 5 Day Hypertrophy Split", days: makePresetPlans()[5].map((day) => ({ ...day, id: makeId("day") })) } satisfies CustomPlan;
-  }
 
-  return {
-    id: makeId("plan"),
-    name: planName,
-    days: makePresetPlans()[4].map((day) => ({ ...day, id: makeId("day") })),
-  } satisfies CustomPlan;
-}
 
-function summarizePlan(plan: CustomPlan) {
-  return `${plan.name}\n${plan.days
-    .map((day, index) => {
-      const exercises = day.exercises.map((exercise) => `${exercise.name} ${exercise.sets}x${exercise.reps}`).join(", ");
-      return `Day ${index + 1}: ${day.title}\n${exercises}`;
-    })
-    .join("\n\n")}`;
-}
+
+
+
+
+
+
+
+
+
+
+
+
 
 function createStarterCustomPlan() {
   return {
@@ -802,17 +603,6 @@ export default function Page() {
   const [exerciseGroupFilter, setExerciseGroupFilter] = useState<MuscleGroup | "All">("All");
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
   const [compactList, setCompactList] = useState(true);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() =>
-    readJson<ChatMessage[]>(CHAT_KEY, [
-      {
-        id: makeId("msg"),
-        role: "assistant",
-        content:
-          "Smart Coach ฟรี ไม่ใช้ API: ถาม set/volume/warmup/ท่าสำรองได้ หรือสั่งจัดตารางแล้วกด Save Plan เข้า Custom",
-      },
-    ])
-  );
-  const [chatInput, setChatInput] = useState("");
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
 
   const presetPlans = useMemo(() => makePresetPlans(), []);
@@ -857,7 +647,6 @@ export default function Page() {
 
   useEffect(() => writeSessionJson(SET_INPUTS_KEY, inputs), [inputs]);
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
-  useEffect(() => writeSessionJson(CHAT_KEY, chatMessages), [chatMessages]);
   useEffect(() => writeSessionJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
 
   useEffect(() => {
@@ -1016,91 +805,7 @@ export default function Page() {
     setChatMessages((old) => [...old, confirmation]);
   }
 
-  function sendCoachMessage() {
-    const text = chatInput.trim();
-    if (!text) return;
-
-    const userMessage: ChatMessage = { id: makeId("msg"), role: "user", content: text };
-    const directAnswer = answerCoachQuestion(text);
-    const wantsPlan = shouldGeneratePlan(text);
-    const wantsAnalysis = detectPlanAnalysisRequest(text);
-    const wantsModification = detectModificationRequest(text);
-
-    if (directAnswer && !wantsPlan) {
-      const response: ChatMessage = {
-        id: makeId("msg"),
-        role: "assistant",
-        content: directAnswer.content,
-      };
-
-      setChatMessages((old) => [...old, userMessage, response]);
-      setChatInput("");
-      return;
-    }
-
-    if (wantsAnalysis && !wantsPlan && !wantsModification) {
-      const response: ChatMessage = {
-        id: makeId("msg"),
-        role: "assistant",
-        content: formatPlanVolumeAnalysis(activePlan),
-      };
-
-      setChatMessages((old) => [...old, userMessage, response]);
-      setChatInput("");
-      return;
-    }
-
-    if (wantsModification && !wantsPlan) {
-      const groups = inferGroupsFromText(text);
-      const generatedPlan: CustomPlan = {
-        id: makeId("plan"),
-        name: `AI Adjusted ${groups.join(" + ")}`,
-        days:
-          mode === "custom" && selectedCustomPlan
-            ? selectedCustomPlan.days.map((dayItem) => {
-                const shouldAdjust = groups.some((group) => dayItem.focus.includes(group));
-                if (!shouldAdjust) return dayItem;
-
-                const additions = recommendForGroups(groups).slice(0, 2);
-                const existing = new Set(dayItem.exercises.map((exercise) => exercise.name));
-                const cleanAdditions = additions.filter((exercise) => !existing.has(exercise.name));
-
-                return {
-                  ...dayItem,
-                  id: makeId("day"),
-                  subtitle: "Adjusted by HA IT Smart Coach",
-                  exercises: [...dayItem.exercises, ...cleanAdditions].slice(0, 8),
-                };
-              })
-            : buildCoachPlanFromText(text).days,
-      };
-
-      const response: ChatMessage = {
-        id: makeId("msg"),
-        role: "assistant",
-        content:
-          `ผมทำเวอร์ชันปรับจากคำขอให้แล้ว: ${groups.join(", ")}\n\n${summarizePlan(generatedPlan)}\n\nกด Save Plan เพื่อบันทึกเป็น Custom plan ใหม่ได้เลย`,
-        plan: generatedPlan,
-      };
-
-      setChatMessages((old) => [...old, userMessage, response]);
-      setChatInput("");
-      return;
-    }
-
-    const generatedPlan = buildCoachPlanFromText(text);
-    const targetGroups = inferGroupsFromText(text);
-    const response: ChatMessage = {
-      id: makeId("msg"),
-      role: "assistant",
-      content:
-        `จัดตารางให้แล้วจากเป้าหมาย: ${targetGroups.join(", ")}\n\n${summarizePlan(generatedPlan)}\n\nกด Save Plan เพื่อบันทึกตารางนี้เข้า Custom ได้เลย`,
-      plan: generatedPlan,
-    };
-
-    setChatMessages((old) => [...old, userMessage, response]);
-    setChatInput("");
-  }
+  
 
   function updateCustomPlanName(name: string) {
     if (!selectedCustomPlan) return;
@@ -1228,11 +933,6 @@ export default function Page() {
       title: "Custom",
       description: "สร้างตารางเองแบบพับ control ไว้ให้หน้าโล่ง",
     },
-    coach: {
-      eyebrow: "AI Coach",
-      title: "Coach",
-      description: "พิมพ์เป้าหมาย แล้วบันทึกแผนเข้า Custom ได้",
-    },
     history: {
       eyebrow: "Temporary",
       title: "History",
@@ -1260,7 +960,7 @@ export default function Page() {
           </div>
 
           <button
-            onClick={() => setMode("coach")}
+            onClick={() => setMode("today")}
             className="rounded-2xl bg-emerald-400 px-3 py-2 text-sm font-black text-zinc-950"
           >
             Coach
@@ -1332,59 +1032,6 @@ export default function Page() {
               ))}
             </div>
           </div>
-
-        {mode === "coach" && (
-          <div className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
-            <div className="mb-4 flex items-center gap-3">
-              <div className="rounded-2xl bg-emerald-400 p-3 text-zinc-950">
-                <Bot size={22} />
-              </div>
-              <div>
-                <h3 className="text-xl font-black">HA IT Coach</h3>
-                <p className="text-sm text-zinc-400">Ask, analyze or generate a plan.</p>
-              </div>
-            </div>
-
-            <div className="max-h-[60vh] space-y-3 overflow-y-auto rounded-3xl bg-zinc-950 p-3">
-              {chatMessages.map((message) => (
-                <div key={message.id} className={`rounded-3xl p-3 ${message.role === "user" ? "ml-8 bg-emerald-400 text-zinc-950" : "mr-8 bg-zinc-900 text-zinc-100"}`}>
-                  <p className="mb-1 flex items-center gap-2 text-xs font-black uppercase opacity-70">
-                    {message.role === "assistant" ? <Bot size={14} /> : <MessageCircle size={14} />}
-                    {message.role === "assistant" ? "HA IT Coach" : "You"}
-                  </p>
-                  <p className="whitespace-pre-wrap text-sm leading-6">{message.content}</p>
-                  {message.plan && (
-                    <button onClick={() => savePlanFromChat(message.plan!)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-zinc-950">
-                      <Save size={16} /> Save Plan to Custom
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-3 grid gap-2">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {[
-                  "Pec Deck ควรกี่เซต",
-                  "วิเคราะห์ตารางนี้ให้หน่อย",
-                  "เพิ่มแขนให้ตารางนี้",
-                  "จัด 4 วัน เน้น hypertrophy แขนไม่เบา",
-                ].map((prompt) => (
-                  <button key={prompt} onClick={() => setChatInput(prompt)} className="min-w-fit rounded-full bg-zinc-950 px-3 py-2 text-xs font-bold text-zinc-300">
-                    {prompt}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-end gap-2">
-                <textarea value={chatInput} onChange={(event) => setChatInput(event.target.value)} placeholder="พิมพ์เป้าหมาย เช่น จัด 4 วัน เน้นอกหลัง แขนไม่เบา" className="min-h-[56px] flex-1 rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm outline-none focus:border-emerald-400" />
-                <button onClick={sendCoachMessage} className="rounded-2xl bg-emerald-400 p-4 text-zinc-950">
-                  <Send size={20} />
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {(mode === "today" || mode === "preset") && days === 5 && (
           <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
@@ -1860,8 +1507,8 @@ export default function Page() {
         <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1">
           {[
             ["today", "Today"],
+            ["preset", "Preset"],
             ["custom", "Custom"],
-            ["coach", "Coach"],
             ["history", "Log"],
             ["library", "Library"],
           ].map(([key, label]) => (

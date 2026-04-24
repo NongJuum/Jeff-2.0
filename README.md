@@ -98,3 +98,9 @@ Keep postcss.config.mjs.
 - Removed incorrect root-level layout.tsx if it contained CSS.
 - Ensured Tailwind import lives only in app/globals.css.
 - Ensured app/layout.tsx is valid TypeScript/React.
+
+## No Coach clean version
+- Removed Coach mode from the UI.
+- Removed Smart Coach copy.
+- Bottom navigation is now Today, Preset, Custom, Log and Library.
+- The app is focused on workout tracking and custom plan building.
