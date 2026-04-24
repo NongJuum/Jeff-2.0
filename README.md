@@ -75,3 +75,9 @@ Keep postcss.config.mjs.
 - History is standalone and cleaner for mobile.
 - Coach chat is more compact.
 - Day carousel and exercise carousel are smaller and more responsive.
+
+## Coach answer fix
+- Coach now separates direct questions from plan generation.
+- It can answer set/volume/warmup/substitution questions without forcing a new plan.
+- It only generates a plan when the message looks like a plan request.
+- Added direct exercise prescription answers for mentioned exercise names.

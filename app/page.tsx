@@ -427,6 +427,123 @@ function inferDayCountFromText(text: string) {
   return 4;
 }
 
+
+function findMentionedExercises(text: string) {
+  const lower = text.toLowerCase();
+  return exerciseLibrary.filter((exercise) => lower.includes(exercise.name.toLowerCase()));
+}
+
+function formatExercisePrescription(name: string) {
+  const exercise = findExercise(name);
+  const prescription = getPrescription(exercise);
+
+  return `${exercise.name}: ${prescription.sets} hard sets × ${prescription.reps} reps${prescription.warmup ? " · warmup recommended" : " · no specific warmup"}`;
+}
+
+function answerCoachQuestion(text: string) {
+  const lower = text.toLowerCase();
+  const mentionedExercises = findMentionedExercises(text);
+
+  const asksSet =
+    lower.includes("set") ||
+    lower.includes("เซต") ||
+    lower.includes("sets") ||
+    lower.includes("กี่เซต") ||
+    lower.includes("workout set") ||
+    lower.includes("working set");
+
+  const asksWarmup =
+    lower.includes("warm") ||
+    lower.includes("วอร์ม") ||
+    lower.includes("warmup") ||
+    lower.includes("warm up");
+
+  const asksSubstitution =
+    lower.includes("แทน") ||
+    lower.includes("สำรอง") ||
+    lower.includes("substitute") ||
+    lower.includes("alternative") ||
+    lower.includes("เครื่องไม่ว่าง");
+
+  const asksVolume =
+    lower.includes("volume") ||
+    lower.includes("เยอะไป") ||
+    lower.includes("น้อยไป") ||
+    lower.includes("พอไหม") ||
+    lower.includes("เพียงพอ") ||
+    lower.includes("ต่อสัปดาห์") ||
+    lower.includes("week");
+
+  const asksWhy =
+    lower.includes("ทำไม") ||
+    lower.includes("why") ||
+    lower.includes("หลัก") ||
+    lower.includes("jeff");
+
+  if (mentionedExercises.length > 0 && asksSet) {
+    return {
+      content:
+        `ได้ ควรดูเป็นรายท่า ไม่ใช่ set เท่ากันหมด\n\n${mentionedExercises
+          .map((exercise) => formatExercisePrescription(exercise.name))
+          .join("\n")}\n\nหลักที่ใช้คือ compound หนักใช้ set พอประมาณเพื่อคุม fatigue ส่วน isolation ที่ recovery ง่ายกว่า เช่น pec deck, lateral raise, curl, cable extension สามารถใช้ 3-4 hard sets ได้`,
+    };
+  }
+
+  if (mentionedExercises.length > 0 && asksSubstitution) {
+    const lines = mentionedExercises.map((exercise) => {
+      const planExercise = toPlanExercise(exercise.name);
+      const alternatives = getAlternatives(planExercise).slice(0, 5);
+      return `${exercise.name} แทนได้ด้วย: ${alternatives.join(", ") || "ไม่มีท่าใกล้เคียงพอใน library"}`;
+    });
+
+    return {
+      content:
+        `ท่าสำรองควรอยู่ movement ใกล้กันและกล้ามเนื้อหลักเดียวกัน\n\n${lines.join("\n")}`,
+    };
+  }
+
+  if (asksWarmup) {
+    return {
+      content:
+        "หลัก warmup ในแอพนี้คือทำเฉพาะท่าหนักหรือ compound ที่เสี่ยง fatigue/technical breakdown เช่น bench, press, squat, row, pulldown, RDL, hip thrust\n\nสูตร warmup จาก PR:\n40% × 8-10 reps\n60% × 5-6 reps\n80% × 2-3 reps\n\nIsolation เช่น pec deck, lateral raise, curl, pressdown ส่วนใหญ่ไม่ต้องมี warmup เฉพาะ แต่อาจทำ feeler set เบาๆ ได้ถ้าข้อต่อยังไม่พร้อม",
+    };
+  }
+
+  if (asksVolume || asksWhy) {
+    return {
+      content:
+        "ถ้าอิงหลัก hypertrophy แบบ Jeff-style ควรดู 3 อย่างพร้อมกัน:\n\n1. Weekly hard sets: กล้ามหลักประมาณ 10-20 sets/week เป็นกรอบกว้าง\n2. Per-session fatigue: อย่ายัดท่าเยอะจนท้าย session กลายเป็น junk volume\n3. Exercise type: compound หนักมัก 2-3 sets, isolation ฟื้นตัวง่ายกว่ามัก 3-4 sets\n\nดังนั้น pec deck 4 sets พอสมเหตุสมผลกว่า 2 sets ถ้าวันนั้นต้องการ chest isolation volume จริง ส่วน RDL/deadlift ไม่ควรดัน 4 sets ง่ายๆ เพราะ fatigue หลังล่างสูง",
+    };
+  }
+
+  if (asksSet) {
+    return {
+      content:
+        "โดยรวมใน HA IT ตอนนี้ใช้หลักนี้:\n\nCompound หลัก: 3 hard sets\nHinge หนัก เช่น RDL/Deadlift: 2 hard sets\nChest isolation เช่น Pec Deck / Seated Cable Pec Flye: 4 hard sets\nLateral raise หลัก: 4 hard sets\nBiceps/Triceps priority เช่น Bayesian Curl / Overhead Cable Ext: 4 hard sets\nArms ทั่วไป: 3 hard sets\nAbs/Calves: 3-4 hard sets\n\nถ้าบอกชื่อท่ามา ผมจะตอบ set/reps ของท่านั้นตรงๆ ได้",
+    };
+  }
+
+  return null;
+}
+
+function shouldGeneratePlan(text: string) {
+  const lower = text.toLowerCase();
+
+  return (
+    lower.includes("จัด") ||
+    lower.includes("สร้าง") ||
+    lower.includes("ทำตาราง") ||
+    lower.includes("ตาราง") ||
+    lower.includes("split") ||
+    lower.includes("program") ||
+    lower.includes("plan") ||
+    lower.includes("routine") ||
+    lower.includes("schedule") ||
+    lower.includes("วัน")
+  );
+}
+
+
 function buildCoachPlanFromText(text: string) {
   const lower = text.toLowerCase();
   const dayCount = inferDayCountFromText(text);
@@ -633,7 +750,7 @@ export default function Page() {
         id: makeId("msg"),
         role: "assistant",
         content:
-          "พิมพ์เป้าหมายมาได้เลย เช่น “จัด 4 วัน เน้นอกหลัง แขนไม่เบา” หรือ “ทำ 5 วัน แต่ขาแค่วันเดียว” แล้วกด Save Plan เพื่อบันทึกตารางจากแชทได้ทันที",
+          "พิมพ์ได้ 2 แบบ: ถามตรงๆ เช่น “Pec Deck ควรกี่เซต” หรือสั่งจัดตาราง เช่น “จัด 4 วัน เน้นอกหลัง แขนไม่เบา” ถ้าเป็นตารางจะมีปุ่ม Save Plan ให้บันทึกเข้า Custom",
       },
     ])
   );
@@ -846,13 +963,39 @@ export default function Page() {
     if (!text) return;
 
     const userMessage: ChatMessage = { id: makeId("msg"), role: "user", content: text };
+    const directAnswer = answerCoachQuestion(text);
+
+    if (directAnswer && !shouldGeneratePlan(text)) {
+      const response: ChatMessage = {
+        id: makeId("msg"),
+        role: "assistant",
+        content: directAnswer.content,
+      };
+
+      setChatMessages((old) => [...old, userMessage, response]);
+      setChatInput("");
+      return;
+    }
+
+    if (directAnswer && shouldGeneratePlan(text) && !text.toLowerCase().includes("จัด")) {
+      const response: ChatMessage = {
+        id: makeId("msg"),
+        role: "assistant",
+        content: directAnswer.content,
+      };
+
+      setChatMessages((old) => [...old, userMessage, response]);
+      setChatInput("");
+      return;
+    }
+
     const generatedPlan = buildCoachPlanFromText(text);
     const targetGroups = inferGroupsFromText(text);
     const response: ChatMessage = {
       id: makeId("msg"),
       role: "assistant",
       content:
-        `จัดให้แล้วจากเป้าหมาย: ${targetGroups.join(", ")}\n\n${summarizePlan(generatedPlan)}\n\nกด Save Plan เพื่อบันทึกตารางนี้เข้า Custom ได้เลย`,
+        `จัดตารางให้แล้วจากเป้าหมาย: ${targetGroups.join(", ")}\n\n${summarizePlan(generatedPlan)}\n\nกด Save Plan เพื่อบันทึกตารางนี้เข้า Custom ได้เลย`,
       plan: generatedPlan,
     };
 
@@ -1100,7 +1243,7 @@ export default function Page() {
               </div>
               <div>
                 <h3 className="text-xl font-black">HA IT Coach</h3>
-                <p className="text-sm text-zinc-400">Generate plan, then save to Custom.</p>
+                <p className="text-sm text-zinc-400">Ask questions or generate a plan.</p>
               </div>
             </div>
 
@@ -1124,9 +1267,9 @@ export default function Page() {
             <div className="mt-3 grid gap-2">
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {[
+                  "Pec Deck ควรกี่เซต",
+                  "ทำไม RDL แค่ 2 sets",
                   "จัด 4 วัน เน้น hypertrophy แขนไม่เบา",
-                  "ทำ 5 วัน แต่ขาแค่วันเดียว",
-                  "จัด 3 วัน full body เล่นไม่เกิน 1 ชั่วโมง",
                 ].map((prompt) => (
                   <button key={prompt} onClick={() => setChatInput(prompt)} className="min-w-fit rounded-full bg-zinc-950 px-3 py-2 text-xs font-bold text-zinc-300">
                     {prompt}
