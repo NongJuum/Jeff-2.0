@@ -1,41 +1,24 @@
-# Jeff Inspired Fitness App
+# Jeff 2.0 Mobile Workout Update
 
-A Next.js workout planner for 3, 4 and 5 day training splits.
+Updated mobile-first Next.js app.
 
-## Features
-- 3 day full body, 4 day upper/lower, 5 day bodypart split
-- A-tier-or-better exercise seed database
-- Muscle focus per day
-- Exercise substitutions when equipment is unavailable
-- Warmup flag per exercise
-- lbs set and rep logging
-- Instant PR replacement based on weight × reps
-- Demo button via YouTube search
-- LocalStorage persistence
+## Added
+- Full gym exercise list grouped by muscle
+- 3, 4 and 5 day auto split
+- Mobile sticky header and bottom day selector
+- Exercise substitutions from your available gym machines
+- Multi-set logging per exercise
+- PR display by exercise name
+- Automatic warmup calculator from previous best weight
+- Demo button for each exercise
 
-## Run locally
+## Replace files in your repo
+Upload/replace these files:
+- package.json
+- postcss.config.mjs
+- tsconfig.json
+- app/layout.tsx
+- app/globals.css
+- app/page.tsx
 
-```bash
-npm install
-npm run dev
-```
-
-Open http://localhost:3000
-
-## Deploy to Vercel
-
-1. Push this folder to GitHub.
-2. Go to Vercel.
-3. New Project.
-4. Import the GitHub repo.
-5. Framework preset: Next.js.
-6. Build command: npm run build.
-7. Output directory: leave default.
-8. Click Deploy.
-
-## Production notes
-This MVP uses localStorage. For real accounts and cross-device sync, add:
-- Supabase or Neon Postgres
-- Prisma
-- NextAuth/Auth.js
-- Cloudinary or local media library for licensed GIFs/images
+If you still have postcss.config.js, delete it to avoid duplicate config.
