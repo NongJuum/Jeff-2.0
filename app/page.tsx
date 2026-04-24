@@ -563,8 +563,8 @@ function getWeeklyVolumeSummary(plan: DayPlan[]) {
 }
 
 function normalizeSetInputs(raw: SetInput[], sets: number) {
-  if (raw.length === sets) return raw;
-  return [...raw.slice(0, sets), ...createDefaultSetInputs(Math.max(0, sets - raw.length))];
+  if (raw.length >= sets) return raw;
+  return [...raw, ...createDefaultSetInputs(Math.max(0, sets - raw.length))];
 }
 
 export default function Page() {
@@ -734,6 +734,37 @@ export default function Page() {
       return groupMatch && keywordMatch;
     });
   }, [exerciseSearch, exerciseGroupFilter]);
+
+
+  function addManualSet(exerciseId: string, defaultSets: number) {
+    setInputs((old) => {
+      const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
+      return {
+        ...old,
+        [exerciseId]: [
+          ...current,
+          {
+            weightLbs: "",
+            reps: "",
+            done: false,
+          },
+        ],
+      };
+    });
+  }
+
+  function removeManualSet(exerciseId: string, defaultSets: number) {
+    setInputs((old) => {
+      const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
+
+      if (current.length <= 1) return old;
+
+      return {
+        ...old,
+        [exerciseId]: current.slice(0, -1),
+      };
+    });
+  }
 
   function updateSet(exerciseId: string, setIndex: number, field: keyof SetInput, value: string | boolean, defaultSets: number) {
     setInputs((old) => {
@@ -1421,7 +1452,34 @@ export default function Page() {
                     </div>
 
                     <div className="rounded-2xl bg-zinc-950 p-3">
-                      <div className="mb-3 grid grid-cols-[46px_1fr_1fr_42px] gap-2 text-xs font-bold uppercase text-zinc-500">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-bold uppercase text-zinc-500">Working sets</p>
+                          <p className="mt-0.5 text-[11px] text-zinc-600">
+                            Plan {exercise.sets} · Log {setInputs.length}
+                          </p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => removeManualSet(baseExercise.id, exercise.sets)}
+                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40"
+                            disabled={setInputs.length <= 1}
+                            type="button"
+                          >
+                            − Set
+                          </button>
+                          <button
+                            onClick={() => addManualSet(baseExercise.id, exercise.sets)}
+                            className="rounded-xl bg-emerald-400 px-3 py-2 text-xs font-bold text-zinc-950"
+                            type="button"
+                          >
+                            + Set
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mb-2 grid grid-cols-[46px_1fr_1fr_42px] gap-2 text-[11px] font-bold uppercase text-zinc-500">
                         <span>Set</span><span>lbs</span><span>Reps</span><span>Done</span>
                       </div>
                       <div className="space-y-2">

@@ -116,3 +116,9 @@ Keep postcss.config.mjs.
 ## Typecheck fix
 - Removed leftover Coach function savePlanFromChat.
 - Removed remaining references to setChatMessages/chatMessages after Coach mode removal.
+
+## Manual set controls
+- Added + Set button in the logging area.
+- Added − Set button in the logging area.
+- Manual added sets are preserved while filling the workout.
+- Save resets the exercise back to the planned set count.
