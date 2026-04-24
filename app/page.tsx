@@ -99,6 +99,7 @@ const UI_STATE_KEY = "haitUiStateV5";
 const SET_INPUTS_KEY = "haitSetInputsV5";
 const CUSTOM_PLANS_KEY = "haitCustomPlansV2";
 const CHAT_KEY = "haitCoachChatV1";
+const SUBSTITUTE_KEY = "haitSubstitutionsV1";
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -259,33 +260,33 @@ function makeDay(title: string, subtitle: string, focus: MuscleGroup[], exercise
 function makePresetPlans() {
   return {
     3: [
-      makeDay("Day 1 Full Body A", "Chest first, then back, quads, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Hack Squat", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 2 Full Body B", "Posterior chain, row, chest isolation, rear delts", ["Legs", "Back", "Chest", "Shoulders", "Abs & Calves"], ["Romanian Deadlift RDL", "Chest Supported Row", "Seated Cable Pec Flye", "Reverse Pec Deck", "Machine Hip Thrust", "Front Calf Muscle"]),
-      makeDay("Day 3 Full Body C", "Quads, vertical pull, incline chest, hamstrings, core", ["Legs", "Back", "Chest", "Shoulders", "Abs & Calves"], ["Leg Extension", "Neutral Grip Lat Pull Down", "Incline DB Press", "Seated Hamstring Curl", "Cable Lat Raise", "Cable Crunch"]),
+      makeDay("Day 1 Full Body A", "Chest first, then back, quads, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Hack Squat", "Seated Cable Pec Flye", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+      makeDay("Day 2 Full Body B", "Posterior chain, row, chest isolation, rear delts", ["Legs", "Back", "Chest", "Shoulders", "Abs & Calves"], ["Romanian Deadlift RDL", "Chest Supported Row", "Seated Cable Pec Flye", "Reverse Pec Deck", "Machine Hip Thrust", "Cable Crunch", "Front Calf Muscle"]),
+      makeDay("Day 3 Full Body C", "Quads, vertical pull, incline chest, hamstrings, core", ["Legs", "Back", "Chest", "Shoulders", "Abs & Calves"], ["Leg Extension", "Neutral Grip Lat Pull Down", "Incline DB Press", "Seated Hamstring Curl", "Cable Lat Raise", "Overhead Cable Ext", "Cable Crunch"]),
     ],
     4: [
-      makeDay("Day 1 Upper A", "Chest, lats, side delts, biceps, triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 2 Lower A", "Quad bias with hamstrings and calves", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Machine Hip Thrust", "Leg Extension", "Front Calf Muscle"]),
-      makeDay("Day 3 Upper B", "Rows, incline press, rear delts, arms", ["Back", "Chest", "Shoulders", "Arms"], ["Chest Supported Row", "Incline DB Press", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 4 Lower B", "Posterior bias with quads and abs", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "Leg Extension", "Machine Hip Thrust", "Seated Hamstring Curl", "Cable Crunch"]),
+      makeDay("Day 1 Upper A", "Chest, lats, side delts, biceps, triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Chest Supported Row", "Seated Cable Pec Flye", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+      makeDay("Day 2 Lower A", "Quad bias with hamstrings and calves", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Machine Hip Thrust", "Leg Extension", "Bulgarian Split Squat", "Front Calf Muscle"]),
+      makeDay("Day 3 Upper B", "Rows, incline press, rear delts, arms", ["Back", "Chest", "Shoulders", "Arms"], ["Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+      makeDay("Day 4 Lower B", "Posterior bias with quads and abs", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press", "Leg Extension", "Machine Hip Thrust", "Seated Hamstring Curl", "Cable Crunch"]),
     ],
     5: [
-      makeDay("Day 1 Chest + Back", "Press, pull, flye, row", ["Chest", "Back"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Incline DB Press", "Chest Supported Row", "Seated Cable Pec Flye"]),
-      makeDay("Day 2 Legs Quad Bias", "Squat pattern first, then accessories", ["Legs", "Abs & Calves"], ["Hack Squat", "Leg Extension", "Machine Hip Thrust", "Front Calf Muscle"]),
-      makeDay("Day 3 Shoulders + Arms", "Delts first, then biceps and triceps", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 4 Back + Chest", "Row bias with chest support work", ["Back", "Chest"], ["Chest Supported Row", "Cable Lat Prayers", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye", "Incline DB Press"]),
-      makeDay("Day 5 Legs Posterior Bias", "Hinge, hamstrings, glutes, abs", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "Seated Hamstring Curl", "Machine Hip Thrust", "Cable Crunch", "Front Calf Muscle"]),
+      makeDay("Day 1 Chest + Back", "Press, pull, flye, row", ["Chest", "Back"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Incline DB Press", "Chest Supported Row", "Seated Cable Pec Flye", "Cable Lat Prayers"]),
+      makeDay("Day 2 Legs Quad Bias", "Squat pattern first, then accessories", ["Legs", "Abs & Calves"], ["Hack Squat", "45° Leg Press", "Leg Extension", "Machine Hip Thrust", "Seated Hamstring Curl", "Front Calf Muscle"]),
+      makeDay("Day 3 Shoulders + Arms", "Delts first, then biceps and triceps", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Face Away Bayesian Curl", "Machine Preacher Curl", "Overhead Cable Ext", "Triceps Pressdown Bar"]),
+      makeDay("Day 4 Back + Chest", "Row bias with chest support work", ["Back", "Chest"], ["Chest Supported Row", "Cable Lat Prayers", "Neutral Grip Lat Pull Down", "Wide Grip Cable Row", "Seated Cable Pec Flye", "Incline DB Press"]),
+      makeDay("Day 5 Legs Posterior Bias", "Hinge, hamstrings, glutes, abs", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "Seated Hamstring Curl", "Machine Hip Thrust", "Bulgarian Split Squat", "Cable Crunch", "Front Calf Muscle"]),
     ],
   } satisfies Record<3 | 4 | 5, DayPlan[]>;
 }
 
 function makeFiveDayLegOncePlan() {
   return [
-    makeDay("Day 1 Push", "Chest, shoulders, triceps", ["Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Incline DB Press", "Cable Lat Raise", "Overhead Cable Ext"]),
-    makeDay("Day 2 Pull", "Back thickness, lats, biceps", ["Back", "Arms"], ["Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Face Away Bayesian Curl"]),
-    makeDay("Day 3 Legs Only", "One leg day with quad, hamstring, glute, calf", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Machine Hip Thrust", "Leg Extension", "Front Calf Muscle"]),
-    makeDay("Day 4 Upper A", "Chest and back with shoulder accessory", ["Chest", "Back", "Shoulders"], ["Machine Chest Press", "Chest Supported Row", "Seated Cable Pec Flye", "Reverse Pec Deck"]),
-    makeDay("Day 5 Upper B + Arms", "Back, incline chest, delts, arms", ["Back", "Chest", "Shoulders", "Arms"], ["Neutral Grip Lat Pull Down", "Incline DB Press", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+    makeDay("Day 1 Push", "Chest, shoulders, triceps", ["Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye", "Cable Lat Raise", "Overhead Cable Ext", "Triceps Pressdown Bar"]),
+    makeDay("Day 2 Pull", "Back thickness, lats, biceps", ["Back", "Arms"], ["Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl", "Machine Preacher Curl"]),
+    makeDay("Day 3 Legs Only", "One leg day with quad, hamstring, glute, calf", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Machine Hip Thrust", "Leg Extension", "Bulgarian Split Squat", "Front Calf Muscle"]),
+    makeDay("Day 4 Upper A", "Chest and back with shoulder accessory", ["Chest", "Back", "Shoulders"], ["Machine Chest Press", "Incline DB Press", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye", "Reverse Pec Deck"]),
+    makeDay("Day 5 Upper B + Arms", "Back, incline chest, delts, arms", ["Back", "Chest", "Shoulders", "Arms"], ["Neutral Grip Lat Pull Down", "Chest Supported Row", "Incline DB Press", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
   ];
 }
 
@@ -338,9 +339,9 @@ function buildCoachPlanFromText(text: string) {
       id: makeId("plan"),
       name: planName,
       days: [
-        makeDay("AI Full Body A", "Press, pull, squat, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Hack Squat", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+        makeDay("AI Full Body A", "Press, pull, squat, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Hack Squat", "Seated Cable Pec Flye", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
         makeDay("AI Full Body B", "Hinge, row, chest isolation, glutes, calves", ["Legs", "Back", "Chest", "Abs & Calves"], ["Romanian Deadlift RDL", "Chest Supported Row", "Seated Cable Pec Flye", "Machine Hip Thrust", "Front Calf Muscle"]),
-        makeDay("AI Full Body C", "Quad isolation, incline chest, hamstring, rear delt, core", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["Leg Extension", "Incline DB Press", "Seated Hamstring Curl", "Reverse Pec Deck", "Cable Crunch"]),
+        makeDay("AI Full Body C", "Quad isolation, incline chest, hamstring, rear delt, core", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["Leg Extension", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Hamstring Curl", "Reverse Pec Deck", "Cable Crunch"]),
       ],
     } satisfies CustomPlan;
   }
@@ -409,11 +410,52 @@ function formatShortDate(dateIso: string) {
   return new Intl.DateTimeFormat("th-TH", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(dateIso));
 }
 
+function getRelatedMovements(movement: string) {
+  if (["horizontal press", "incline press"].includes(movement)) return ["horizontal press", "incline press"];
+  if (["chest flye"].includes(movement)) return ["chest flye"];
+  if (["row"].includes(movement)) return ["row"];
+  if (["vertical pull", "lat isolation"].includes(movement)) return ["vertical pull", "lat isolation"];
+  if (["squat press", "quad isolation"].includes(movement)) return ["squat press", "quad isolation", "single leg"];
+  if (["hinge", "hamstring curl"].includes(movement)) return ["hinge", "hamstring curl"];
+  if (["glute bridge", "glute isolation", "glute press"].includes(movement)) return ["glute bridge", "glute isolation", "glute press", "single leg"];
+  if (["lateral raise"].includes(movement)) return ["lateral raise"];
+  if (["rear delt"].includes(movement)) return ["rear delt"];
+  if (["shoulder press"].includes(movement)) return ["shoulder press"];
+  if (["biceps curl"].includes(movement)) return ["biceps curl"];
+  if (["triceps overhead", "triceps extension", "triceps pressdown"].includes(movement)) return ["triceps overhead", "triceps extension", "triceps pressdown"];
+  if (["abs"].includes(movement)) return ["abs"];
+  if (["calves"].includes(movement)) return ["calves"];
+  return [movement];
+}
+
 function getAlternatives(exercise: PlanExercise) {
-  return exerciseLibrary
-    .filter((candidate) => candidate.group === exercise.group && candidate.movement === exercise.movement && candidate.name !== exercise.name)
-    .slice(0, 6)
-    .map((candidate) => candidate.name);
+  const related = getRelatedMovements(exercise.movement);
+  const primary = exerciseLibrary.filter(
+    (candidate) =>
+      candidate.group === exercise.group &&
+      related.includes(candidate.movement) &&
+      candidate.name !== exercise.name
+  );
+
+  const fallback = exerciseLibrary.filter(
+    (candidate) => candidate.group === exercise.group && candidate.name !== exercise.name
+  );
+
+  return Array.from(new Set([...primary, ...fallback].map((candidate) => candidate.name))).slice(0, 8);
+}
+
+function applyExerciseIdentity(base: PlanExercise, exerciseName: string): PlanExercise {
+  const next = toPlanExercise(exerciseName);
+  return {
+    ...base,
+    name: next.name,
+    group: next.group,
+    movement: next.movement,
+    muscles: next.muscles,
+    sets: next.sets,
+    reps: next.reps,
+    warmup: next.warmup,
+  };
 }
 
 function getWeeklyVolumeSummary(plan: DayPlan[]) {
@@ -496,6 +538,7 @@ export default function Page() {
     ])
   );
   const [chatInput, setChatInput] = useState("");
+  const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
 
   const presetPlans = useMemo(() => makePresetPlans(), []);
   const fiveDayLegOncePlan = useMemo(() => makeFiveDayLegOncePlan(), []);
@@ -539,6 +582,7 @@ export default function Page() {
   useEffect(() => writeSessionJson(SET_INPUTS_KEY, inputs), [inputs]);
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
   useEffect(() => writeSessionJson(CHAT_KEY, chatMessages), [chatMessages]);
+  useEffect(() => writeSessionJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
 
   useEffect(() => {
     const saveScroll = () => {
@@ -789,10 +833,24 @@ export default function Page() {
   }
 
   function substituteExercise(currentExercise: PlanExercise, newName: string) {
-    const next = toPlanExercise(newName);
     if (mode === "custom") {
-      updateCustomExercise(currentExercise.id, { name: next.name, group: next.group, movement: next.movement, muscles: next.muscles, reps: next.reps, sets: next.sets, warmup: next.warmup });
+      const next = toPlanExercise(newName);
+      updateCustomExercise(currentExercise.id, {
+        name: next.name,
+        group: next.group,
+        movement: next.movement,
+        muscles: next.muscles,
+        reps: next.reps,
+        sets: next.sets,
+        warmup: next.warmup,
+      });
+      return;
     }
+
+    setSubstituteMap((old) => ({
+      ...old,
+      [currentExercise.id]: newName,
+    }));
   }
 
   return (
@@ -1119,15 +1177,17 @@ export default function Page() {
             )}
 
             <div className="mt-4 grid gap-4">
-              {day.exercises.map((exercise, index) => {
+              {day.exercises.map((baseExercise, index) => {
+                const selectedSubstitute = substituteMap[baseExercise.id];
+                const exercise = mode === "custom" || !selectedSubstitute ? baseExercise : applyExerciseIdentity(baseExercise, selectedSubstitute);
                 const pr = prMap[exercise.name];
                 const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
-                const rawSetInputs = inputs[exercise.id] ?? createDefaultSetInputs(exercise.sets);
+                const rawSetInputs = inputs[baseExercise.id] ?? createDefaultSetInputs(exercise.sets);
                 const setInputs = normalizeSetInputs(rawSetInputs, exercise.sets);
                 const alternatives = getAlternatives(exercise);
 
                 return (
-                  <article key={exercise.id} className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+                  <article key={baseExercise.id} className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap gap-2">
@@ -1143,7 +1203,7 @@ export default function Page() {
 
                       <div className="flex flex-col gap-2">
                         <a href={youtubeSearch(`${exercise.name} proper form`)} target="_blank" rel="noreferrer" className="rounded-2xl bg-zinc-50 p-3 text-zinc-950" aria-label="Watch demo"><PlayCircle size={22} /></a>
-                        {mode === "custom" && <button onClick={() => removeExerciseFromCurrentDay(exercise.id)} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Remove exercise"><Trash2 size={18} /></button>}
+                        {mode === "custom" && <button onClick={() => removeExerciseFromCurrentDay(baseExercise.id)} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Remove exercise"><Trash2 size={18} /></button>}
                       </div>
                     </div>
 
@@ -1155,13 +1215,13 @@ export default function Page() {
                       <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-950 p-3">
                         <div>
                           <label className="mb-1 block text-xs font-bold text-zinc-500">Sets</label>
-                          <input inputMode="numeric" value={exercise.sets} onChange={(event) => updateCustomExercise(exercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none" />
+                          <input inputMode="numeric" value={exercise.sets} onChange={(event) => updateCustomExercise(baseExercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none" />
                         </div>
                         <div>
                           <label className="mb-1 block text-xs font-bold text-zinc-500">Reps</label>
-                          <input value={exercise.reps} onChange={(event) => updateCustomExercise(exercise.id, { reps: event.target.value })} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none" />
+                          <input value={exercise.reps} onChange={(event) => updateCustomExercise(baseExercise.id, { reps: event.target.value })} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none" />
                         </div>
-                        <button onClick={() => updateCustomExercise(exercise.id, { warmup: !exercise.warmup })} className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
+                        <button onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })} className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
                           Warmup
                         </button>
                       </div>
@@ -1170,11 +1230,11 @@ export default function Page() {
                     {alternatives.length > 0 && (
                       <div className="mb-4 rounded-2xl bg-zinc-950 p-3">
                         <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><RotateCcw size={14} /> Same pattern substitutions</label>
-                        <select value={exercise.name} onChange={(event) => { if (mode === "custom") substituteExercise(exercise, event.target.value); }} disabled={mode !== "custom"} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none disabled:opacity-60">
+                        <select value={exercise.name} onChange={(event) => { if (mode === "custom") substituteExercise(baseExercise, event.target.value); }} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none">
                           <option>{exercise.name}</option>
                           {alternatives.map((name) => <option key={name}>{name}</option>)}
                         </select>
-                        {mode !== "custom" && <p className="mt-2 text-xs text-zinc-500">Substitution editing is available in Custom mode.</p>}
+                        <p className="mt-2 text-xs text-zinc-500">เลือกแทนได้ทั้ง Preset และ Custom โดยจำกัดให้ใกล้เคียง pattern เดิม</p>
                       </div>
                     )}
 
@@ -1203,15 +1263,15 @@ export default function Page() {
                         {setInputs.map((set, setIndex) => (
                           <div key={setIndex} className="grid grid-cols-[46px_1fr_1fr_42px] gap-2">
                             <div className="flex items-center font-black text-zinc-400">{setIndex + 1}</div>
-                            <input inputMode="decimal" value={set.weightLbs} onChange={(event) => updateSet(exercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={pr?.weightLbs ? String(pr.weightLbs) : "135"} />
-                            <input inputMode="numeric" value={set.reps} onChange={(event) => updateSet(exercise.id, setIndex, "reps", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder="8" />
-                            <button onClick={() => updateSet(exercise.id, setIndex, "done", !set.done, exercise.sets)} className={`rounded-2xl border ${set.done ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-700 bg-zinc-900 text-zinc-500"}`}>
+                            <input inputMode="decimal" value={set.weightLbs} onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={pr?.weightLbs ? String(pr.weightLbs) : "135"} />
+                            <input inputMode="numeric" value={set.reps} onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder="8" />
+                            <button onClick={() => updateSet(baseExercise.id, setIndex, "done", !set.done, exercise.sets)} className={`rounded-2xl border ${set.done ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-700 bg-zinc-900 text-zinc-500"}`}>
                               <Check size={18} className="mx-auto" />
                             </button>
                           </div>
                         ))}
                       </div>
-                      <button onClick={() => saveAllSets(exercise)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-4 text-base font-black text-zinc-950 active:scale-[0.99]">
+                      <button onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-4 text-base font-black text-zinc-950 active:scale-[0.99]">
                         <Save size={18} /> Save all working sets
                       </button>
                     </div>

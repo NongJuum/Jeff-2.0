@@ -21,3 +21,10 @@ This is a local rule-based coach, not a real OpenAI API integration. It works on
 Replace your repo with everything in this ZIP.
 Delete old postcss.config.js if it exists.
 Keep postcss.config.mjs.
+
+## Substitution and volume fix
+- Fixed substitution select in Preset mode
+- Substitutions now persist in session state
+- Alternatives now fall back to related movement and same muscle group so the list no longer disappears
+- Increased sparse 4-exercise days to more complete 5-7 exercise days
+- Preset and coach plans now have more realistic hypertrophy day density
