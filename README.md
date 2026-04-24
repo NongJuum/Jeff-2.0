@@ -112,3 +112,7 @@ Keep postcss.config.mjs.
 - Made day cards, exercise navigation, and bottom navigation smaller and cleaner.
 - Simplified selected-day summary and workout card UI.
 - Improved small-screen scaling for a cleaner mobile-first feel.
+
+## Typecheck fix
+- Removed leftover Coach function savePlanFromChat.
+- Removed remaining references to setChatMessages/chatMessages after Coach mode removal.

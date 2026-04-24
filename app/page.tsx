@@ -70,12 +70,6 @@ type LogSet = {
   date: string;
 };
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  plan?: CustomPlan;
-};
 
 type PersistedUiState = {
   mode: AppMode;
@@ -780,30 +774,7 @@ export default function Page() {
     setMode("custom");
   }
 
-  function savePlanFromChat(plan: CustomPlan) {
-    const savedPlan = {
-      ...plan,
-      id: makeId("plan"),
-      name: plan.name,
-      days: plan.days.map((dayItem) => ({
-        ...dayItem,
-        id: makeId("day"),
-        exercises: dayItem.exercises.map((exercise) => ({ ...exercise, id: makeId("ex") })),
-      })),
-    };
-
-    setCustomPlans((old) => [...old, savedPlan]);
-    setSelectedCustomPlanId(savedPlan.id);
-    setSelectedCustomDay(0);
-    setMode("custom");
-
-    const confirmation: ChatMessage = {
-      id: makeId("msg"),
-      role: "assistant",
-      content: `Saved: ${savedPlan.name}. เปิดไปที่ Custom แล้วเลือกตารางนี้ได้เลย`,
-    };
-    setChatMessages((old) => [...old, confirmation]);
-  }
+  
 
   
 
