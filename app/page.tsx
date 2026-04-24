@@ -1175,20 +1175,41 @@ export default function Page() {
         )}
 
         {mode === "custom" && selectedCustomPlan && (
-          <div className="mt-4 rounded-3xl border border-emerald-400/20 bg-emerald-400/5 p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="flex-1">
-                <label className="mb-2 block text-xs font-bold uppercase text-emerald-300">Custom builder</label>
-                <input value={selectedCustomPlan.name} onChange={(event) => updateCustomPlanName(event.target.value)} className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-base font-black outline-none" />
-              </div>
-              <button onClick={deleteCustomPlan} className="mt-6 rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Delete plan"><Trash2 size={18} /></button>
-            </div>
+          <details className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
+            <summary className="cursor-pointer text-base font-black text-emerald-300">Custom plan settings</summary>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={createNewCustomPlan} className="flex items-center justify-center gap-2 rounded-2xl bg-zinc-950 px-3 py-3 text-sm font-black text-zinc-300"><Plus size={16} /> New Plan</button>
-              <button onClick={addCustomDay} className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-3 py-3 text-sm font-black text-zinc-950"><Plus size={16} /> Add Day</button>
+            <div className="mt-4 grid gap-3">
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Plan name</label>
+                <input
+                  value={selectedCustomPlan.name}
+                  onChange={(event) => updateCustomPlanName(event.target.value)}
+                  className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-base font-black outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={createNewCustomPlan}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-zinc-950 px-3 py-3 text-xs font-black text-zinc-300"
+                >
+                  <Plus size={15} /> New
+                </button>
+                <button
+                  onClick={addCustomDay}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-3 py-3 text-xs font-black text-zinc-950"
+                >
+                  <Plus size={15} /> Day
+                </button>
+                <button
+                  onClick={deleteCustomPlan}
+                  className="flex items-center justify-center gap-2 rounded-2xl border border-red-500/40 bg-red-500/10 px-3 py-3 text-xs font-black text-red-300"
+                >
+                  <Trash2 size={15} /> Delete
+                </button>
+              </div>
             </div>
-          </div>
+          </details>
         )}
 
         {(mode === "today" || mode === "preset" || mode === "custom") && (
@@ -1207,29 +1228,51 @@ export default function Page() {
           <>
             <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
               {mode === "custom" ? (
-                <div className="mb-4 grid gap-3">
+                <div className="mb-3 grid gap-3">
                   <div className="flex items-center gap-2">
-                    <Pencil size={16} className="text-zinc-500" />
-                    <input value={day.title} onChange={(event) => updateCustomDay(day.id, (current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-xl font-black outline-none" />
-                    <button onClick={() => deleteCustomDay(day.id)} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Delete day"><MinusCircle size={18} /></button>
+                    <input
+                      value={day.title}
+                      onChange={(event) => updateCustomDay(day.id, (current) => ({ ...current, title: event.target.value }))}
+                      className="min-w-0 flex-1 rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-lg font-black outline-none"
+                    />
+                    <button
+                      onClick={() => deleteCustomDay(day.id)}
+                      className="shrink-0 rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300"
+                      aria-label="Delete day"
+                    >
+                      <MinusCircle size={18} />
+                    </button>
                   </div>
 
-                  <div>
-                    <p className="mb-2 text-xs font-bold uppercase text-zinc-500">Target muscles</p>
-                    <div className="flex flex-wrap gap-2">
-                      {allGroups.map((group) => (
-                        <button key={group} onClick={() => toggleDayFocus(group)} className={`rounded-full px-3 py-2 text-xs font-bold ${day.focus.includes(group) ? "bg-emerald-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
-                          {group}
-                        </button>
-                      ))}
+                  <details className="rounded-2xl bg-zinc-950 p-3">
+                    <summary className="cursor-pointer text-sm font-black text-zinc-300">Day targets & recommendation</summary>
+
+                    <div className="mt-3">
+                      <p className="mb-2 text-xs font-bold uppercase text-zinc-500">Target muscles</p>
+                      <div className="flex flex-wrap gap-2">
+                        {allGroups.map((group) => (
+                          <button
+                            key={group}
+                            onClick={() => toggleDayFocus(group)}
+                            className={`rounded-full px-3 py-2 text-xs font-bold ${
+                              day.focus.includes(group) ? "bg-emerald-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+                            }`}
+                          >
+                            {group}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={recommendIntoCurrentDay}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-zinc-950"
+                      >
+                        <Sparkles size={16} /> Recommend exercises
+                      </button>
                     </div>
-                  </div>
-
-                  <button onClick={recommendIntoCurrentDay} className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-4 text-base font-black text-zinc-950">
-                    <Sparkles size={18} /> Recommend from Jeff-inspired order
-                  </button>
+                  </details>
                 </div>
-              ) : (
+              ) : () : (
                 <>
                   <h2 className="text-xl font-black">{day.title}</h2>
                   <p className="mt-1 text-sm text-zinc-400">{day.subtitle}</p>
@@ -1276,7 +1319,7 @@ export default function Page() {
               </div>
             </div>
             <details className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
-              <summary className="cursor-pointer text-base font-black">Weekly hard set check</summary>
+              <summary className="cursor-pointer text-sm font-black text-zinc-300">Weekly volume check</summary>
               <p className="mt-2 text-xs text-zinc-400">Direct planned sets from this split. Presses/pulls still add indirect arm work.</p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {weeklyVolumeSummary.map(([muscle, sets]) => (
@@ -1289,31 +1332,56 @@ export default function Page() {
             </details>
 
             {mode === "custom" && (
-              <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-base font-black"><Plus size={16} /> Add exercise</h3>
-                <div className="grid gap-2 sm:grid-cols-[0.8fr_1fr]">
-                  <select value={exerciseGroupFilter} onChange={(event) => setExerciseGroupFilter(event.target.value as MuscleGroup | "All")} className="rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm font-bold outline-none">
-                    <option value="All">All groups</option>
-                    {allGroups.map((group) => <option key={group} value={group}>{group}</option>)}
-                  </select>
-                  <div className="flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-3 py-2">
-                    <Search size={16} className="text-zinc-500" />
-                    <input value={exerciseSearch} onChange={(event) => setExerciseSearch(event.target.value)} placeholder="Search exercise" className="w-full bg-transparent py-2 text-sm outline-none" />
+              <details className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+                <summary className="cursor-pointer text-sm font-black text-zinc-300">
+                  <Plus size={16} className="mr-2 inline" /> Add exercise
+                </summary>
+
+                <div className="mt-4">
+                  <div className="grid gap-2 sm:grid-cols-[0.8fr_1fr]">
+                    <select
+                      value={exerciseGroupFilter}
+                      onChange={(event) => setExerciseGroupFilter(event.target.value as MuscleGroup | "All")}
+                      className="rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm font-bold outline-none"
+                    >
+                      <option value="All">All groups</option>
+                      {allGroups.map((group) => (
+                        <option key={group} value={group}>
+                          {group}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-3 py-2">
+                      <Search size={16} className="text-zinc-500" />
+                      <input
+                        value={exerciseSearch}
+                        onChange={(event) => setExerciseSearch(event.target.value)}
+                        placeholder="Search exercise"
+                        className="w-full bg-transparent py-2 text-sm outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {filteredExercisePicker.map((item) => (
+                      <button
+                        key={item.name}
+                        onClick={() => addExerciseToCurrentDay(item.name)}
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl bg-zinc-950 px-3 py-3 text-left"
+                      >
+                        <span>
+                          <span className="block font-bold">{item.name}</span>
+                          <span className="text-xs text-zinc-500">
+                            {item.group} · {item.movement} · {item.tier}
+                          </span>
+                        </span>
+                        <Plus size={18} className="text-emerald-300" />
+                      </button>
+                    ))}
                   </div>
                 </div>
-
-                <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
-                  {filteredExercisePicker.map((item) => (
-                    <button key={item.name} onClick={() => addExerciseToCurrentDay(item.name)} className="flex w-full items-center justify-between gap-3 rounded-2xl bg-zinc-950 px-3 py-3 text-left">
-                      <span>
-                        <span className="block font-bold">{item.name}</span>
-                        <span className="text-xs text-zinc-500">{item.group} · {item.movement} · {item.tier}</span>
-                      </span>
-                      <Plus size={18} className="text-emerald-300" />
-                    </button>
-                  ))}
-                </div>
-              </div>
+              </details>
             )}
 
             <div className="mt-4 grid gap-4">
@@ -1339,7 +1407,7 @@ export default function Page() {
                           {exercise.warmup ? <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300"><Flame className="mr-1 inline" size={12} /> Warmup</span> : <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">No warmup</span>}
                         </div>
 
-                        <h3 className="mt-3 text-2xl font-black leading-tight">{exercise.name}</h3>
+                        <h3 className="mt-3 text-xl font-black leading-tight sm:text-2xl">{exercise.name}</h3>
                         <p className="mt-1 text-sm text-zinc-400">Target: {exercise.sets} hard working sets × {exercise.reps} reps</p>
                       </div>
 
@@ -1349,47 +1417,70 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div className="mb-4 flex flex-wrap gap-2">
+                    <div className="mb-3 flex flex-wrap gap-2">
                       {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
                     </div>
 
                     {mode === "custom" && (
-                      <div className="mb-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-950 p-3">
-                        <div>
-                          <label className="mb-1 block text-xs font-bold text-zinc-500">Sets</label>
-                          <input inputMode="numeric" value={exercise.sets} onChange={(event) => updateCustomExercise(baseExercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none" />
+                      <details className="mb-4 rounded-2xl bg-zinc-950 p-3">
+                        <summary className="cursor-pointer text-sm font-black text-zinc-300">Edit sets / reps / warmup</summary>
+
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="mb-1 block text-xs font-bold text-zinc-500">Sets</label>
+                            <input
+                              inputMode="numeric"
+                              value={exercise.sets}
+                              onChange={(event) => updateCustomExercise(baseExercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })}
+                              className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-bold text-zinc-500">Reps</label>
+                            <input
+                              value={exercise.reps}
+                              onChange={(event) => updateCustomExercise(baseExercise.id, { reps: event.target.value })}
+                              className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none"
+                            />
+                          </div>
+
+                          <button
+                            onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })}
+                            className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${
+                              exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+                            }`}
+                          >
+                            Warmup
+                          </button>
                         </div>
-                        <div>
-                          <label className="mb-1 block text-xs font-bold text-zinc-500">Reps</label>
-                          <input value={exercise.reps} onChange={(event) => updateCustomExercise(baseExercise.id, { reps: event.target.value })} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none" />
-                        </div>
-                        <button onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })} className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"}`}>
-                          Warmup
-                        </button>
-                      </div>
+                      </details>
                     )}
 
                     {alternatives.length > 0 && (
-                      <div className="mb-4 rounded-2xl bg-zinc-950 p-3">
-                        <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
-                          <RotateCcw size={14} /> Same pattern substitutions
-                        </label>
-                        <select
-                          value={exercise.name}
-                          onChange={(event) => substituteExercise(baseExercise, event.target.value)}
-                          className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none"
-                        >
-                          <option value={exercise.name}>{exercise.name}</option>
-                          {alternatives.map((name) => (
-                            <option key={name} value={name}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
-                        <p className="mt-2 text-xs text-zinc-500">
-                          Preset จะเปลี่ยนชั่วคราวใน session ส่วน Custom จะบันทึกเข้าแผนจริง
-                        </p>
-                      </div>
+                      <details className="mb-4 rounded-2xl bg-zinc-950 p-3">
+                        <summary className="cursor-pointer text-sm font-black text-zinc-300">
+                          <RotateCcw size={14} className="mr-2 inline" /> Substitute exercise
+                        </summary>
+
+                        <div className="mt-3">
+                          <select
+                            value={exercise.name}
+                            onChange={(event) => substituteExercise(baseExercise, event.target.value)}
+                            className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none"
+                          >
+                            <option value={exercise.name}>{exercise.name}</option>
+                            {alternatives.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="mt-2 text-xs text-zinc-500">
+                            Preset = session only, Custom = saved to plan.
+                          </p>
+                        </div>
+                      </details>
                     )}
 
                     <div className="mb-4 grid gap-3 sm:grid-cols-2">

@@ -59,3 +59,11 @@ Keep postcss.config.mjs.
 - Default workout view shows one exercise at a time with Previous/Next controls.
 - Weekly volume checker is collapsed by default to reduce vertical clutter.
 - Bottom navigation is now the main mobile navigation.
+
+## Custom responsive cleanup
+- Custom plan settings are collapsed by default.
+- Day targets/recommendation are collapsed into a small panel.
+- Add Exercise is collapsed by default.
+- Exercise set/reps editing is collapsed.
+- Substitution selector is collapsed.
+- Exercise card text and spacing are tightened for mobile.
