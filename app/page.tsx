@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
   CalendarDays,
+  ClipboardList,
   Check,
   ChevronDown,
   Dumbbell,
@@ -12,6 +13,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  Trash2,
   Trophy,
 } from "lucide-react";
 
@@ -420,6 +422,40 @@ const plans: Record<3 | 4 | 5, DayPlan[]> = {
   ],
 };
 
+
+const fiveDayLegOncePlan: DayPlan[] = [
+  {
+    title: "Day 1 Push",
+    subtitle: "Chest, shoulders, triceps",
+    focus: ["Chest", "Shoulders", "Arms"],
+    exerciseIds: ["machineChestPress", "inclineDbPress", "cableLatRaise", "overheadCableExt"],
+  },
+  {
+    title: "Day 2 Pull",
+    subtitle: "Back thickness, lats, biceps",
+    focus: ["Back", "Arms"],
+    exerciseIds: ["chestSupportedRow", "neutralGripLatPulldown", "cableLatPrayers", "faceAwayBayesianCurl"],
+  },
+  {
+    title: "Day 3 Legs Only",
+    subtitle: "One leg day with quad, hamstring, glute, calf",
+    focus: ["Legs", "Abs & Calves"],
+    exerciseIds: ["hackSquat", "seatedHamstringCurl", "machineHipThrust", "legExtension", "frontCalf"],
+  },
+  {
+    title: "Day 4 Upper A",
+    subtitle: "Chest and back with shoulder accessory",
+    focus: ["Chest", "Back", "Shoulders"],
+    exerciseIds: ["machineChestPress", "chestSupportedRow", "seatedCablePecFlye", "reversePecDeck"],
+  },
+  {
+    title: "Day 5 Upper B + Arms",
+    subtitle: "Back, incline chest, delts, arms",
+    focus: ["Back", "Chest", "Shoulders", "Arms"],
+    exerciseIds: ["neutralGripLatPulldown", "inclineDbPress", "cableLatRaise", "faceAwayBayesianCurl", "overheadCableExt"],
+  },
+];
+
 function youtubeSearch(query: string) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 }
@@ -438,6 +474,75 @@ function getWarmupSets(bestWeight?: number) {
   ];
 }
 
+function isWithinLastDays(dateIso: string, daysBack: number) {
+  const time = new Date(dateIso).getTime();
+  if (Number.isNaN(time)) return false;
+  const cutoff = Date.now() - daysBack * 24 * 60 * 60 * 1000;
+  return time >= cutoff;
+}
+
+function formatShortDate(dateIso: string) {
+  return new Intl.DateTimeFormat("th-TH", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(dateIso));
+}
+
+function getSamePatternAlternatives(base: Exercise) {
+  const names = exerciseNamesByGroup[base.group];
+
+  if (base.group === "Chest") {
+    if (base.name.includes("Flye") || base.name.includes("Pec") || base.name.includes("Crossover")) {
+      return names.filter((name) => name.includes("Flye") || name.includes("Pec") || name.includes("Crossover"));
+    }
+    if (base.name.includes("Incline")) {
+      return names.filter((name) => name.includes("Incline") || name.includes("Machine Chest Press") || name.includes("Smith Machine Press"));
+    }
+    return names.filter((name) => name.includes("Press") || name.includes("Bench"));
+  }
+
+  if (base.group === "Back") {
+    if (base.name.includes("Pull") || base.name.includes("Prayers")) {
+      return names.filter((name) => name.includes("Pull") || name.includes("Prayers"));
+    }
+    return names.filter((name) => name.includes("Row"));
+  }
+
+  if (base.group === "Legs") {
+    if (base.name.includes("Curl")) {
+      return names.filter((name) => name.includes("Curl") || name.includes("Romanian") || name.includes("Back Extension"));
+    }
+    if (base.name.includes("Thrust") || base.name.includes("Abduction") || base.name.includes("Kickbacks")) {
+      return names.filter((name) => name.includes("Thrust") || name.includes("Abduction") || name.includes("Kickbacks") || name.includes("Lunge") || name.includes("Bulgarian"));
+    }
+    if (base.name.includes("Romanian") || base.name.includes("Deadlift") || base.name.includes("Back Extension")) {
+      return names.filter((name) => name.includes("Romanian") || name.includes("Deadlift") || name.includes("Back Extension") || name.includes("Curl"));
+    }
+    return names.filter((name) => name.includes("Squat") || name.includes("Press") || name.includes("Extension") || name.includes("Nordic") || name.includes("Sissy"));
+  }
+
+  if (base.group === "Shoulders") {
+    if (base.name.includes("Press")) {
+      return names.filter((name) => name.includes("Press"));
+    }
+    if (base.name.includes("Reverse") || base.name.includes("Face Pull")) {
+      return names.filter((name) => name.includes("Reverse") || name.includes("Face Pull"));
+    }
+    return names.filter((name) => name.includes("Raise"));
+  }
+
+  if (base.group === "Arms") {
+    if (base.muscles.some((m) => m.includes("Biceps")) || base.name.includes("Curl") || base.name.includes("Preacher")) {
+      return names.filter((name) => name.includes("Curl") || name.includes("Preacher"));
+    }
+    return names.filter((name) => name.includes("Overhead") || name.includes("Skullcrusher") || name.includes("Katana") || name.includes("Triceps"));
+  }
+
+  return names;
+}
+
 function createDefaultSetInputs(sets: number): SetInput[] {
   return Array.from({ length: sets }, () => ({
     weightLbs: "",
@@ -448,30 +553,40 @@ function createDefaultSetInputs(sets: number): SetInput[] {
 
 export default function Page() {
   const [days, setDays] = useState<3 | 4 | 5>(4);
+  const [fiveDayMode, setFiveDayMode] = useState<"twoLegDays" | "oneLegDay">("twoLegDays");
   const [selectedDay, setSelectedDay] = useState(0);
   const [activeMap, setActiveMap] = useState<Record<string, string>>({});
   const [logs, setLogs] = useState<LogSet[]>([]);
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>({});
   const [librarySearch, setLibrarySearch] = useState("");
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     const raw = window.localStorage.getItem("trainingLogsV2");
-    if (raw) setLogs(JSON.parse(raw));
+    if (raw) {
+      const parsed = JSON.parse(raw) as LogSet[];
+      setLogs(parsed.filter((item) => isWithinLastDays(item.date, 14)));
+    }
 
     const rawMap = window.localStorage.getItem("activeExerciseMapV2");
     if (rawMap) setActiveMap(JSON.parse(rawMap));
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("trainingLogsV2", JSON.stringify(logs));
+    window.localStorage.setItem("trainingLogsV2", JSON.stringify(logs.filter((item) => isWithinLastDays(item.date, 14))));
   }, [logs]);
 
   useEffect(() => {
     window.localStorage.setItem("activeExerciseMapV2", JSON.stringify(activeMap));
   }, [activeMap]);
 
-  const day = plans[days][selectedDay] ?? plans[days][0];
+  const activePlan = days === 5 && fiveDayMode === "oneLegDay" ? fiveDayLegOncePlan : plans[days];
+  const day = activePlan[selectedDay] ?? activePlan[0];
+
+  useEffect(() => {
+    if (selectedDay >= activePlan.length) setSelectedDay(0);
+  }, [activePlan.length, selectedDay]);
 
   const prMap = useMemo(() => {
     const best: Record<string, LogSet> = {};
@@ -548,6 +663,31 @@ export default function Page() {
     return all.filter((item) => item.name.toLowerCase().includes(keyword) || item.group.toLowerCase().includes(keyword));
   }, [librarySearch]);
 
+  const recentLogs = useMemo(() => {
+    return logs
+      .filter((item) => isWithinLastDays(item.date, 14))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [logs]);
+
+  const recentLogsByDate = useMemo(() => {
+    return recentLogs.reduce<Record<string, LogSet[]>>((acc, item) => {
+      const key = new Intl.DateTimeFormat("th-TH", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      }).format(new Date(item.date));
+
+      acc[key] = acc[key] ?? [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+  }, [recentLogs]);
+
+  function clearHistory() {
+    setLogs([]);
+    window.localStorage.removeItem("trainingLogsV2");
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-50">
       <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
@@ -559,12 +699,20 @@ export default function Page() {
             <h1 className="text-lg font-black leading-tight">Workout Tracker</h1>
           </div>
 
-          <button
-            onClick={() => setShowLibrary((value) => !value)}
-            className="rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold"
-          >
-            Library
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowHistory((value) => !value)}
+              className="rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold"
+            >
+              History
+            </button>
+            <button
+              onClick={() => setShowLibrary((value) => !value)}
+              className="rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm font-bold"
+            >
+              Library
+            </button>
+          </div>
         </div>
       </section>
 
@@ -597,6 +745,90 @@ export default function Page() {
             </div>
           </div>
         </div>
+
+
+        {days === 5 && (
+          <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
+            <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  setFiveDayMode("twoLegDays");
+                  setSelectedDay(0);
+                }}
+                className={`rounded-2xl px-3 py-3 text-sm font-black ${
+                  fiveDayMode === "twoLegDays" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
+                }`}
+              >
+                2 Leg Days
+              </button>
+              <button
+                onClick={() => {
+                  setFiveDayMode("oneLegDay");
+                  setSelectedDay(0);
+                }}
+                className={`rounded-2xl px-3 py-3 text-sm font-black ${
+                  fiveDayMode === "oneLegDay" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
+                }`}
+              >
+                1 Leg Day
+              </button>
+            </div>
+          </div>
+        )}
+
+
+        {showHistory && (
+          <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-black">
+                  <ClipboardList size={18} /> History Log
+                </h3>
+                <p className="mt-1 text-sm text-zinc-400">Temporary record from the last 14 days only.</p>
+              </div>
+
+              {recentLogs.length > 0 && (
+                <button
+                  onClick={clearHistory}
+                  className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300"
+                  aria-label="Clear history"
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
+            </div>
+
+            {recentLogs.length === 0 ? (
+              <div className="rounded-2xl bg-zinc-950 p-4 text-sm text-zinc-400">
+                No workout log yet. Save working sets first.
+              </div>
+            ) : (
+              <div className="max-h-[420px] space-y-4 overflow-y-auto pr-1">
+                {Object.entries(recentLogsByDate).map(([date, items]) => (
+                  <div key={date} className="rounded-2xl bg-zinc-950 p-3">
+                    <h4 className="mb-3 text-sm font-black text-emerald-300">{date}</h4>
+                    <div className="space-y-2">
+                      {items.map((item, index) => (
+                        <div key={`${item.date}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-bold leading-tight">{item.exerciseName}</p>
+                              <p className="mt-1 text-xs text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
+                            </div>
+                            <p className="whitespace-nowrap text-sm font-black text-emerald-300">
+                              {item.weightLbs} lbs × {item.reps}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {showLibrary && (
           <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
@@ -640,7 +872,7 @@ export default function Page() {
         )}
 
         <div className="mt-4 flex snap-x gap-2 overflow-x-auto pb-2">
-          {plans[days].map((item, index) => (
+          {activePlan.map((item, index) => (
             <button
               key={item.title}
               onClick={() => setSelectedDay(index)}
@@ -677,7 +909,7 @@ export default function Page() {
             const bestWeight = best?.weightLbs;
             const warmups = exercise.warmup ? getWarmupSets(bestWeight) : [];
             const setInputs = inputs[exercise.id] ?? createDefaultSetInputs(exercise.sets);
-            const options = Array.from(new Set([base.name, ...base.alternatives, ...exerciseNamesByGroup[base.group]]));
+            const options = Array.from(new Set([base.name, ...base.alternatives, ...getSamePatternAlternatives(base)])).filter((name) => name !== "DB Pullovers");
 
             return (
               <article key={`${baseId}-${index}`} className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4">

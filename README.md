@@ -1,16 +1,12 @@
-# Jeff 2.0 Mobile Workout Update
+# Jeff 2.0 Mobile Workout Update v2
 
-Updated mobile-first Next.js app.
-
-## Added
-- Full gym exercise list grouped by muscle
-- 3, 4 and 5 day auto split
-- Mobile sticky header and bottom day selector
-- Exercise substitutions from your available gym machines
-- Multi-set logging per exercise
-- PR display by exercise name
-- Automatic warmup calculator from previous best weight
-- Demo button for each exercise
+## New in this update
+- Added temporary History Log for the last 14 days
+- History is stored locally only and old logs are filtered out automatically
+- Added Clear History button
+- Substitutions are now limited to the same muscle group and similar movement pattern
+- Added alternate 5 day split with only 1 leg day
+- Kept the previous 5 day split with 2 leg days as selectable mode
 
 ## Replace files in your repo
 Upload/replace these files:
