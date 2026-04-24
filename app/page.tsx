@@ -969,6 +969,40 @@ export default function Page() {
     return selected ? [selected] : [];
   }, [day, compactList, activeExerciseIndex]);
 
+
+  const pageMeta = {
+    today: {
+      eyebrow: "Workout",
+      title: "Today",
+      description: "เลือกวันและเล่นทีละท่า ลดการเลื่อนหน้าจอ",
+    },
+    preset: {
+      eyebrow: "Preset",
+      title: "Program",
+      description: "เลือก split 3 / 4 / 5 วัน",
+    },
+    custom: {
+      eyebrow: "Builder",
+      title: "Custom",
+      description: "สร้างตารางเองแบบพับ control ไว้ให้หน้าโล่ง",
+    },
+    coach: {
+      eyebrow: "AI Coach",
+      title: "Coach",
+      description: "พิมพ์เป้าหมาย แล้วบันทึกแผนเข้า Custom ได้",
+    },
+    history: {
+      eyebrow: "Temporary",
+      title: "History",
+      description: "ดู log ย้อนหลัง 14 วัน",
+    },
+    library: {
+      eyebrow: "Exercise",
+      title: "Library",
+      description: "ค้นหาท่าทั้งหมดใน gym",
+    },
+  }[mode];
+
   return (
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-50">
       <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
@@ -993,14 +1027,55 @@ export default function Page() {
       </section>
 
       <section className="mx-auto max-w-5xl px-4 py-4">
-        <div className="grid gap-3 rounded-3xl border border-zinc-800 bg-zinc-900 p-4 md:grid-cols-[1fr_0.75fr]">
-          <div>
-            <p className="text-sm text-zinc-400">Preset + Custom + AI Coach</p>
-            <h2 className="mt-1 text-2xl font-black">Build your own split</h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Use preset splits, custom builder, or chat with HA IT Coach. Presets now target sensible Jeff-style volume, around 10-20 hard sets per muscle per week without stuffing junk volume into one session.
-            </p>
-          </div>
+        <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+          <p className="text-xs font-black uppercase tracking-wide text-emerald-300">{pageMeta.eyebrow}</p>
+          <h2 className="mt-1 text-2xl font-black">{pageMeta.title}</h2>
+          <p className="mt-1 text-sm leading-6 text-zinc-400">{pageMeta.description}</p>
+
+          {(mode === "today" || mode === "preset") && (
+            <div className="mt-4 rounded-2xl bg-zinc-950 p-3">
+              <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Training days</label>
+              <div className="relative">
+                <select
+                  value={days}
+                  onChange={(event) => {
+                    setDays(Number(event.target.value) as 3 | 4 | 5);
+                    setSelectedDay(0);
+                    setActiveExerciseIndex(0);
+                  }}
+                  className="w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-black outline-none"
+                >
+                  <option value={3}>3 days Full Body</option>
+                  <option value={4}>4 days Upper / Lower</option>
+                  <option value={5}>5 days Split</option>
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-4 text-zinc-400" size={20} />
+              </div>
+            </div>
+          )}
+
+          {mode === "custom" && selectedCustomPlan && (
+            <div className="mt-4 rounded-2xl bg-zinc-950 p-3">
+              <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Custom plan</label>
+              <div className="relative">
+                <select
+                  value={selectedCustomPlan?.id ?? ""}
+                  onChange={(event) => {
+                    setSelectedCustomPlanId(event.target.value);
+                    setSelectedCustomDay(0);
+                    setActiveExerciseIndex(0);
+                  }}
+                  className="w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-black outline-none"
+                >
+                  {customPlans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>{plan.name}</option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-4 top-4 text-zinc-400" size={20} />
+              </div>
+            </div>
+          )}
+        </div>
 
           <div className="grid gap-2">
             <div className="grid grid-cols-3 gap-2 rounded-2xl bg-zinc-950 p-2">
@@ -1014,35 +1089,6 @@ export default function Page() {
                 </button>
               ))}
             </div>
-
-            {isPresetLike ? (
-              <div className="rounded-2xl bg-zinc-950 p-3">
-                <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Training days</label>
-                <div className="relative">
-                  <select value={days} onChange={(event) => { setDays(Number(event.target.value) as 3 | 4 | 5); setSelectedDay(0); }} className="w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-black outline-none">
-                    <option value={3}>3 days Full Body</option>
-                    <option value={4}>4 days Upper / Lower</option>
-                    <option value={5}>5 days Split</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-4 top-4 text-zinc-400" size={20} />
-                </div>
-              </div>
-            ) : mode === "custom" ? (
-              <div className="rounded-2xl bg-zinc-950 p-3">
-                <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Custom plan</label>
-                <div className="relative">
-                  <select value={selectedCustomPlan?.id ?? ""} onChange={(event) => { setSelectedCustomPlanId(event.target.value); setSelectedCustomDay(0); }} className="w-full appearance-none rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-black outline-none">
-                    {customPlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name}</option>)}
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-4 top-4 text-zinc-400" size={20} />
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-2xl bg-zinc-950 p-3">
-                <p className="text-xs font-bold uppercase text-emerald-300">HA IT Coach</p>
-                <p className="mt-1 text-sm text-zinc-400">Generate a plan from chat, then save to Custom.</p>
-              </div>
-            )}
           </div>
         </div>
 
@@ -1054,11 +1100,11 @@ export default function Page() {
               </div>
               <div>
                 <h3 className="text-xl font-black">HA IT Coach</h3>
-                <p className="text-sm text-zinc-400">Rule-based AI coach inside the app. It can generate and save plans without an API key.</p>
+                <p className="text-sm text-zinc-400">Generate plan, then save to Custom.</p>
               </div>
             </div>
 
-            <div className="max-h-[520px] space-y-3 overflow-y-auto rounded-3xl bg-zinc-950 p-3">
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto rounded-3xl bg-zinc-950 p-3">
               {chatMessages.map((message) => (
                 <div key={message.id} className={`rounded-3xl p-3 ${message.role === "user" ? "ml-8 bg-emerald-400 text-zinc-950" : "mr-8 bg-zinc-900 text-zinc-100"}`}>
                   <p className="mb-1 flex items-center gap-2 text-xs font-black uppercase opacity-70">
@@ -1098,7 +1144,7 @@ export default function Page() {
           </div>
         )}
 
-        {mode === "preset" && days === 5 && (
+        {(mode === "today" || mode === "preset") && days === 5 && (
           <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
             <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
             <div className="grid grid-cols-2 gap-2">
@@ -1121,13 +1167,13 @@ export default function Page() {
             {recentLogs.length === 0 ? (
               <div className="rounded-2xl bg-zinc-950 p-4 text-sm text-zinc-400">No workout log yet. Save working sets first.</div>
             ) : (
-              <div className="max-h-[420px] space-y-4 overflow-y-auto pr-1">
+              <div className="space-y-3 pr-1">
                 {Object.entries(recentLogsByDate).map(([date, items]) => (
                   <div key={date} className="rounded-2xl bg-zinc-950 p-3">
                     <h4 className="mb-3 text-sm font-black text-emerald-300">{date}</h4>
                     <div className="space-y-2">
                       {items.map((item, index) => (
-                        <div key={`${item.date}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                        <div key={`${item.date}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="font-bold leading-tight">{item.exerciseName}</p>
@@ -1149,25 +1195,40 @@ export default function Page() {
           <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
             <div className="mb-4 flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-3 py-2">
               <Search size={18} className="text-zinc-500" />
-              <input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Search exercise, movement or muscle" className="w-full bg-transparent py-2 outline-none" />
+              <input
+                value={librarySearch}
+                onChange={(event) => setLibrarySearch(event.target.value)}
+                placeholder="Search exercise, movement or muscle"
+                className="w-full bg-transparent py-2 outline-none"
+              />
             </div>
 
-            <div className="max-h-96 overflow-y-auto pr-1">
+            <div className="space-y-2">
               {allGroups.map((group) => {
                 const names = filteredLibrary.filter((item) => item.group === group);
                 if (names.length === 0) return null;
+
                 return (
-                  <div key={group} className="mb-5">
-                    <h3 className="mb-2 flex items-center gap-2 text-sm font-black text-emerald-300"><Library size={14} /> {group}</h3>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                  <details key={group} className="rounded-2xl bg-zinc-950 p-3" open={librarySearch.trim().length > 0}>
+                    <summary className="cursor-pointer text-sm font-black text-emerald-300">
+                      <Library size={14} className="mr-2 inline" /> {group} · {names.length}
+                    </summary>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       {names.map((item) => (
-                        <a key={item.name} href={youtubeSearch(`${item.name} proper form`)} target="_blank" rel="noreferrer" className="rounded-2xl bg-zinc-950 px-3 py-3 text-sm text-zinc-300">
+                        <a
+                          key={item.name}
+                          href={youtubeSearch(`${item.name} proper form`)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-2xl bg-zinc-900 px-3 py-3 text-sm text-zinc-300"
+                        >
                           <span className="font-bold">{item.name}</span>
-                          <span className="ml-2 text-xs text-zinc-500">{item.movement}</span>
+                          <span className="mt-1 block text-xs text-zinc-500">{item.movement} · {item.tier}</span>
                         </a>
                       ))}
                     </div>
-                  </div>
+                  </details>
                 );
               })}
             </div>
@@ -1215,9 +1276,13 @@ export default function Page() {
         {(mode === "today" || mode === "preset" || mode === "custom") && (
           <div className="mt-4 flex snap-x gap-2 overflow-x-auto pb-2">
             {activePlan.map((item, index) => (
-              <button key={item.id} onClick={() => (isPresetLike ? setSelectedDay(index) : setSelectedCustomDay(index))} className={`min-w-[180px] snap-start rounded-3xl px-4 py-3 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+              <button key={item.id} onClick={() => {
+                if (isPresetLike) setSelectedDay(index);
+                else setSelectedCustomDay(index);
+                setActiveExerciseIndex(0);
+              }} className={`min-w-[152px] snap-start rounded-2xl px-3 py-3 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
                 <CalendarDays size={16} />
-                <p className="mt-2 font-black">{item.title}</p>
+                <p className="mt-2 line-clamp-1 font-black">{item.title}</p>
                 <p className="mt-1 text-xs opacity-80">{item.subtitle}</p>
               </button>
             ))}
@@ -1308,7 +1373,7 @@ export default function Page() {
                       setActiveExerciseIndex(index);
                       setCompactList(true);
                     }}
-                    className={`min-w-[132px] snap-start rounded-2xl px-3 py-3 text-left text-xs ${
+                    className={`min-w-[116px] snap-start rounded-2xl px-3 py-3 text-left text-xs ${
                       activeExerciseIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
                     }`}
                   >

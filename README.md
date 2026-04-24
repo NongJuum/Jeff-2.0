@@ -67,3 +67,11 @@ Keep postcss.config.mjs.
 - Exercise set/reps editing is collapsed.
 - Substitution selector is collapsed.
 - Exercise card text and spacing are tightened for mobile.
+
+## All pages mobile cleanup
+- Every main page now has a compact page header instead of a large repeated hero block.
+- Today/Preset/Custom controls are contextual, not duplicated everywhere.
+- Library is now accordion grouped by muscle and opens groups only when searching.
+- History is standalone and cleaner for mobile.
+- Coach chat is more compact.
+- Day carousel and exercise carousel are smaller and more responsive.
