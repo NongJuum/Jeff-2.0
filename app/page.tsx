@@ -226,37 +226,104 @@ function getPrescription(exercise: Exercise) {
   const movement = exercise.movement;
   const name = exercise.name.toLowerCase();
 
-  if (exercise.group === "Arms") {
-    return { sets: 3, reps: "10 to 15", warmup: false };
-  }
+  const individual: Record<string, { sets: number; reps: string; warmup: boolean }> = {
+    "machine chest press": { sets: 3, reps: "6 to 10", warmup: true },
+    "bench press": { sets: 3, reps: "5 to 8", warmup: true },
+    "flat db press": { sets: 3, reps: "8 to 12", warmup: true },
+    "incline db press": { sets: 3, reps: "8 to 12", warmup: true },
+    "incline machine bench": { sets: 3, reps: "8 to 12", warmup: true },
+    "incline smith machine bench": { sets: 3, reps: "8 to 12", warmup: true },
+    "smith machine press": { sets: 3, reps: "6 to 10", warmup: true },
+    "smith machine floor press": { sets: 3, reps: "6 to 10", warmup: true },
 
-  if (exercise.group === "Abs & Calves") {
-    return { sets: 3, reps: movement === "calves" ? "8 to 15" : "10 to 15", warmup: false };
-  }
+    "pec deck": { sets: 4, reps: "10 to 15", warmup: false },
+    "seated cable pec flye": { sets: 4, reps: "10 to 15", warmup: false },
+    "cable crossover": { sets: 3, reps: "12 to 20", warmup: false },
+    "db flye": { sets: 3, reps: "10 to 15", warmup: false },
 
-  if (movement === "hinge") {
-    return { sets: 2, reps: name.includes("deadlift") && !name.includes("romanian") ? "3 to 6" : "6 to 10", warmup: true };
-  }
+    "chest supported row": { sets: 3, reps: "8 to 12", warmup: true },
+    "cable row": { sets: 3, reps: "8 to 12", warmup: true },
+    "cable rows": { sets: 3, reps: "8 to 12", warmup: true },
+    "wide grip cable row": { sets: 3, reps: "10 to 15", warmup: true },
+    "deficit pendlay row": { sets: 3, reps: "6 to 10", warmup: true },
+    "one arm db row": { sets: 3, reps: "8 to 12", warmup: false },
+    "meadows row": { sets: 3, reps: "8 to 12", warmup: false },
+    "kroc row": { sets: 2, reps: "10 to 15", warmup: true },
 
-  if (movement === "single leg") {
-    return { sets: 2, reps: "8 to 12 each leg", warmup: false };
-  }
+    "neutral grip lat pull down": { sets: 3, reps: "8 to 12", warmup: true },
+    "widegrip lat pull down": { sets: 3, reps: "8 to 12", warmup: true },
+    "one arm lat pull down": { sets: 3, reps: "10 to 15", warmup: false },
+    "weighted pull up": { sets: 3, reps: "5 to 8", warmup: true },
+    "cable lat prayers": { sets: 3, reps: "12 to 15", warmup: false },
+    "db pullovers": { sets: 3, reps: "10 to 15", warmup: false },
 
-  if (movement.includes("flye")) {
-    return { sets: 2, reps: "10 to 15", warmup: false };
-  }
+    "hack squat": { sets: 3, reps: "6 to 10", warmup: true },
+    "pendulum squat": { sets: 3, reps: "6 to 10", warmup: true },
+    "barbell back squat": { sets: 3, reps: "5 to 8", warmup: true },
+    "front squat": { sets: 3, reps: "5 to 8", warmup: true },
+    "smith machine squat": { sets: 3, reps: "6 to 10", warmup: true },
+    "smith machine squat feet forward": { sets: 3, reps: "8 to 12", warmup: true },
+    "45° leg press": { sets: 3, reps: "10 to 15", warmup: true },
+    "45° leg press high foot": { sets: 3, reps: "10 to 15", warmup: true },
 
-  if (movement.includes("raise") || movement.includes("rear delt") || movement.includes("glute isolation")) {
-    return { sets: 3, reps: "12 to 20", warmup: false };
-  }
+    "romanian deadlift rdl": { sets: 2, reps: "6 to 10", warmup: true },
+    "deadlift": { sets: 2, reps: "3 to 6", warmup: true },
+    "45° back extension": { sets: 3, reps: "10 to 15", warmup: false },
+    "seated hamstring curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "lying leg curl": { sets: 3, reps: "10 to 15", warmup: false },
 
-  if (movement.includes("isolation") || movement.includes("curl") || movement === "lat isolation") {
-    return { sets: 3, reps: movement === "lat isolation" ? "12 to 15" : "10 to 15", warmup: false };
-  }
+    "leg extension": { sets: 4, reps: "10 to 15", warmup: false },
+    "reverse nordic": { sets: 3, reps: "8 to 12", warmup: false },
+    "sissy squat": { sets: 3, reps: "10 to 15", warmup: false },
 
-  if (movement === "vertical pull" && name.includes("weighted")) {
-    return { sets: 3, reps: "5 to 8", warmup: true };
-  }
+    "machine hip thrust": { sets: 3, reps: "8 to 12", warmup: true },
+    "machine hip abduction": { sets: 3, reps: "12 to 20", warmup: false },
+    "kickbacks": { sets: 3, reps: "12 to 20", warmup: false },
+    "bulgarian split squat": { sets: 3, reps: "8 to 12 each leg", warmup: false },
+    "lunges": { sets: 3, reps: "8 to 12 each leg", warmup: false },
+    "smith machine lunge ffe": { sets: 3, reps: "8 to 12 each leg", warmup: false },
+    "step ups high box": { sets: 3, reps: "8 to 12 each leg", warmup: false },
+
+    "machine shoulder press": { sets: 3, reps: "6 to 10", warmup: true },
+    "seated db overhead press": { sets: 3, reps: "8 to 12", warmup: true },
+    "cable lat raise": { sets: 4, reps: "12 to 20", warmup: false },
+    "atlantis machine lat raise": { sets: 4, reps: "12 to 20", warmup: false },
+    "behind back cable lat raise": { sets: 4, reps: "12 to 20", warmup: false },
+    "cable y raise": { sets: 3, reps: "12 to 20", warmup: false },
+    "lean in db raise": { sets: 3, reps: "12 to 20", warmup: false },
+    "reverse pec deck": { sets: 3, reps: "12 to 20", warmup: false },
+    "reverse cable crossover": { sets: 3, reps: "12 to 20", warmup: false },
+    "rope face pull": { sets: 3, reps: "12 to 20", warmup: false },
+
+    "face away bayesian curl": { sets: 4, reps: "10 to 15", warmup: false },
+    "incline curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "machine preacher curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "db preacher curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "ez bar curl": { sets: 3, reps: "8 to 12", warmup: false },
+    "standing db curl": { sets: 3, reps: "10 to 15", warmup: false },
+
+    "overhead cable ext": { sets: 4, reps: "10 to 15", warmup: false },
+    "katana cable": { sets: 3, reps: "10 to 15", warmup: false },
+    "1 arm db overhead": { sets: 3, reps: "10 to 15", warmup: false },
+    "barbell skullcrusher": { sets: 3, reps: "8 to 12", warmup: false },
+    "db skullcrusher": { sets: 3, reps: "10 to 15", warmup: false },
+    "triceps pressdown bar": { sets: 3, reps: "10 to 15", warmup: false },
+
+    "cable crunch": { sets: 3, reps: "10 to 15", warmup: false },
+    "machine abs crunch": { sets: 3, reps: "10 to 15", warmup: false },
+    "front calf muscle": { sets: 4, reps: "8 to 15", warmup: false },
+  };
+
+  if (individual[name]) return individual[name];
+
+  if (exercise.group === "Arms") return { sets: 3, reps: "10 to 15", warmup: false };
+  if (exercise.group === "Abs & Calves") return { sets: 3, reps: movement === "calves" ? "8 to 15" : "10 to 15", warmup: false };
+  if (movement === "hinge") return { sets: 2, reps: name.includes("deadlift") && !name.includes("romanian") ? "3 to 6" : "6 to 10", warmup: true };
+  if (movement === "single leg") return { sets: 3, reps: "8 to 12 each leg", warmup: false };
+  if (movement.includes("flye")) return { sets: 3, reps: "10 to 15", warmup: false };
+  if (movement.includes("raise") || movement.includes("rear delt") || movement.includes("glute isolation")) return { sets: 3, reps: "12 to 20", warmup: false };
+  if (movement.includes("isolation") || movement.includes("curl") || movement === "lat isolation") return { sets: 3, reps: movement === "lat isolation" ? "12 to 15" : "10 to 15", warmup: false };
+  if (movement === "vertical pull" && name.includes("weighted")) return { sets: 3, reps: "5 to 8", warmup: true };
 
   return {
     sets: 3,
@@ -864,8 +931,9 @@ export default function Page() {
   }
 
   function substituteExercise(currentExercise: PlanExercise, newName: string) {
+    const next = toPlanExercise(newName);
+
     if (mode === "custom") {
-      const next = toPlanExercise(newName);
       updateCustomExercise(currentExercise.id, {
         name: next.name,
         group: next.group,
@@ -878,10 +946,15 @@ export default function Page() {
       return;
     }
 
-    setSubstituteMap((old) => ({
-      ...old,
-      [currentExercise.id]: newName,
-    }));
+    setSubstituteMap((old) => {
+      const copy = { ...old };
+      if (newName === currentExercise.name) {
+        delete copy[currentExercise.id];
+        return copy;
+      }
+      copy[currentExercise.id] = newName;
+      return copy;
+    });
   }
 
   return (
@@ -1225,6 +1298,7 @@ export default function Page() {
                           <span className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-bold text-zinc-400">#{index + 1}</span>
                           <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">{exercise.group}</span>
                           <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">{exercise.movement}</span>
+                          {mode === "preset" && substituteMap[baseExercise.id] && <span className="rounded-full bg-blue-400/10 px-3 py-1 text-xs font-bold text-blue-300">Subbed</span>}
                           {exercise.warmup ? <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300"><Flame className="mr-1 inline" size={12} /> Warmup</span> : <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">No warmup</span>}
                         </div>
 
@@ -1260,12 +1334,24 @@ export default function Page() {
 
                     {alternatives.length > 0 && (
                       <div className="mb-4 rounded-2xl bg-zinc-950 p-3">
-                        <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><RotateCcw size={14} /> Same pattern substitutions</label>
-                        <select value={exercise.name} onChange={(event) => { if (mode === "custom") substituteExercise(baseExercise, event.target.value); }} className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none">
-                          <option>{exercise.name}</option>
-                          {alternatives.map((name) => <option key={name}>{name}</option>)}
+                        <label className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
+                          <RotateCcw size={14} /> Same pattern substitutions
+                        </label>
+                        <select
+                          value={exercise.name}
+                          onChange={(event) => substituteExercise(baseExercise, event.target.value)}
+                          className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none"
+                        >
+                          <option value={exercise.name}>{exercise.name}</option>
+                          {alternatives.map((name) => (
+                            <option key={name} value={name}>
+                              {name}
+                            </option>
+                          ))}
                         </select>
-                        <p className="mt-2 text-xs text-zinc-500">เลือกแทนได้ทั้ง Preset และ Custom โดยจำกัดให้ใกล้เคียง pattern เดิม</p>
+                        <p className="mt-2 text-xs text-zinc-500">
+                          Preset จะเปลี่ยนชั่วคราวใน session ส่วน Custom จะบันทึกเข้าแผนจริง
+                        </p>
                       </div>
                     )}
 

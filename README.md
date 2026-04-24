@@ -43,3 +43,11 @@ Keep postcss.config.mjs.
   - Isolation/accessory later
   - Arms/abs/calves toward the end
 - Substitutions remain same-muscle/similar-pattern and work in both Preset and Custom.
+
+## Individual set and substitution fix
+- Fixed preset substitution so selecting an option immediately changes the displayed exercise.
+- Added individual per-exercise set prescriptions instead of one generic rule per movement pattern.
+- Pec Deck and Seated Cable Pec Flye are now 4 hard sets, not 2.
+- Face Away Bayesian Curl and Overhead Cable Extension are 4 sets; most other direct arms are 3 sets.
+- Cable lateral raise and major lateral raise variations are 4 sets.
+- Heavy hinges/deadlifts stay lower due to fatigue.
