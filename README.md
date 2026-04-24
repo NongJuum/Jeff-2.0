@@ -51,3 +51,11 @@ Keep postcss.config.mjs.
 - Face Away Bayesian Curl and Overhead Cable Extension are 4 sets; most other direct arms are 3 sets.
 - Cable lateral raise and major lateral raise variations are 4 sets.
 - Heavy hinges/deadlifts stay lower due to fatigue.
+
+## Mobile UX cleanup
+- History and Library are now real bottom tabs, not dropdown panels.
+- Added Today tab for a cleaner workout view.
+- Added exercise navigation carousel so users can jump to a movement without scrolling through the whole day.
+- Default workout view shows one exercise at a time with Previous/Next controls.
+- Weekly volume checker is collapsed by default to reduce vertical clutter.
+- Bottom navigation is now the main mobile navigation.
