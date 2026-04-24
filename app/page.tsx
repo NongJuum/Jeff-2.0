@@ -1332,7 +1332,6 @@ export default function Page() {
               ))}
             </div>
           </div>
-        </div>
 
         {mode === "coach" && (
           <div className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
