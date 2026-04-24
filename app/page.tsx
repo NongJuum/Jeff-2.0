@@ -226,16 +226,43 @@ function getPrescription(exercise: Exercise) {
   const movement = exercise.movement;
   const name = exercise.name.toLowerCase();
 
-  if (exercise.group === "Arms") return { sets: 4, reps: "10 to 15", warmup: false };
-  if (exercise.group === "Abs & Calves") return { sets: 3, reps: movement === "calves" ? "8 to 15" : "10 to 15", warmup: false };
-  if (movement === "hinge") return { sets: 2, reps: name.includes("deadlift") && !name.includes("romanian") ? "3 to 6" : "6 to 10", warmup: true };
-  if (movement.includes("flye") || movement.includes("isolation") || movement.includes("curl") || movement.includes("raise") || movement.includes("rear delt")) {
-    return { sets: 3, reps: movement.includes("raise") || movement.includes("rear delt") || movement.includes("glute isolation") ? "12 to 20" : "10 to 15", warmup: false };
+  if (exercise.group === "Arms") {
+    return { sets: 3, reps: "10 to 15", warmup: false };
   }
-  if (movement === "single leg") return { sets: 3, reps: "8 to 12 each leg", warmup: false };
-  if (movement === "lat isolation") return { sets: 3, reps: "12 to 15", warmup: false };
-  if (movement === "vertical pull" && name.includes("weighted")) return { sets: 3, reps: "5 to 8", warmup: true };
-  return { sets: 3, reps: movement.includes("incline") || movement.includes("row") || movement.includes("vertical pull") || movement.includes("glute bridge") ? "8 to 12" : "6 to 10", warmup: true };
+
+  if (exercise.group === "Abs & Calves") {
+    return { sets: 3, reps: movement === "calves" ? "8 to 15" : "10 to 15", warmup: false };
+  }
+
+  if (movement === "hinge") {
+    return { sets: 2, reps: name.includes("deadlift") && !name.includes("romanian") ? "3 to 6" : "6 to 10", warmup: true };
+  }
+
+  if (movement === "single leg") {
+    return { sets: 2, reps: "8 to 12 each leg", warmup: false };
+  }
+
+  if (movement.includes("flye")) {
+    return { sets: 2, reps: "10 to 15", warmup: false };
+  }
+
+  if (movement.includes("raise") || movement.includes("rear delt") || movement.includes("glute isolation")) {
+    return { sets: 3, reps: "12 to 20", warmup: false };
+  }
+
+  if (movement.includes("isolation") || movement.includes("curl") || movement === "lat isolation") {
+    return { sets: 3, reps: movement === "lat isolation" ? "12 to 15" : "10 to 15", warmup: false };
+  }
+
+  if (movement === "vertical pull" && name.includes("weighted")) {
+    return { sets: 3, reps: "5 to 8", warmup: true };
+  }
+
+  return {
+    sets: 3,
+    reps: movement.includes("incline") || movement.includes("row") || movement.includes("vertical pull") || movement.includes("glute bridge") ? "8 to 12" : "6 to 10",
+    warmup: true,
+  };
 }
 
 function toPlanExercise(name: string): PlanExercise {
@@ -260,48 +287,52 @@ function makeDay(title: string, subtitle: string, focus: MuscleGroup[], exercise
 function makePresetPlans() {
   return {
     3: [
-      makeDay("Day 1 Full Body A", "Chest first, then back, quads, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Hack Squat", "Seated Cable Pec Flye", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 2 Full Body B", "Posterior chain, row, chest isolation, rear delts", ["Legs", "Back", "Chest", "Shoulders", "Abs & Calves"], ["Romanian Deadlift RDL", "Chest Supported Row", "Seated Cable Pec Flye", "Reverse Pec Deck", "Machine Hip Thrust", "Cable Crunch", "Front Calf Muscle"]),
-      makeDay("Day 3 Full Body C", "Quads, vertical pull, incline chest, hamstrings, core", ["Legs", "Back", "Chest", "Shoulders", "Abs & Calves"], ["Leg Extension", "Neutral Grip Lat Pull Down", "Incline DB Press", "Seated Hamstring Curl", "Cable Lat Raise", "Overhead Cable Ext", "Cable Crunch"]),
+      makeDay("Day 1 Full Body A", "Squat, horizontal press, row, hamstrings, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Hack Squat", "Machine Chest Press", "Chest Supported Row", "Seated Hamstring Curl", "Cable Lat Raise", "Overhead Cable Ext"]),
+      makeDay("Day 2 Full Body B", "Hinge, vertical pull, incline press, quads, rear delts, biceps", ["Legs", "Back", "Chest", "Shoulders", "Arms"], ["Romanian Deadlift RDL", "Neutral Grip Lat Pull Down", "Incline DB Press", "Leg Extension", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
+      makeDay("Day 3 Full Body C", "Leg press, chest isolation, row, glutes, delts, calves or abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["45° Leg Press", "Seated Cable Pec Flye", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
     ],
     4: [
-      makeDay("Day 1 Upper A", "Chest, lats, side delts, biceps, triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Chest Supported Row", "Seated Cable Pec Flye", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 2 Lower A", "Quad bias with hamstrings and calves", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Machine Hip Thrust", "Leg Extension", "Bulgarian Split Squat", "Front Calf Muscle"]),
-      makeDay("Day 3 Upper B", "Rows, incline press, rear delts, arms", ["Back", "Chest", "Shoulders", "Arms"], ["Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 4 Lower B", "Posterior bias with quads and abs", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press", "Leg Extension", "Machine Hip Thrust", "Seated Hamstring Curl", "Cable Crunch"]),
+      makeDay("Day 1 Upper A", "Press, row, pulldown, chest isolation, delts, triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye", "Cable Lat Raise", "Overhead Cable Ext"]),
+      makeDay("Day 2 Lower A", "Quad bias with hamstrings, glutes, calves", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Machine Hip Thrust", "Leg Extension", "Front Calf Muscle"]),
+      makeDay("Day 3 Upper B", "Incline press, row, lat isolation, rear delts, biceps, triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Incline DB Press", "Cable Row", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl", "Triceps Pressdown Bar"]),
+      makeDay("Day 4 Lower B", "Posterior bias with quads, abs, calves", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press", "Lying Leg Curl", "Bulgarian Split Squat", "Cable Crunch", "Front Calf Muscle"]),
     ],
     5: [
-      makeDay("Day 1 Chest + Back", "Press, pull, flye, row", ["Chest", "Back"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Incline DB Press", "Chest Supported Row", "Seated Cable Pec Flye", "Cable Lat Prayers"]),
-      makeDay("Day 2 Legs Quad Bias", "Squat pattern first, then accessories", ["Legs", "Abs & Calves"], ["Hack Squat", "45° Leg Press", "Leg Extension", "Machine Hip Thrust", "Seated Hamstring Curl", "Front Calf Muscle"]),
-      makeDay("Day 3 Shoulders + Arms", "Delts first, then biceps and triceps", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Face Away Bayesian Curl", "Machine Preacher Curl", "Overhead Cable Ext", "Triceps Pressdown Bar"]),
-      makeDay("Day 4 Back + Chest", "Row bias with chest support work", ["Back", "Chest"], ["Chest Supported Row", "Cable Lat Prayers", "Neutral Grip Lat Pull Down", "Wide Grip Cable Row", "Seated Cable Pec Flye", "Incline DB Press"]),
-      makeDay("Day 5 Legs Posterior Bias", "Hinge, hamstrings, glutes, abs", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "Seated Hamstring Curl", "Machine Hip Thrust", "Bulgarian Split Squat", "Cable Crunch", "Front Calf Muscle"]),
+      makeDay("Day 1 Chest + Back A", "Horizontal press, row, incline press, vertical pull, flye", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye"]),
+      makeDay("Day 2 Legs Quad Bias", "Squat press, leg curl, quad isolation, glute, calf", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Front Calf Muscle"]),
+      makeDay("Day 3 Shoulders + Arms", "Shoulder press, side delt, rear delt, biceps, triceps", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+      makeDay("Day 4 Chest + Back B", "Row bias, lat isolation, chest press, flye, rear delt", ["Back", "Chest", "Shoulders"], ["Cable Row", "Cable Lat Prayers", "Incline Machine Bench", "Pec Deck", "Rope Face Pull"]),
+      makeDay("Day 5 Legs Posterior Bias", "Hinge, squat press, hamstring curl, glute, abs or calves", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Lying Leg Curl", "Machine Hip Thrust", "Cable Crunch", "Front Calf Muscle"]),
     ],
   } satisfies Record<3 | 4 | 5, DayPlan[]>;
 }
 
 function makeFiveDayLegOncePlan() {
   return [
-    makeDay("Day 1 Push", "Chest, shoulders, triceps", ["Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye", "Cable Lat Raise", "Overhead Cable Ext", "Triceps Pressdown Bar"]),
-    makeDay("Day 2 Pull", "Back thickness, lats, biceps", ["Back", "Arms"], ["Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl", "Machine Preacher Curl"]),
-    makeDay("Day 3 Legs Only", "One leg day with quad, hamstring, glute, calf", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Machine Hip Thrust", "Leg Extension", "Bulgarian Split Squat", "Front Calf Muscle"]),
-    makeDay("Day 4 Upper A", "Chest and back with shoulder accessory", ["Chest", "Back", "Shoulders"], ["Machine Chest Press", "Incline DB Press", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye", "Reverse Pec Deck"]),
-    makeDay("Day 5 Upper B + Arms", "Back, incline chest, delts, arms", ["Back", "Chest", "Shoulders", "Arms"], ["Neutral Grip Lat Pull Down", "Chest Supported Row", "Incline DB Press", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+    makeDay("Day 1 Push", "Chest press, incline, flye, side delt, triceps", ["Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye", "Cable Lat Raise", "Overhead Cable Ext"]),
+    makeDay("Day 2 Pull", "Row, pulldown, lat isolation, rear delt, biceps", ["Back", "Shoulders", "Arms"], ["Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
+    makeDay("Day 3 Legs Only", "Single weekly leg day with complete lower-body coverage", ["Legs", "Abs & Calves"], ["Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Front Calf Muscle"]),
+    makeDay("Day 4 Upper A", "Chest and back volume without extra leg fatigue", ["Chest", "Back", "Shoulders"], ["Incline Machine Bench", "Cable Row", "Pec Deck", "Widegrip Lat Pull Down", "Rope Face Pull"]),
+    makeDay("Day 5 Upper B + Arms", "Upper pump with direct arm work", ["Back", "Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Chest Supported Row", "Cable Lat Raise", "Machine Preacher Curl", "Triceps Pressdown Bar"]),
   ];
 }
 
 function recommendForGroups(groups: MuscleGroup[]) {
   const names: string[] = [];
+
   if (groups.includes("Chest")) names.push("Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye");
   if (groups.includes("Back")) names.push("Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers");
   if (groups.includes("Legs")) names.push("Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust");
   if (groups.includes("Shoulders")) {
+    if (!groups.includes("Chest")) names.push("Machine Shoulder Press");
     names.push("Cable Lat Raise", "Reverse Pec Deck");
-    if (!groups.includes("Chest")) names.unshift("Machine Shoulder Press");
   }
   if (groups.includes("Arms")) names.push("Face Away Bayesian Curl", "Overhead Cable Ext");
   if (groups.includes("Abs & Calves")) names.push("Cable Crunch", "Front Calf Muscle");
-  return Array.from(new Set(names)).map(toPlanExercise);
+
+  // Keep the day dense enough for hypertrophy but avoid junk volume.
+  const maxExercises = groups.includes("Legs") ? 6 : groups.length >= 3 ? 7 : 6;
+  return Array.from(new Set(names)).slice(0, maxExercises).map(toPlanExercise);
 }
 
 function inferGroupsFromText(text: string): MuscleGroup[] {
@@ -340,8 +371,8 @@ function buildCoachPlanFromText(text: string) {
       name: planName,
       days: [
         makeDay("AI Full Body A", "Press, pull, squat, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Machine Chest Press", "Neutral Grip Lat Pull Down", "Hack Squat", "Seated Cable Pec Flye", "Cable Lat Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-        makeDay("AI Full Body B", "Hinge, row, chest isolation, glutes, calves", ["Legs", "Back", "Chest", "Abs & Calves"], ["Romanian Deadlift RDL", "Chest Supported Row", "Seated Cable Pec Flye", "Machine Hip Thrust", "Front Calf Muscle"]),
-        makeDay("AI Full Body C", "Quad isolation, incline chest, hamstring, rear delt, core", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["Leg Extension", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Hamstring Curl", "Reverse Pec Deck", "Cable Crunch"]),
+        makeDay("AI Full Body B", "Hinge, row, chest isolation, glutes, calves", ["Legs", "Back", "Chest", "Abs & Calves"], ["Romanian Deadlift RDL", "Neutral Grip Lat Pull Down", "Incline DB Press", "Leg Extension", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
+        makeDay("AI Full Body C", "Quad isolation, incline chest, hamstring, rear delt, core", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["45° Leg Press", "Seated Cable Pec Flye", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
       ],
     } satisfies CustomPlan;
   }
@@ -884,7 +915,7 @@ export default function Page() {
             <p className="text-sm text-zinc-400">Preset + Custom + AI Coach</p>
             <h2 className="mt-1 text-2xl font-black">Build your own split</h2>
             <p className="mt-2 text-sm leading-6 text-zinc-400">
-              Use preset splits, custom builder, or chat with HA IT Coach to generate a plan and save it directly.
+              Use preset splits, custom builder, or chat with HA IT Coach. Presets now target sensible Jeff-style volume, around 10-20 hard sets per muscle per week without stuffing junk volume into one session.
             </p>
           </div>
 

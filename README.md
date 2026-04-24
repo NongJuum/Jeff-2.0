@@ -28,3 +28,18 @@ Keep postcss.config.mjs.
 - Alternatives now fall back to related movement and same muscle group so the list no longer disappears
 - Increased sparse 4-exercise days to more complete 5-7 exercise days
 - Preset and coach plans now have more realistic hypertrophy day density
+
+## Jeff-principled correction
+- Rebuilt preset day structures around public Jeff-style hypertrophy principles:
+  - Most muscles land near the 10-20 hard sets/week range
+  - Avoids excessive per-session junk volume
+  - Compounds mostly 3 sets
+  - Isolation mostly 2-3 sets
+  - Direct arms 3 sets per isolation, with indirect arm volume from pressing/pulling
+  - Very fatiguing hinge/deadlift patterns stay at 2 sets
+- 3 day, 4 day, and 5 day presets now use balanced movement order:
+  - Heavy compound first
+  - Secondary compound next
+  - Isolation/accessory later
+  - Arms/abs/calves toward the end
+- Substitutions remain same-muscle/similar-pattern and work in both Preset and Custom.
