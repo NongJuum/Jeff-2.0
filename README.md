@@ -26,3 +26,9 @@ If you still have postcss.config.js, delete it to avoid duplicate config.
 - Keeps History/Library panel state
 - Keeps unsaved set inputs temporarily
 - Restores scroll position with sessionStorage
+
+## HA IT branding update
+- App name changed to HA IT
+- Browser favicon uses the provided barbell lifter icon
+- Added app icons for mobile/PWA usage
+- Added web manifest

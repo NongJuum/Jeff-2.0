@@ -693,10 +693,15 @@ export default function Page() {
       <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div>
-            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-300">
-              <Dumbbell size={14} /> Jeff 2.0
-            </p>
-            <h1 className="text-lg font-black leading-tight">Workout Tracker</h1>
+            <div className="flex items-center gap-3">
+              <img src="/hait-logo.png" alt="HA IT logo" className="h-9 w-9 rounded-xl bg-white object-contain p-1" />
+              <div>
+                <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-300">
+                  <Dumbbell size={14} /> HA IT
+                </p>
+                <h1 className="text-lg font-black leading-tight">Workout Tracker</h1>
+              </div>
+            </div>
           </div>
 
           <div className="flex gap-2">
