@@ -104,3 +104,11 @@ Keep postcss.config.mjs.
 - Removed Smart Coach copy.
 - Bottom navigation is now Today, Preset, Custom, Log and Library.
 - The app is focused on workout tracking and custom plan building.
+
+
+## Minimal responsive UI cleanup
+- Reduced oversized typography and spacing across all main screens.
+- Shortened non-essential descriptive text.
+- Made day cards, exercise navigation, and bottom navigation smaller and cleaner.
+- Simplified selected-day summary and workout card UI.
+- Improved small-screen scaling for a cleaner mobile-first feel.

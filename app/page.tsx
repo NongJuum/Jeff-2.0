@@ -921,27 +921,27 @@ export default function Page() {
     today: {
       eyebrow: "Workout",
       title: "Today",
-      description: "เลือกวันและเล่นทีละท่า ลดการเลื่อนหน้าจอ",
+      description: "เล่นทีละท่าแบบง่ายๆ",
     },
     preset: {
       eyebrow: "Preset",
       title: "Program",
-      description: "เลือก split 3 / 4 / 5 วัน",
+      description: "เลือกโปรแกรมที่ต้องการ",
     },
     custom: {
       eyebrow: "Builder",
       title: "Custom",
-      description: "สร้างตารางเองแบบพับ control ไว้ให้หน้าโล่ง",
+      description: "สร้างและแก้ตารางเอง",
     },
     history: {
       eyebrow: "Temporary",
       title: "History",
-      description: "ดู log ย้อนหลัง 14 วัน",
+      description: "ย้อนหลัง 14 วัน",
     },
     library: {
       eyebrow: "Exercise",
       title: "Library",
-      description: "ค้นหาท่าทั้งหมดใน gym",
+      description: "รวมท่าที่มีใน gym",
     },
   }[mode];
 
@@ -949,7 +949,7 @@ export default function Page() {
     <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-50">
       <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <img src="/hait-logo.png" alt="HA IT logo" className="h-9 w-9 rounded-xl bg-white object-contain p-1" />
             <div>
               <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-300">
@@ -958,24 +958,17 @@ export default function Page() {
               <h1 className="text-lg font-black leading-tight">Workout Tracker</h1>
             </div>
           </div>
-
-          <button
-            onClick={() => setMode("today")}
-            className="rounded-2xl bg-emerald-400 px-3 py-2 text-sm font-black text-zinc-950"
-          >
-            Coach
-          </button>
         </div>
       </section>
 
       <section className="mx-auto max-w-5xl px-4 py-4">
-        <div className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
-          <p className="text-xs font-black uppercase tracking-wide text-emerald-300">{pageMeta.eyebrow}</p>
-          <h2 className="mt-1 text-2xl font-black">{pageMeta.title}</h2>
-          <p className="mt-1 text-sm leading-6 text-zinc-400">{pageMeta.description}</p>
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
+          <p className="text-[10px] font-black uppercase tracking-wide text-emerald-300">{pageMeta.eyebrow}</p>
+          <h2 className="mt-1 text-lg font-black">{pageMeta.title}</h2>
+          <p className="mt-1 text-xs leading-5 text-zinc-500">{pageMeta.description}</p>
 
           {(mode === "today" || mode === "preset") && (
-            <div className="mt-4 rounded-2xl bg-zinc-950 p-3">
+            <div className="mt-3 rounded-xl bg-zinc-950 p-3">
               <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Training days</label>
               <div className="relative">
                 <select
@@ -997,7 +990,7 @@ export default function Page() {
           )}
 
           {mode === "custom" && selectedCustomPlan && (
-            <div className="mt-4 rounded-2xl bg-zinc-950 p-3">
+            <div className="mt-3 rounded-xl bg-zinc-950 p-3">
               <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Custom plan</label>
               <div className="relative">
                 <select
@@ -1020,13 +1013,13 @@ export default function Page() {
         </div>
 
           <div className="grid gap-2">
-            <div className="grid grid-cols-3 gap-2 rounded-2xl bg-zinc-950 p-2">
+            <div className="grid grid-cols-3 gap-2 rounded-xl bg-zinc-950 p-1.5">
               {[
                 ["today", "Today"],
                 ["preset", "Preset"],
                 ["custom", "Custom"],
               ].map(([key, label]) => (
-                <button key={key} onClick={() => setMode(key as AppMode)} className={`rounded-2xl py-3 text-sm font-black ${mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+                <button key={key} onClick={() => setMode(key as AppMode)} className={`rounded-xl py-2.5 text-sm font-bold ${mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
                   {label}
                 </button>
               ))}
@@ -1034,7 +1027,7 @@ export default function Page() {
           </div>
 
         {(mode === "today" || mode === "preset") && days === 5 && (
-          <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
+          <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
             <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => { setFiveDayMode("twoLegDays"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "twoLegDays" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"}`}>2 Leg Days</button>
@@ -1044,11 +1037,11 @@ export default function Page() {
         )}
 
         {mode === "history" && (
-          <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <h3 className="flex items-center gap-2 text-lg font-black"><ClipboardList size={18} /> History Log</h3>
-                <p className="mt-1 text-sm text-zinc-400">Temporary record from the last 14 days only.</p>
+                <p className="mt-0.5 text-[11px] text-zinc-500">Temporary record from the last 14 days only.</p>
               </div>
               {recentLogs.length > 0 && <button onClick={clearHistory} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Clear history"><Trash2 size={18} /></button>}
             </div>
@@ -1066,7 +1059,7 @@ export default function Page() {
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="font-bold leading-tight">{item.exerciseName}</p>
-                              <p className="mt-1 text-xs text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
+                              <p className="mt-1 text-[11px] text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
                             </div>
                             <p className="whitespace-nowrap text-sm font-black text-emerald-300">{item.weightLbs} lbs × {item.reps}</p>
                           </div>
@@ -1087,7 +1080,7 @@ export default function Page() {
               <input
                 value={librarySearch}
                 onChange={(event) => setLibrarySearch(event.target.value)}
-                placeholder="Search exercise, movement or muscle"
+                placeholder="Search"
                 className="w-full bg-transparent py-2 outline-none"
               />
             </div>
@@ -1126,7 +1119,7 @@ export default function Page() {
 
         {mode === "custom" && selectedCustomPlan && (
           <details className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
-            <summary className="cursor-pointer text-base font-black text-emerald-300">Custom plan settings</summary>
+            <summary className="cursor-pointer text-base font-black text-emerald-300">Plan settings</summary>
 
             <div className="mt-4 grid gap-3">
               <div>
@@ -1163,15 +1156,15 @@ export default function Page() {
         )}
 
         {(mode === "today" || mode === "preset" || mode === "custom") && (
-          <div className="mt-4 flex snap-x gap-2 overflow-x-auto pb-2">
+          <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1">
             {activePlan.map((item, index) => (
               <button key={item.id} onClick={() => {
                 if (isPresetLike) setSelectedDay(index);
                 else setSelectedCustomDay(index);
                 setActiveExerciseIndex(0);
-              }} className={`min-w-[152px] snap-start rounded-2xl px-3 py-3 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+              }} className={`min-w-[136px] snap-start rounded-xl px-3 py-2.5 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
                 <CalendarDays size={16} />
-                <p className="mt-2 line-clamp-1 font-black">{item.title}</p>
+                <p className="mt-1 line-clamp-2 text-sm font-bold leading-5">{item.title}</p>
                 <p className="mt-1 text-xs opacity-80">{item.subtitle}</p>
               </button>
             ))}
@@ -1199,8 +1192,8 @@ export default function Page() {
                   </div>
 
                   <details className="rounded-2xl bg-zinc-950 p-3">
-                    <summary className="cursor-pointer text-sm font-black text-zinc-300">
-                      Day targets & recommendation
+                    <summary className="cursor-pointer text-xs font-bold text-zinc-300">
+                      Targets & recommend
                     </summary>
 
                     <div className="mt-3">
@@ -1223,7 +1216,7 @@ export default function Page() {
                         onClick={recommendIntoCurrentDay}
                         className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-zinc-950"
                       >
-                        <Sparkles size={16} /> Recommend exercises
+                        <Sparkles size={16} /> Recommend
                       </button>
                     </div>
                   </details>
@@ -1235,24 +1228,24 @@ export default function Page() {
                 </>
               )}
 
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-2 flex flex-wrap gap-1.5">
                 {day.focus.map((focus) => (
-                  <span key={focus} className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-300">{focus}</span>
+                  <span key={focus} className="rounded-full bg-zinc-800 px-2.5 py-1 text-[11px] font-medium text-zinc-300">{focus}</span>
                 ))}
               </div>
             </div>
 
             <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
-              <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-black">Exercise navigation</h3>
-                  <p className="mt-1 text-xs text-zinc-500">แตะเลือกท่า ไม่ต้องเลื่อนยาวทั้งหน้า</p>
+                  <h3 className="text-sm font-bold">Exercises</h3>
+                  <p className="mt-1 text-[11px] text-zinc-500">เลือกท่าที่ต้องการ</p>
                 </div>
                 <button
                   onClick={() => setCompactList((value) => !value)}
-                  className="rounded-2xl bg-zinc-950 px-3 py-2 text-xs font-black text-zinc-300"
+                  className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-medium text-zinc-300"
                 >
-                  {compactList ? "Show All" : "One by One"}
+                  {compactList ? "All" : "Focus"}
                 </button>
               </div>
 
@@ -1264,19 +1257,19 @@ export default function Page() {
                       setActiveExerciseIndex(index);
                       setCompactList(true);
                     }}
-                    className={`min-w-[116px] snap-start rounded-2xl px-3 py-3 text-left text-xs ${
+                    className={`min-w-[96px] snap-start rounded-xl px-3 py-2.5 text-left text-xs ${
                       activeExerciseIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
                     }`}
                   >
-                    <span className="block font-black">#{index + 1}</span>
-                    <span className="mt-1 line-clamp-2 block font-bold">{item.name}</span>
+                    <span className="block text-[11px] font-bold">#{index + 1}</span>
+                    <span className="mt-1 line-clamp-3 block text-sm font-semibold leading-5">{item.name}</span>
                   </button>
                 ))}
               </div>
             </div>
             <details className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
-              <summary className="cursor-pointer text-sm font-black text-zinc-300">Weekly volume check</summary>
-              <p className="mt-2 text-xs text-zinc-400">Direct planned sets from this split. Presses/pulls still add indirect arm work.</p>
+              <summary className="cursor-pointer text-xs font-bold text-zinc-300">Volume</summary>
+              <p className="mt-2 text-xs text-zinc-400">Direct weekly sets</p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {weeklyVolumeSummary.map(([muscle, sets]) => (
                   <div key={muscle} className="rounded-2xl bg-zinc-950 p-3">
@@ -1289,7 +1282,7 @@ export default function Page() {
 
             {mode === "custom" && (
               <details className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
-                <summary className="cursor-pointer text-sm font-black text-zinc-300">
+                <summary className="cursor-pointer text-xs font-bold text-zinc-300">
                   <Plus size={16} className="mr-2 inline" /> Add exercise
                 </summary>
 
@@ -1313,7 +1306,7 @@ export default function Page() {
                       <input
                         value={exerciseSearch}
                         onChange={(event) => setExerciseSearch(event.target.value)}
-                        placeholder="Search exercise"
+                        placeholder="Search"
                         className="w-full bg-transparent py-2 text-sm outline-none"
                       />
                     </div>
@@ -1352,7 +1345,7 @@ export default function Page() {
                 const alternatives = getAlternatives(exercise);
 
                 return (
-                  <article key={baseExercise.id} className="rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap gap-2">
@@ -1363,8 +1356,8 @@ export default function Page() {
                           {exercise.warmup ? <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300"><Flame className="mr-1 inline" size={12} /> Warmup</span> : <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">No warmup</span>}
                         </div>
 
-                        <h3 className="mt-3 text-xl font-black leading-tight sm:text-2xl">{exercise.name}</h3>
-                        <p className="mt-1 text-sm text-zinc-400">Target: {exercise.sets} hard working sets × {exercise.reps} reps</p>
+                        <h3 className="mt-2 text-lg font-black leading-snug sm:text-xl">{exercise.name}</h3>
+                        <p className="mt-1 text-sm text-zinc-400">{exercise.sets} hard working sets × {exercise.reps} reps</p>
                       </div>
 
                       <div className="flex flex-col gap-2">
@@ -1373,13 +1366,13 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div className="mb-3 flex flex-wrap gap-2">
+                    <div className="mb-2 flex flex-wrap gap-1.5">
                       {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
                     </div>
 
                     {mode === "custom" && (
-                      <details className="mb-4 rounded-2xl bg-zinc-950 p-3">
-                        <summary className="cursor-pointer text-sm font-black text-zinc-300">Edit sets / reps / warmup</summary>
+                      <details className="mb-3 rounded-xl bg-zinc-950 p-3">
+                        <summary className="cursor-pointer text-xs font-bold text-zinc-300">Edit</summary>
 
                         <div className="mt-3 grid grid-cols-3 gap-2">
                           <div>
@@ -1414,16 +1407,16 @@ export default function Page() {
                     )}
 
                     {alternatives.length > 0 && (
-                      <details className="mb-4 rounded-2xl bg-zinc-950 p-3">
-                        <summary className="cursor-pointer text-sm font-black text-zinc-300">
-                          <RotateCcw size={14} className="mr-2 inline" /> Substitute exercise
+                      <details className="mb-3 rounded-xl bg-zinc-950 p-3">
+                        <summary className="cursor-pointer text-xs font-bold text-zinc-300">
+                          <RotateCcw size={14} className="mr-2 inline" /> Substitute
                         </summary>
 
                         <div className="mt-3">
                           <select
                             value={exercise.name}
                             onChange={(event) => substituteExercise(baseExercise, event.target.value)}
-                            className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-4 text-base font-bold outline-none"
+                            className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm font-medium outline-none"
                           >
                             <option value={exercise.name}>{exercise.name}</option>
                             {alternatives.map((name) => (
@@ -1432,7 +1425,7 @@ export default function Page() {
                               </option>
                             ))}
                           </select>
-                          <p className="mt-2 text-xs text-zinc-500">
+                          <p className="mt-2 text-[11px] text-zinc-500">
                             Preset = session only, Custom = saved to plan.
                           </p>
                         </div>
@@ -1472,7 +1465,7 @@ export default function Page() {
                           </div>
                         ))}
                       </div>
-                      <button onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-4 text-base font-black text-zinc-950 active:scale-[0.99]">
+                      <button onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99]">
                         <Save size={18} /> Save all working sets
                       </button>
                     </div>
@@ -1481,14 +1474,14 @@ export default function Page() {
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
                           onClick={() => setActiveExerciseIndex(Math.max(0, activeExerciseIndex - 1))}
-                          className="rounded-2xl bg-zinc-950 px-4 py-3 text-sm font-black text-zinc-300 disabled:opacity-40"
+                          className="rounded-xl bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-300 disabled:opacity-40"
                           disabled={activeExerciseIndex === 0}
                         >
                           Previous
                         </button>
                         <button
                           onClick={() => setActiveExerciseIndex(Math.min(day.exercises.length - 1, activeExerciseIndex + 1))}
-                          className="rounded-2xl bg-zinc-50 px-4 py-3 text-sm font-black text-zinc-950 disabled:opacity-40"
+                          className="rounded-xl bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-950 disabled:opacity-40"
                           disabled={activeExerciseIndex >= day.exercises.length - 1}
                         >
                           Next
@@ -1503,7 +1496,7 @@ export default function Page() {
         )}
       </section>
 
-      <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
+      <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-1.5 backdrop-blur">
         <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1">
           {[
             ["today", "Today"],
@@ -1515,7 +1508,7 @@ export default function Page() {
             <button
               key={key}
               onClick={() => setMode(key as AppMode)}
-              className={`rounded-2xl py-3 text-[11px] font-black ${
+              className={`rounded-xl py-2.5 text-[11px] font-medium ${
                 mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"
               }`}
             >
