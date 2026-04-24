@@ -18,3 +18,11 @@ Upload/replace these files:
 - app/page.tsx
 
 If you still have postcss.config.js, delete it to avoid duplicate config.
+
+## New in this state persistence update
+- Keeps selected 3/4/5 day mode after switching apps
+- Keeps selected workout day
+- Keeps 5-day split mode
+- Keeps History/Library panel state
+- Keeps unsaved set inputs temporarily
+- Restores scroll position with sessionStorage
