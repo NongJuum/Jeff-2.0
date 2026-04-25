@@ -113,6 +113,16 @@ function writeSessionJson<T>(key: string, value: T) {
   } catch {}
 }
 
+function clearPersistedSetInputs(nextInputs: Record<string, SetInput[]>) {
+  if (!isBrowser()) return;
+
+  try {
+    window.sessionStorage.setItem(SET_INPUTS_KEY, JSON.stringify(nextInputs));
+  } catch {
+    // Ignore storage errors.
+  }
+}
+
 function writeLocalJson<T>(key: string, value: T) {
   if (!isBrowser()) return;
 
@@ -698,12 +708,19 @@ export default function Page() {
 
   const prMap = useMemo(() => {
     const best: Record<string, LogSet> = {};
+
     for (const log of logs) {
       const current = best[log.exerciseName];
-      const score = log.weightLbs * log.reps;
-      const currentScore = current ? current.weightLbs * current.reps : -1;
-      if (!current || score > currentScore || (score === currentScore && log.weightLbs > current.weightLbs)) best[log.exerciseName] = log;
+
+      if (
+        !current ||
+        log.weightLbs > current.weightLbs ||
+        (log.weightLbs === current.weightLbs && log.reps > current.reps)
+      ) {
+        best[log.exerciseName] = log;
+      }
     }
+
     return best;
   }, [logs]);
 
@@ -788,8 +805,20 @@ export default function Page() {
       .filter((item) => item.weightLbs > 0 && item.reps > 0);
 
     if (validSets.length === 0) return;
+
+    const clearedSets = createDefaultSetInputs(exercise.sets);
+
     setLogs((old) => [...old, ...validSets]);
-    setInputs((old) => ({ ...old, [exercise.id]: createDefaultSetInputs(exercise.sets) }));
+
+    setInputs((old) => {
+      const nextInputs = {
+        ...old,
+        [exercise.id]: clearedSets,
+      };
+
+      clearPersistedSetInputs(nextInputs);
+      return nextInputs;
+    });
   }
 
   function clearHistory() {
@@ -1436,7 +1465,7 @@ export default function Page() {
 
                     <div className="mb-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><Trophy size={14} /> Current PR</p>
+                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><Trophy size={14} /> Max Weight PR</p>
                         <p className="mt-2 text-2xl font-black text-emerald-300">{pr ? `${pr.weightLbs} lbs × ${pr.reps}` : "No record"}</p>
                       </div>
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
@@ -1495,7 +1524,7 @@ export default function Page() {
                         ))}
                       </div>
                       <button onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99]">
-                        <Save size={18} /> Save all working sets
+                        <Save size={18} /> Save sets
                       </button>
                     </div>
 
