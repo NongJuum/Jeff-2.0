@@ -68,6 +68,8 @@ type RestTimerState = {
   running: boolean;
 };
 
+type RestMode = "short" | "normal" | "heavy";
+
 type LogSet = {
   exerciseId: string;
   exerciseName: string;
@@ -491,8 +493,15 @@ function getRestSeconds(exercise: PlanExercise) {
   const movement = exercise.movement.toLowerCase();
   const name = exercise.name.toLowerCase();
 
+  const isMachineCompound =
+    name.includes("machine") ||
+    name.includes("smith") ||
+    name.includes("leg press") ||
+    name.includes("hack squat") ||
+    name.includes("pendulum");
+
   if (movement === "hinge" || name.includes("deadlift") || name.includes("rdl")) {
-    return 240;
+    return 210;
   }
 
   if (
@@ -503,7 +512,7 @@ function getRestSeconds(exercise: PlanExercise) {
     movement.includes("glute bridge") ||
     movement.includes("glute press")
   ) {
-    return 180;
+    return isMachineCompound ? 150 : 180;
   }
 
   if (exercise.group === "Abs & Calves") {
@@ -529,6 +538,15 @@ function formatRestTime(seconds: number) {
   const remainingSeconds = seconds % 60;
 
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
+function getRestSecondsByMode(exercise: PlanExercise, mode: RestMode) {
+  const normal = getRestSeconds(exercise);
+
+  if (mode === "short") return Math.max(30, normal - 30);
+  if (mode === "heavy") return normal + 30;
+
+  return normal;
 }
 
 function createDefaultSetInputs(sets: number): SetInput[] {
@@ -664,6 +682,8 @@ export default function Page() {
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
   const [restTimer, setRestTimer] = useState<RestTimerState>({ exerciseId: null, secondsLeft: 0, totalSeconds: 0, running: false });
   const [restTimerEnabled, setRestTimerEnabled] = useState(true);
+  const [restModeMap, setRestModeMap] = useState<Record<string, RestMode>>({});
+  const [customRestMap, setCustomRestMap] = useState<Record<string, number>>({});
   const [librarySearch, setLibrarySearch] = useState("");
   const [showLibrary, setShowLibrary] = useState(initialUiState.showLibrary);
   const [showHistory, setShowHistory] = useState(initialUiState.showHistory);
@@ -837,13 +857,61 @@ export default function Page() {
   function startRestTimer(exercise: PlanExercise) {
     if (!restTimerEnabled) return;
 
-    const seconds = getRestSeconds(exercise);
+    const mode = restModeMap[exercise.id] ?? "normal";
+    const seconds = customRestMap[exercise.id] ?? getRestSecondsByMode(exercise, mode);
 
     setRestTimer({
       exerciseId: exercise.id,
       secondsLeft: seconds,
       totalSeconds: seconds,
       running: true,
+    });
+  }
+
+  function adjustRestSeconds(exercise: PlanExercise, deltaSeconds: number) {
+    const mode = restModeMap[exercise.id] ?? "normal";
+    const current = customRestMap[exercise.id] ?? getRestSecondsByMode(exercise, mode);
+    const next = Math.max(30, current + deltaSeconds);
+
+    setCustomRestMap((old) => ({
+      ...old,
+      [exercise.id]: next,
+    }));
+
+    setRestTimer((currentTimer) => {
+      if (currentTimer.exerciseId !== exercise.id || currentTimer.running) return currentTimer;
+
+      return {
+        exerciseId: exercise.id,
+        secondsLeft: next,
+        totalSeconds: next,
+        running: false,
+      };
+    });
+  }
+
+  function setRestMode(exercise: PlanExercise, mode: RestMode) {
+    const seconds = getRestSecondsByMode(exercise, mode);
+
+    setRestModeMap((old) => ({
+      ...old,
+      [exercise.id]: mode,
+    }));
+
+    setCustomRestMap((old) => ({
+      ...old,
+      [exercise.id]: seconds,
+    }));
+
+    setRestTimer((currentTimer) => {
+      if (currentTimer.exerciseId !== exercise.id || currentTimer.running) return currentTimer;
+
+      return {
+        exerciseId: exercise.id,
+        secondsLeft: seconds,
+        totalSeconds: seconds,
+        running: false,
+      };
     });
   }
 
@@ -1587,6 +1655,8 @@ export default function Page() {
                 const records = recordsMap[exercise.name] ?? {};
                 const pr = records.maxWeight ?? prMap[exercise.name];
                 const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
+                const restMode = restModeMap[baseExercise.id] ?? "normal";
+                const selectedRestSeconds = customRestMap[baseExercise.id] ?? getRestSecondsByMode({ ...exercise, id: baseExercise.id }, restMode);
                 const rawSetInputs = inputs[baseExercise.id] ?? createDefaultSetInputs(exercise.sets);
                 const setInputs = normalizeSetInputs(rawSetInputs, exercise.sets);
                 const alternatives = getAlternatives(exercise);
@@ -1727,10 +1797,10 @@ export default function Page() {
                         <div>
                           <p className="text-xs font-bold uppercase text-zinc-500">Rest Timer</p>
                           <p className="mt-1 text-2xl font-black text-emerald-300">
-                            {restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0 ? formatRestTime(restTimer.secondsLeft) : formatRestTime(getRestSeconds(exercise))}
+                            {restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0 ? formatRestTime(restTimer.secondsLeft) : formatRestTime(selectedRestSeconds)}
                           </p>
                           <p className="mt-0.5 text-[11px] text-zinc-500">
-                            Recommended rest for this exercise
+                            Adjustable rest for this exercise
                           </p>
                         </div>
 
@@ -1753,6 +1823,42 @@ export default function Page() {
                             {restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop" : "Start"}
                           </button>
                         </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {[
+                          ["short", "Short"],
+                          ["normal", "Normal"],
+                          ["heavy", "Heavy"],
+                        ].map(([mode, label]) => (
+                          <button
+                            key={mode}
+                            onClick={() => setRestMode({ ...exercise, id: baseExercise.id }, mode as RestMode)}
+                            className={`rounded-xl px-3 py-2 text-xs font-bold ${
+                              restMode === mode ? "bg-zinc-50 text-zinc-950" : "bg-zinc-900 text-zinc-400"
+                            }`}
+                            type="button"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, -30)}
+                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300"
+                          type="button"
+                        >
+                          −30s
+                        </button>
+                        <button
+                          onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, 30)}
+                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300"
+                          type="button"
+                        >
+                          +30s
+                        </button>
                       </div>
 
                       {restTimer.exerciseId === baseExercise.id && restTimer.totalSeconds > 0 && (

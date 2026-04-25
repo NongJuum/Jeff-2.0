@@ -161,3 +161,8 @@ Keep postcss.config.mjs.
   - Isolation arms/delts/flye: 1:30
   - Abs/calves: 1:00
 - Users can turn the timer on/off or manually start/stop it.
+
+## Rest timer controls
+- Added Short / Normal / Heavy rest modes per exercise.
+- Added −30s / +30s adjustment.
+- Machine compounds default closer to 2:30, free-weight compounds around 3:00, hinges around 3:30, isolation around 1:30.
