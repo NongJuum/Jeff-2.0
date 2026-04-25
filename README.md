@@ -140,3 +140,9 @@ Keep postcss.config.mjs.
 ## Duplicate helper fix
 - Removed duplicate persistSetInputsNow helper created by repeated patches.
 - Kept tick-save and clear behavior intact.
+
+## Keep values after tick
+- Check button now saves a single set and keeps the lbs/reps visible.
+- Saved rows stay checked.
+- Editing lbs/reps marks the row as unsaved again.
+- Finish & clear saves unsaved rows and clears all inputs.

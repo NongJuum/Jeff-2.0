@@ -831,8 +831,25 @@ export default function Page() {
   function updateSet(exerciseId: string, setIndex: number, field: keyof SetInput, value: string | boolean, defaultSets: number) {
     setInputs((old) => {
       const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
-      const updated = current.map((set, index) => (index === setIndex ? { ...set, [field]: value } : set));
-      return { ...old, [exerciseId]: updated };
+      const updated = current.map((set, index) => {
+        if (index !== setIndex) return set;
+
+        const nextSet = { ...set, [field]: value };
+
+        if (field === "weightLbs" || field === "reps") {
+          nextSet.done = false;
+        }
+
+        return nextSet;
+      });
+
+      const nextInputs = {
+        ...old,
+        [exerciseId]: updated,
+      };
+
+      persistSetInputsNow(nextInputs);
+      return nextInputs;
     });
   }
 
@@ -847,20 +864,22 @@ export default function Page() {
 
     if (weightLbs <= 0 || reps <= 0) return;
 
-    const logSet: LogSet = {
-      exerciseId: exercise.id,
-      exerciseName: exercise.name,
-      weightLbs,
-      reps,
-      setNumber: setIndex + 1,
-      date: new Date().toISOString(),
-    };
+    if (!item.done) {
+      const logSet: LogSet = {
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        weightLbs,
+        reps,
+        setNumber: setIndex + 1,
+        date: new Date().toISOString(),
+      };
 
-    setLogs((old) => [...old, logSet]);
+      setLogs((old) => [...old, logSet]);
+    }
 
     setInputs((old) => {
       const current = normalizeSetInputs(old[exercise.id] ?? createDefaultSetInputs(exercise.sets), exercise.sets);
-      const updated = current.map((set, index) => (index === setIndex ? createEmptySetInput() : set));
+      const updated = current.map((set, index) => (index === setIndex ? { ...set, done: true } : set));
       const nextInputs = {
         ...old,
         [exercise.id]: updated,
@@ -883,8 +902,10 @@ export default function Page() {
         reps: Number(item.reps),
         setNumber: index + 1,
         date: new Date().toISOString(),
+        alreadySaved: item.done,
       }))
-      .filter((item) => item.weightLbs > 0 && item.reps > 0);
+      .filter((item) => item.weightLbs > 0 && item.reps > 0 && !item.alreadySaved)
+      .map(({ alreadySaved, ...item }) => item);
 
     if (validSets.length > 0) {
       setLogs((old) => [...old, ...validSets]);
@@ -1631,7 +1652,7 @@ export default function Page() {
                         ))}
                       </div>
                       <button onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99]">
-                        <Save size={18} /> Save sets
+                        <Save size={18} /> Finish & clear
                       </button>
                     </div>
 
