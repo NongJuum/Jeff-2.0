@@ -1150,11 +1150,490 @@ export default function Page() {
           <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
             <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
             <div className="grid grid-cols-2 gap-2">
-              <button
-                              onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex)}
-                              className="rounded-2xl border border-zinc-700 bg-zinc-900 text-zinc-500 active:border-emerald-400 active:bg-emerald-400 active:text-zinc-950"
-                              type="button"
-                            >
+              <button onClick={() => { setFiveDayMode("twoLegDays"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "twoLegDays" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"}`}>2 Leg Days</button>
+              <button onClick={() => { setFiveDayMode("oneLegDay"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "oneLegDay" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"}`}>1 Leg Day</button>
+            </div>
+          </div>
+        )}
+
+        {mode === "history" && (
+          <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-black"><ClipboardList size={18} /> History Log</h3>
+                <p className="mt-0.5 text-[11px] text-zinc-500">Temporary record from the last 14 days only.</p>
+              </div>
+              {recentLogs.length > 0 && <button onClick={clearHistory} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Clear history"><Trash2 size={18} /></button>}
+            </div>
+
+            {recentLogs.length === 0 ? (
+              <div className="rounded-2xl bg-zinc-950 p-4 text-sm text-zinc-400">No workout log yet. Save working sets first.</div>
+            ) : (
+              <div className="space-y-3 pr-1">
+                {Object.entries(recentLogsByDate).map(([date, items]) => (
+                  <div key={date} className="rounded-2xl bg-zinc-950 p-3">
+                    <h4 className="mb-3 text-sm font-black text-emerald-300">{date}</h4>
+                    <div className="space-y-2">
+                      {items.map((item, index) => (
+                        <div key={`${item.date}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-bold leading-tight">{item.exerciseName}</p>
+                              <p className="mt-1 text-[11px] text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
+                            </div>
+                            <p className="whitespace-nowrap text-sm font-black text-emerald-300">{item.weightLbs} lbs × {item.reps}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {mode === "library" && (
+          <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+            <div className="mb-4 flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-3 py-2">
+              <Search size={18} className="text-zinc-500" />
+              <input
+                value={librarySearch}
+                onChange={(event) => setLibrarySearch(event.target.value)}
+                placeholder="Search"
+                className="w-full bg-transparent py-2 outline-none"
+              />
+            </div>
+
+            <div className="space-y-2">
+              {allGroups.map((group) => {
+                const names = filteredLibrary.filter((item) => item.group === group);
+                if (names.length === 0) return null;
+
+                return (
+                  <details key={group} className="rounded-2xl bg-zinc-950 p-3" open={librarySearch.trim().length > 0}>
+                    <summary className="cursor-pointer text-sm font-black text-emerald-300">
+                      <Library size={14} className="mr-2 inline" /> {group} · {names.length}
+                    </summary>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      {names.map((item) => (
+                        <a
+                          key={item.name}
+                          href={youtubeSearch(`${item.name} proper form`)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-2xl bg-zinc-900 px-3 py-3 text-sm text-zinc-300"
+                        >
+                          <span className="font-bold">{item.name}</span>
+                          <span className="mt-1 block text-xs text-zinc-500">{item.movement} · {item.tier}</span>
+                        </a>
+                      ))}
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {mode === "custom" && selectedCustomPlan && (
+          <details className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
+            <summary className="cursor-pointer text-base font-black text-emerald-300">Plan settings</summary>
+
+            <div className="mt-4 grid gap-3">
+              <div>
+                <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Plan name</label>
+                <input
+                  value={selectedCustomPlan.name}
+                  onChange={(event) => updateCustomPlanName(event.target.value)}
+                  className="w-full rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-base font-black outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={createNewCustomPlan}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-zinc-950 px-3 py-3 text-xs font-black text-zinc-300"
+                >
+                  <Plus size={15} /> New
+                </button>
+                <button
+                  onClick={addCustomDay}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-3 py-3 text-xs font-black text-zinc-950"
+                >
+                  <Plus size={15} /> Day
+                </button>
+                <button
+                  onClick={deleteCustomPlan}
+                  className="flex items-center justify-center gap-2 rounded-2xl border border-red-500/40 bg-red-500/10 px-3 py-3 text-xs font-black text-red-300"
+                >
+                  <Trash2 size={15} /> Delete
+                </button>
+              </div>
+            </div>
+          </details>
+        )}
+
+        {(mode === "today" || mode === "preset" || mode === "custom") && (
+          <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1">
+            {activePlan.map((item, index) => (
+              <button key={item.id} onClick={() => {
+                if (isPresetLike) setSelectedDay(index);
+                else setSelectedCustomDay(index);
+                setActiveExerciseIndex(0);
+              }} className={`min-w-[136px] snap-start rounded-xl px-3 py-2.5 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+                <CalendarDays size={16} />
+                <p className="mt-1 line-clamp-2 text-sm font-bold leading-5">{item.title}</p>
+                <p className="mt-1 text-xs opacity-80">{item.subtitle}</p>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {(mode === "today" || mode === "preset" || mode === "custom") && day && (
+          <>
+            <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+              {mode === "custom" ? (
+                <div className="mb-3 grid gap-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={day.title}
+                      onChange={(event) => updateCustomDay(day.id, (current) => ({ ...current, title: event.target.value }))}
+                      className="min-w-0 flex-1 rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-lg font-black outline-none"
+                    />
+                    <button
+                      onClick={() => deleteCustomDay(day.id)}
+                      className="shrink-0 rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300"
+                      aria-label="Delete day"
+                    >
+                      <MinusCircle size={18} />
+                    </button>
+                  </div>
+
+                  <details className="rounded-2xl bg-zinc-950 p-3">
+                    <summary className="cursor-pointer text-xs font-bold text-zinc-300">
+                      Targets & recommend
+                    </summary>
+
+                    <div className="mt-3">
+                      <p className="mb-2 text-xs font-bold uppercase text-zinc-500">Target muscles</p>
+                      <div className="flex flex-wrap gap-2">
+                        {allGroups.map((group) => (
+                          <button
+                            key={group}
+                            onClick={() => toggleDayFocus(group)}
+                            className={`rounded-full px-3 py-2 text-xs font-bold ${
+                              day.focus.includes(group) ? "bg-emerald-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+                            }`}
+                          >
+                            {group}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={recommendIntoCurrentDay}
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-zinc-950"
+                      >
+                        <Sparkles size={16} /> Recommend
+                      </button>
+                    </div>
+                  </details>
+                </div>
+              ) : (
+                <>
+                  <h2 className="text-xl font-black">{day.title}</h2>
+                  <p className="mt-1 text-sm text-zinc-400">{day.subtitle}</p>
+                </>
+              )}
+
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {day.focus.map((focus) => (
+                  <span key={focus} className="rounded-full bg-zinc-800 px-2.5 py-1 text-[11px] font-medium text-zinc-300">{focus}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold">Exercises</h3>
+                  <p className="mt-1 text-[11px] text-zinc-500">เลือกท่าที่ต้องการ</p>
+                </div>
+                <button
+                  onClick={() => setCompactList((value) => !value)}
+                  className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-medium text-zinc-300"
+                >
+                  {compactList ? "All" : "Focus"}
+                </button>
+              </div>
+
+              <div className="flex snap-x gap-2 overflow-x-auto pb-1">
+                {day.exercises.map((item, index) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveExerciseIndex(index);
+                      setCompactList(true);
+                    }}
+                    className={`min-w-[96px] snap-start rounded-xl px-3 py-2.5 text-left text-xs ${
+                      activeExerciseIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
+                    }`}
+                  >
+                    <span className="block text-[11px] font-bold">#{index + 1}</span>
+                    <span className="mt-1 line-clamp-3 block text-sm font-semibold leading-5">{item.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <details className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+              <summary className="cursor-pointer text-xs font-bold text-zinc-300">Volume</summary>
+              <p className="mt-2 text-xs text-zinc-400">Direct weekly sets</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {weeklyVolumeSummary.map(([muscle, sets]) => (
+                  <div key={muscle} className="rounded-2xl bg-zinc-950 p-3">
+                    <p className="text-xs text-zinc-500">{muscle}</p>
+                    <p className="mt-1 text-lg font-black">{sets} sets / week</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+
+            {mode === "custom" && (
+              <details className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
+                <summary className="cursor-pointer text-xs font-bold text-zinc-300">
+                  <Plus size={16} className="mr-2 inline" /> Add exercise
+                </summary>
+
+                <div className="mt-4">
+                  <div className="grid gap-2 sm:grid-cols-[0.8fr_1fr]">
+                    <select
+                      value={exerciseGroupFilter}
+                      onChange={(event) => setExerciseGroupFilter(event.target.value as MuscleGroup | "All")}
+                      className="rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm font-bold outline-none"
+                    >
+                      <option value="All">All groups</option>
+                      {allGroups.map((group) => (
+                        <option key={group} value={group}>
+                          {group}
+                        </option>
+                      ))}
+                    </select>
+
+                    <div className="flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-3 py-2">
+                      <Search size={16} className="text-zinc-500" />
+                      <input
+                        value={exerciseSearch}
+                        onChange={(event) => setExerciseSearch(event.target.value)}
+                        placeholder="Search"
+                        className="w-full bg-transparent py-2 text-sm outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-3 max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {filteredExercisePicker.map((item) => (
+                      <button
+                        key={item.name}
+                        onClick={() => addExerciseToCurrentDay(item.name)}
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl bg-zinc-950 px-3 py-3 text-left"
+                      >
+                        <span>
+                          <span className="block font-bold">{item.name}</span>
+                          <span className="text-xs text-zinc-500">
+                            {item.group} · {item.movement} · {item.tier}
+                          </span>
+                        </span>
+                        <Plus size={18} className="text-emerald-300" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </details>
+            )}
+
+            <div className="mt-4 grid gap-4">
+              {visibleExercises.map((baseExercise) => {
+                const index = day.exercises.findIndex((item) => item.id === baseExercise.id);
+                const selectedSubstitute = substituteMap[baseExercise.id];
+                const exercise = mode === "custom" || !selectedSubstitute ? baseExercise : applyExerciseIdentity(baseExercise, selectedSubstitute);
+                const records = recordsMap[exercise.name] ?? {};
+                const pr = records.maxWeight ?? prMap[exercise.name];
+                const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
+                const rawSetInputs = inputs[baseExercise.id] ?? createDefaultSetInputs(exercise.sets);
+                const setInputs = normalizeSetInputs(rawSetInputs, exercise.sets);
+                const alternatives = getAlternatives(exercise);
+
+                return (
+                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-bold text-zinc-400">#{index + 1}</span>
+                          <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">{exercise.group}</span>
+                          <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">{exercise.movement}</span>
+                          {mode === "preset" && substituteMap[baseExercise.id] && <span className="rounded-full bg-blue-400/10 px-3 py-1 text-xs font-bold text-blue-300">Subbed</span>}
+                          {exercise.warmup ? <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300"><Flame className="mr-1 inline" size={12} /> Warmup</span> : <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">No warmup</span>}
+                        </div>
+
+                        <h3 className="mt-2 text-lg font-black leading-snug sm:text-xl">{exercise.name}</h3>
+                        <p className="mt-1 text-sm text-zinc-400">{exercise.sets} hard working sets × {exercise.reps} reps</p>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <a href={youtubeSearch(`${exercise.name} proper form`)} target="_blank" rel="noreferrer" className="rounded-2xl bg-zinc-50 p-3 text-zinc-950" aria-label="Watch demo"><PlayCircle size={22} /></a>
+                        {mode === "custom" && <button onClick={() => removeExerciseFromCurrentDay(baseExercise.id)} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Remove exercise"><Trash2 size={18} /></button>}
+                      </div>
+                    </div>
+
+                    <div className="mb-2 flex flex-wrap gap-1.5">
+                      {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
+                    </div>
+
+                    {mode === "custom" && (
+                      <details className="mb-3 rounded-xl bg-zinc-950 p-3">
+                        <summary className="cursor-pointer text-xs font-bold text-zinc-300">Edit</summary>
+
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="mb-1 block text-xs font-bold text-zinc-500">Sets</label>
+                            <input
+                              inputMode="numeric"
+                              value={exercise.sets}
+                              onChange={(event) => updateCustomExercise(baseExercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })}
+                              className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="mb-1 block text-xs font-bold text-zinc-500">Reps</label>
+                            <input
+                              value={exercise.reps}
+                              onChange={(event) => updateCustomExercise(baseExercise.id, { reps: event.target.value })}
+                              className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none"
+                            />
+                          </div>
+
+                          <button
+                            onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })}
+                            className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${
+                              exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+                            }`}
+                          >
+                            Warmup
+                          </button>
+                        </div>
+                      </details>
+                    )}
+
+                    {alternatives.length > 0 && (
+                      <details className="mb-3 rounded-xl bg-zinc-950 p-3">
+                        <summary className="cursor-pointer text-xs font-bold text-zinc-300">
+                          <RotateCcw size={14} className="mr-2 inline" /> Substitute
+                        </summary>
+
+                        <div className="mt-3">
+                          <select
+                            value={exercise.name}
+                            onChange={(event) => substituteExercise(baseExercise, event.target.value)}
+                            className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm font-medium outline-none"
+                          >
+                            <option value={exercise.name}>{exercise.name}</option>
+                            {alternatives.map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="mt-2 text-[11px] text-zinc-500">
+                            Preset = session only, Custom = saved to plan.
+                          </p>
+                        </div>
+                      </details>
+                    )}
+
+                    <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
+                          <Trophy size={14} /> Records
+                        </p>
+
+                        <div className="mt-2 grid gap-2">
+                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                            <p className="text-[11px] font-bold uppercase text-zinc-500">Max Weight</p>
+                            <p className="mt-1 text-lg font-black text-emerald-300">
+                              {records.maxWeight ? `${records.maxWeight.weightLbs} lbs × ${records.maxWeight.reps}` : "No record"}
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                              <p className="text-[11px] font-bold uppercase text-zinc-500">Best Reps</p>
+                              <p className="mt-1 text-sm font-black text-zinc-100">
+                                {records.bestReps ? `${records.bestReps.weightLbs} × ${records.bestReps.reps}` : "—"}
+                              </p>
+                            </div>
+
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                              <p className="text-[11px] font-bold uppercase text-zinc-500">Best Volume</p>
+                              <p className="mt-1 text-sm font-black text-zinc-100">
+                                {records.bestVolume ? `${records.bestVolume.weightLbs} × ${records.bestVolume.reps}` : "—"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><BarChart3 size={14} /> Warmup from Max</p>
+                        {exercise.warmup ? (
+                          warmups.length > 0 ? (
+                            <div className="mt-2 space-y-1 text-sm">
+                              {warmups.map((item) => <p key={item.label}><span className="text-zinc-500">{item.label}:</span> <span className="font-bold">{item.weight} lbs</span> <span className="text-zinc-400">× {item.reps}</span></p>)}
+                            </div>
+                          ) : <p className="mt-2 text-sm text-zinc-400">Save a record first</p>
+                        ) : <p className="mt-2 text-sm text-zinc-400">Skip specific warmup</p>}
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl bg-zinc-950 p-3">
+                      <div className="mb-3 flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-bold uppercase text-zinc-500">Working sets</p>
+                          <p className="mt-0.5 text-[11px] text-zinc-600">
+                            Plan {exercise.sets} · Log {setInputs.length}
+                          </p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => removeManualSet(baseExercise.id, exercise.sets)}
+                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40"
+                            disabled={setInputs.length <= 1}
+                            type="button"
+                          >
+                            − Set
+                          </button>
+                          <button
+                            onClick={() => addManualSet(baseExercise.id, exercise.sets)}
+                            className="rounded-xl bg-emerald-400 px-3 py-2 text-xs font-bold text-zinc-950"
+                            type="button"
+                          >
+                            + Set
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="mb-2 grid grid-cols-[46px_1fr_1fr_42px] gap-2 text-[11px] font-bold uppercase text-zinc-500">
+                        <span>Set</span><span>lbs</span><span>Reps</span><span>Save</span>
+                      </div>
+                      <div className="space-y-2">
+                        {setInputs.map((set, setIndex) => (
+                          <div key={setIndex} className="grid grid-cols-[46px_1fr_1fr_42px] gap-2">
+                            <div className="flex items-center font-black text-zinc-400">{setIndex + 1}</div>
+                            <input inputMode="decimal" value={set.weightLbs} onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={pr?.weightLbs ? String(pr.weightLbs) : "135"} />
+                            <input inputMode="numeric" value={set.reps} onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder="8" />
+                            <button onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex)} className={`rounded-2xl border ${set.done ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-700 bg-zinc-900 text-zinc-500"}`}>
                               <Check size={18} className="mx-auto" />
                             </button>
                           </div>

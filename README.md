@@ -131,7 +131,8 @@ Keep postcss.config.mjs.
 - Warmup still uses Max Weight record.
 - This gives better context while training instead of relying on one PR number.
 
-## Force tick-save fix
-- The check button now directly calls saveSingleSet.
-- The set row is saved to logs and cleared immediately.
-- Save sets clears all visible rows using the same baseExercise id.
+## Stable tick save fix
+- Rebuilt from stable records version.
+- Check button saves one set immediately and clears that row.
+- Save sets saves all valid rows and clears all rows.
+- Avoids broken JSX patch from previous build.
