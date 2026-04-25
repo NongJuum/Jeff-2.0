@@ -771,6 +771,23 @@ export default function Page() {
 
   const recentLogs = useMemo(() => logs.filter((item) => isWithinLastDays(item.date, 14)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [logs]);
 
+  const lastSetMap = useMemo(() => {
+    const latest: Record<string, Record<number, LogSet>> = {};
+
+    const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    for (const log of sortedLogs) {
+      latest[log.exerciseName] = latest[log.exerciseName] ?? {};
+
+      if (!latest[log.exerciseName][log.setNumber]) {
+        latest[log.exerciseName][log.setNumber] = log;
+      }
+    }
+
+    return latest;
+  }, [logs]);
+
+
   const recentLogsByDate = useMemo(() => {
     return recentLogs.reduce<Record<string, LogSet[]>>((acc, item) => {
       const key = new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric" }).format(new Date(item.date));
@@ -1640,16 +1657,20 @@ export default function Page() {
                         <span>Set</span><span>lbs</span><span>Reps</span><span>Save</span>
                       </div>
                       <div className="space-y-2">
-                        {setInputs.map((set, setIndex) => (
-                          <div key={setIndex} className="grid grid-cols-[46px_1fr_1fr_42px] gap-2">
+                        {setInputs.map((set, setIndex) => {
+                          const latestSet = lastSetMap[exercise.name]?.[setIndex + 1];
+
+                          return (
+                            <div key={setIndex} className="grid grid-cols-[46px_1fr_1fr_42px] gap-2">
                             <div className="flex items-center font-black text-zinc-400">{setIndex + 1}</div>
-                            <input inputMode="decimal" value={set.weightLbs} onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={pr?.weightLbs ? String(pr.weightLbs) : "135"} />
-                            <input inputMode="numeric" value={set.reps} onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder="8" />
+                            <input inputMode="decimal" value={set.weightLbs} onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={latestSet ? String(latestSet.weightLbs) : "0"} />
+                            <input inputMode="numeric" value={set.reps} onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={latestSet ? String(latestSet.reps) : "0"} />
                             <button onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex)} className={`rounded-2xl border ${set.done ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-700 bg-zinc-900 text-zinc-500"}`}>
                               <Check size={18} className="mx-auto" />
                             </button>
-                          </div>
-                        ))}
+                            </div>
+                          );
+                        })}
                       </div>
                       <button onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99]">
                         <Save size={18} /> Finish & clear

@@ -146,3 +146,8 @@ Keep postcss.config.mjs.
 - Saved rows stay checked.
 - Editing lbs/reps marks the row as unsaved again.
 - Finish & clear saves unsaved rows and clears all inputs.
+
+## Last workout placeholders
+- Empty lbs/reps fields now show the last saved value for that exercise and set number.
+- If there is no history, placeholders show 0.
+- After saving a set, the latest log updates future placeholders.
