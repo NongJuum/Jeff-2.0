@@ -136,3 +136,7 @@ Keep postcss.config.mjs.
 - Check button saves one set immediately and clears that row.
 - Save sets saves all valid rows and clears all rows.
 - Avoids broken JSX patch from previous build.
+
+## Duplicate helper fix
+- Removed duplicate persistSetInputsNow helper created by repeated patches.
+- Kept tick-save and clear behavior intact.

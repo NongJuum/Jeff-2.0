@@ -129,15 +129,6 @@ function persistSetInputsNow(nextInputs: Record<string, SetInput[]>) {
   }
 }
 
-function persistSetInputsNow(nextInputs: Record<string, SetInput[]>) {
-  if (!isBrowser()) return;
-
-  try {
-    window.sessionStorage.setItem(SET_INPUTS_KEY, JSON.stringify(nextInputs));
-  } catch {
-    // Ignore storage errors.
-  }
-}
 
 function writeLocalJson<T>(key: string, value: T) {
   if (!isBrowser()) return;
