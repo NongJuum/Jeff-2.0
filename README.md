@@ -151,3 +151,13 @@ Keep postcss.config.mjs.
 - Empty lbs/reps fields now show the last saved value for that exercise and set number.
 - If there is no history, placeholders show 0.
 - After saving a set, the latest log updates future placeholders.
+
+## Rest timer
+- Added optional rest countdown in the workout page.
+- Rest starts automatically after saving a set when enabled.
+- Defaults:
+  - Hinge/deadlift/RDL: 4:00
+  - Compound press/row/pull/squat: 3:00
+  - Isolation arms/delts/flye: 1:30
+  - Abs/calves: 1:00
+- Users can turn the timer on/off or manually start/stop it.

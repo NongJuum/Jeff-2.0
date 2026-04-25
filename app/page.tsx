@@ -61,6 +61,13 @@ type SetInput = {
   done: boolean;
 };
 
+type RestTimerState = {
+  exerciseId: string | null;
+  secondsLeft: number;
+  totalSeconds: number;
+  running: boolean;
+};
+
 type LogSet = {
   exerciseId: string;
   exerciseName: string;
@@ -480,6 +487,50 @@ function getWarmupSets(bestWeight?: number) {
   ];
 }
 
+function getRestSeconds(exercise: PlanExercise) {
+  const movement = exercise.movement.toLowerCase();
+  const name = exercise.name.toLowerCase();
+
+  if (movement === "hinge" || name.includes("deadlift") || name.includes("rdl")) {
+    return 240;
+  }
+
+  if (
+    movement.includes("press") ||
+    movement.includes("row") ||
+    movement.includes("vertical pull") ||
+    movement.includes("squat") ||
+    movement.includes("glute bridge") ||
+    movement.includes("glute press")
+  ) {
+    return 180;
+  }
+
+  if (exercise.group === "Abs & Calves") {
+    return 60;
+  }
+
+  if (
+    movement.includes("flye") ||
+    movement.includes("raise") ||
+    movement.includes("curl") ||
+    movement.includes("triceps") ||
+    movement.includes("isolation") ||
+    movement.includes("rear delt")
+  ) {
+    return 90;
+  }
+
+  return 120;
+}
+
+function formatRestTime(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 function createDefaultSetInputs(sets: number): SetInput[] {
   return Array.from({ length: sets }, () => ({ weightLbs: "", reps: "", done: false }));
 }
@@ -611,6 +662,8 @@ export default function Page() {
   const [selectedDay, setSelectedDay] = useState(initialUiState.selectedDay);
   const [logs, setLogs] = useState<LogSet[]>([]);
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
+  const [restTimer, setRestTimer] = useState<RestTimerState>({ exerciseId: null, secondsLeft: 0, totalSeconds: 0, running: false });
+  const [restTimerEnabled, setRestTimerEnabled] = useState(true);
   const [librarySearch, setLibrarySearch] = useState("");
   const [showLibrary, setShowLibrary] = useState(initialUiState.showLibrary);
   const [showHistory, setShowHistory] = useState(initialUiState.showHistory);
@@ -758,6 +811,49 @@ export default function Page() {
 
     return records;
   }, [logs]);
+
+  useEffect(() => {
+    if (!restTimer.running || restTimer.secondsLeft <= 0) return;
+
+    const intervalId = window.setInterval(() => {
+      setRestTimer((current) => {
+        if (!current.running) return current;
+
+        const nextSeconds = Math.max(0, current.secondsLeft - 1);
+
+        return {
+          ...current,
+          secondsLeft: nextSeconds,
+          running: nextSeconds > 0,
+        };
+      });
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [restTimer.running, restTimer.secondsLeft]);
+
+  const restProgress = restTimer.totalSeconds > 0 ? Math.round(((restTimer.totalSeconds - restTimer.secondsLeft) / restTimer.totalSeconds) * 100) : 0;
+
+  function startRestTimer(exercise: PlanExercise) {
+    if (!restTimerEnabled) return;
+
+    const seconds = getRestSeconds(exercise);
+
+    setRestTimer({
+      exerciseId: exercise.id,
+      secondsLeft: seconds,
+      totalSeconds: seconds,
+      running: true,
+    });
+  }
+
+  function stopRestTimer() {
+    setRestTimer((current) => ({
+      ...current,
+      running: false,
+      secondsLeft: 0,
+    }));
+  }
 
   const prMap = useMemo(() => {
     const best: Record<string, LogSet> = {};
@@ -926,6 +1022,7 @@ export default function Page() {
 
     if (validSets.length > 0) {
       setLogs((old) => [...old, ...validSets]);
+      startRestTimer(exercise);
     }
 
     setInputs((old) => {
@@ -1623,6 +1720,49 @@ export default function Page() {
                           ) : <p className="mt-2 text-sm text-zinc-400">Save a record first</p>
                         ) : <p className="mt-2 text-sm text-zinc-400">Skip specific warmup</p>}
                       </div>
+                    </div>
+
+                    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase text-zinc-500">Rest Timer</p>
+                          <p className="mt-1 text-2xl font-black text-emerald-300">
+                            {restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0 ? formatRestTime(restTimer.secondsLeft) : formatRestTime(getRestSeconds(exercise))}
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-zinc-500">
+                            Recommended rest for this exercise
+                          </p>
+                        </div>
+
+                        <div className="grid gap-2">
+                          <button
+                            onClick={() => setRestTimerEnabled((value) => !value)}
+                            className={`rounded-xl px-3 py-2 text-xs font-bold ${
+                              restTimerEnabled ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-400"
+                            }`}
+                            type="button"
+                          >
+                            {restTimerEnabled ? "On" : "Off"}
+                          </button>
+
+                          <button
+                            onClick={() => (restTimer.exerciseId === baseExercise.id && restTimer.running ? stopRestTimer() : startRestTimer({ ...exercise, id: baseExercise.id }))}
+                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300"
+                            type="button"
+                          >
+                            {restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop" : "Start"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {restTimer.exerciseId === baseExercise.id && restTimer.totalSeconds > 0 && (
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
+                          <div
+                            className="h-full rounded-full bg-emerald-400 transition-all"
+                            style={{ width: `${restProgress}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <div className="rounded-2xl bg-zinc-950 p-3">
