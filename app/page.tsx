@@ -70,6 +70,12 @@ type LogSet = {
   date: string;
 };
 
+type ExerciseRecords = {
+  maxWeight?: LogSet;
+  bestReps?: LogSet;
+  bestVolume?: LogSet;
+};
+
 
 type PersistedUiState = {
   mode: AppMode;
@@ -706,23 +712,53 @@ export default function Page() {
     if (activeExerciseIndex >= (day?.exercises.length ?? 0)) setActiveExerciseIndex(0);
   }, [mode, selectedDay, selectedCustomDay, activePresetPlan.length, activePlan.length, isPresetLike, activeExerciseIndex, day?.exercises.length]);
 
+  const recordsMap = useMemo(() => {
+    const records: Record<string, ExerciseRecords> = {};
+
+    for (const log of logs) {
+      const current = records[log.exerciseName] ?? {};
+
+      const maxWeight = current.maxWeight;
+      const bestReps = current.bestReps;
+      const bestVolume = current.bestVolume;
+
+      const logVolume = log.weightLbs * log.reps;
+      const bestVolumeScore = bestVolume ? bestVolume.weightLbs * bestVolume.reps : -1;
+
+      records[log.exerciseName] = {
+        maxWeight:
+          !maxWeight ||
+          log.weightLbs > maxWeight.weightLbs ||
+          (log.weightLbs === maxWeight.weightLbs && log.reps > maxWeight.reps)
+            ? log
+            : maxWeight,
+        bestReps:
+          !bestReps ||
+          log.reps > bestReps.reps ||
+          (log.reps === bestReps.reps && log.weightLbs > bestReps.weightLbs)
+            ? log
+            : bestReps,
+        bestVolume:
+          !bestVolume ||
+          logVolume > bestVolumeScore ||
+          (logVolume === bestVolumeScore && log.weightLbs > bestVolume.weightLbs)
+            ? log
+            : bestVolume,
+      };
+    }
+
+    return records;
+  }, [logs]);
+
   const prMap = useMemo(() => {
     const best: Record<string, LogSet> = {};
 
-    for (const log of logs) {
-      const current = best[log.exerciseName];
-
-      if (
-        !current ||
-        log.weightLbs > current.weightLbs ||
-        (log.weightLbs === current.weightLbs && log.reps > current.reps)
-      ) {
-        best[log.exerciseName] = log;
-      }
+    for (const [exerciseName, records] of Object.entries(recordsMap)) {
+      if (records.maxWeight) best[exerciseName] = records.maxWeight;
     }
 
     return best;
-  }, [logs]);
+  }, [recordsMap]);
 
   const recentLogs = useMemo(() => logs.filter((item) => isWithinLastDays(item.date, 14)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [logs]);
 
@@ -1369,7 +1405,8 @@ export default function Page() {
                 const index = day.exercises.findIndex((item) => item.id === baseExercise.id);
                 const selectedSubstitute = substituteMap[baseExercise.id];
                 const exercise = mode === "custom" || !selectedSubstitute ? baseExercise : applyExerciseIdentity(baseExercise, selectedSubstitute);
-                const pr = prMap[exercise.name];
+                const records = recordsMap[exercise.name] ?? {};
+                const pr = records.maxWeight ?? prMap[exercise.name];
                 const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
                 const rawSetInputs = inputs[baseExercise.id] ?? createDefaultSetInputs(exercise.sets);
                 const setInputs = normalizeSetInputs(rawSetInputs, exercise.sets);
@@ -1465,17 +1502,43 @@ export default function Page() {
 
                     <div className="mb-4 grid gap-3 sm:grid-cols-2">
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><Trophy size={14} /> Max Weight PR</p>
-                        <p className="mt-2 text-2xl font-black text-emerald-300">{pr ? `${pr.weightLbs} lbs × ${pr.reps}` : "No record"}</p>
+                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
+                          <Trophy size={14} /> Records
+                        </p>
+
+                        <div className="mt-2 grid gap-2">
+                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                            <p className="text-[11px] font-bold uppercase text-zinc-500">Max Weight</p>
+                            <p className="mt-1 text-lg font-black text-emerald-300">
+                              {records.maxWeight ? `${records.maxWeight.weightLbs} lbs × ${records.maxWeight.reps}` : "No record"}
+                            </p>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                              <p className="text-[11px] font-bold uppercase text-zinc-500">Best Reps</p>
+                              <p className="mt-1 text-sm font-black text-zinc-100">
+                                {records.bestReps ? `${records.bestReps.weightLbs} × ${records.bestReps.reps}` : "—"}
+                              </p>
+                            </div>
+
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                              <p className="text-[11px] font-bold uppercase text-zinc-500">Best Volume</p>
+                              <p className="mt-1 text-sm font-black text-zinc-100">
+                                {records.bestVolume ? `${records.bestVolume.weightLbs} × ${records.bestVolume.reps}` : "—"}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><BarChart3 size={14} /> Warmup from PR</p>
+                        <p className="flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><BarChart3 size={14} /> Warmup from Max</p>
                         {exercise.warmup ? (
                           warmups.length > 0 ? (
                             <div className="mt-2 space-y-1 text-sm">
                               {warmups.map((item) => <p key={item.label}><span className="text-zinc-500">{item.label}:</span> <span className="font-bold">{item.weight} lbs</span> <span className="text-zinc-400">× {item.reps}</span></p>)}
                             </div>
-                          ) : <p className="mt-2 text-sm text-zinc-400">Save a PR first</p>
+                          ) : <p className="mt-2 text-sm text-zinc-400">Save a record first</p>
                         ) : <p className="mt-2 text-sm text-zinc-400">Skip specific warmup</p>}
                       </div>
                     </div>

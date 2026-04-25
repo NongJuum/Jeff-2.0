@@ -122,3 +122,11 @@ Keep postcss.config.mjs.
 - Added − Set button in the logging area.
 - Manual added sets are preserved while filling the workout.
 - Save resets the exercise back to the planned set count.
+
+## Records on workout page
+- Workout page now shows Records for each exercise:
+  - Max Weight
+  - Best Reps
+  - Best Volume
+- Warmup still uses Max Weight record.
+- This gives better context while training instead of relying on one PR number.
