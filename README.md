@@ -172,3 +172,7 @@ Keep postcss.config.mjs.
 - Shows front and back muscle maps.
 - Uses red for primary emphasis and yellow for secondary emphasis.
 - Based on the selected exercise identity, so substitutions update the preview too.
+
+## Clean muscle preview graphic
+- Replaced the first stick-figure SVG with a cleaner silhouette-style SVG.
+- Larger shapes, less clutter, easier to read on mobile.

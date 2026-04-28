@@ -798,9 +798,77 @@ function MusclePreviewFigure({
   secondary: MuscleRegion[];
 }) {
   const fill = (region: MuscleRegion) => getMuscleRegionFill(region, primary, secondary);
+  const stroke = "#09090b";
 
   return (
-    <svg viewBox="0 0 140 240" className="h-52 w-full" aria-hidden="true">
+    <svg viewBox="0 0 220 260" className="h-64 w-full" aria-hidden="true">
+      <defs>
+        <filter id={`softShadow-${side}`} x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="10" stdDeviation="8" floodColor="#000000" floodOpacity="0.25" />
+        </filter>
+      </defs>
+
+      <g filter={`url(#softShadow-${side})`}>
+        <rect x="82" y="12" width="56" height="52" rx="24" fill="#18181b" stroke="#a1a1aa" strokeWidth="3" />
+        <path d="M72 68 C84 58 136 58 148 68 C164 84 170 122 160 156 C151 188 142 224 134 244 L86 244 C78 224 69 188 60 156 C50 122 56 84 72 68 Z" fill="#18181b" stroke="#a1a1aa" strokeWidth="3" />
+        <path d="M66 82 C42 96 31 122 26 160" fill="none" stroke="#a1a1aa" strokeWidth="7" strokeLinecap="round" />
+        <path d="M154 82 C178 96 189 122 194 160" fill="none" stroke="#a1a1aa" strokeWidth="7" strokeLinecap="round" />
+      </g>
+
+      {side === "front" ? (
+        <>
+          <path d="M84 78 C92 70 104 69 110 78 L110 103 C100 111 87 109 79 99 C78 90 79 83 84 78 Z" fill={fill("chest")} stroke={stroke} strokeWidth="3" />
+          <path d="M136 78 C128 70 116 69 110 78 L110 103 C120 111 133 109 141 99 C142 90 141 83 136 78 Z" fill={fill("chest")} stroke={stroke} strokeWidth="3" />
+          <path d="M90 70 C98 65 122 65 130 70 C127 77 119 81 110 81 C101 81 93 77 90 70 Z" fill={fill("upperChest")} stroke={stroke} strokeWidth="3" />
+
+          <path d="M67 74 C55 79 48 91 49 105 C62 107 75 99 80 87 C78 79 74 75 67 74 Z" fill={fill("frontDelts")} stroke={stroke} strokeWidth="3" />
+          <path d="M153 74 C165 79 172 91 171 105 C158 107 145 99 140 87 C142 79 146 75 153 74 Z" fill={fill("frontDelts")} stroke={stroke} strokeWidth="3" />
+          <path d="M50 102 C41 113 39 133 46 145 C57 140 62 122 57 106 Z" fill={fill("biceps")} stroke={stroke} strokeWidth="3" />
+          <path d="M170 102 C179 113 181 133 174 145 C163 140 158 122 163 106 Z" fill={fill("biceps")} stroke={stroke} strokeWidth="3" />
+
+          <path d="M96 108 L124 108 C130 125 128 145 119 160 L101 160 C92 145 90 125 96 108 Z" fill={fill("abs")} stroke={stroke} strokeWidth="3" />
+          <path d="M78 108 C86 122 88 144 84 160 C75 150 68 128 70 112 Z" fill={fill("obliques")} stroke={stroke} strokeWidth="3" />
+          <path d="M142 108 C134 122 132 144 136 160 C145 150 152 128 150 112 Z" fill={fill("obliques")} stroke={stroke} strokeWidth="3" />
+
+          <path d="M80 166 C94 166 104 174 105 190 L101 238 C88 235 78 218 75 197 C73 184 74 174 80 166 Z" fill={fill("quads")} stroke={stroke} strokeWidth="3" />
+          <path d="M140 166 C126 166 116 174 115 190 L119 238 C132 235 142 218 145 197 C147 184 146 174 140 166 Z" fill={fill("quads")} stroke={stroke} strokeWidth="3" />
+          <path d="M84 218 C94 219 101 228 101 244 L82 244 C79 235 80 225 84 218 Z" fill={fill("calves")} stroke={stroke} strokeWidth="3" />
+          <path d="M136 218 C126 219 119 228 119 244 L138 244 C141 235 140 225 136 218 Z" fill={fill("calves")} stroke={stroke} strokeWidth="3" />
+        </>
+      ) : (
+        <>
+          <path d="M82 72 C94 62 126 62 138 72 C145 86 148 103 145 119 L75 119 C72 103 75 86 82 72 Z" fill={fill("upperBack")} stroke={stroke} strokeWidth="3" />
+          <path d="M76 114 C87 120 96 135 99 160 L82 168 C72 149 65 127 67 112 Z" fill={fill("lats")} stroke={stroke} strokeWidth="3" />
+          <path d="M144 114 C133 120 124 135 121 160 L138 168 C148 149 155 127 153 112 Z" fill={fill("lats")} stroke={stroke} strokeWidth="3" />
+          <path d="M96 122 L124 122 L119 158 L101 158 Z" fill={fill("midBack")} stroke={stroke} strokeWidth="3" />
+          <path d="M103 156 L109 156 L107 190 L98 190 Z" fill={fill("erectors")} stroke={stroke} strokeWidth="3" />
+          <path d="M111 156 L117 156 L122 190 L113 190 Z" fill={fill("erectors")} stroke={stroke} strokeWidth="3" />
+
+          <path d="M67 74 C55 79 48 91 49 105 C62 107 75 99 80 87 C78 79 74 75 67 74 Z" fill={fill("rearDelts")} stroke={stroke} strokeWidth="3" />
+          <path d="M153 74 C165 79 172 91 171 105 C158 107 145 99 140 87 C142 79 146 75 153 74 Z" fill={fill("rearDelts")} stroke={stroke} strokeWidth="3" />
+          <path d="M50 102 C41 113 39 133 46 145 C57 140 62 122 57 106 Z" fill={fill("triceps")} stroke={stroke} strokeWidth="3" />
+          <path d="M170 102 C179 113 181 133 174 145 C163 140 158 122 163 106 Z" fill={fill("triceps")} stroke={stroke} strokeWidth="3" />
+
+          <path d="M86 162 C98 158 109 166 110 178 C105 191 93 198 80 192 C73 179 76 168 86 162 Z" fill={fill("glutes")} stroke={stroke} strokeWidth="3" />
+          <path d="M134 162 C122 158 111 166 110 178 C115 191 127 198 140 192 C147 179 144 168 134 162 Z" fill={fill("glutes")} stroke={stroke} strokeWidth="3" />
+
+          <path d="M82 190 C94 190 102 198 102 214 L98 244 L82 244 C76 225 74 203 82 190 Z" fill={fill("hamstrings")} stroke={stroke} strokeWidth="3" />
+          <path d="M138 190 C126 190 118 198 118 214 L122 244 L138 244 C144 225 146 203 138 190 Z" fill={fill("hamstrings")} stroke={stroke} strokeWidth="3" />
+          <path d="M84 220 C94 221 100 229 99 244 L82 244 C79 235 80 225 84 220 Z" fill={fill("calves")} stroke={stroke} strokeWidth="3" />
+          <path d="M136 220 C126 221 120 229 121 244 L138 244 C141 235 140 225 136 220 Z" fill={fill("calves")} stroke={stroke} strokeWidth="3" />
+        </>
+      )}
+    </svg>
+  );
+}: {
+  side: "front" | "back";
+  primary: MuscleRegion[];
+  secondary: MuscleRegion[];
+}) {
+  const fill = (region: MuscleRegion) => getMuscleRegionFill(region, primary, secondary);
+
+  return (
+    <svg viewBox="0 0 140 240" className="h-64 w-full" aria-hidden="true">
       <g fill="none" stroke="#a1a1aa" strokeWidth="2">
         <rect x="52" y="8" width="36" height="40" rx="16" />
         <path d="M56 48 C48 54 44 61 43 70 L41 110 C40 124 46 138 55 150 L55 232" />
@@ -876,7 +944,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase text-zinc-500">Muscle Preview</p>
-          <p className="mt-1 text-sm text-zinc-400">Primary and secondary emphasis for this exercise</p>
+          <p className="mt-1 text-xs text-zinc-500">Red primary, yellow secondary</p>
         </div>
 
         <div className="hidden items-center gap-3 text-[11px] sm:flex">
