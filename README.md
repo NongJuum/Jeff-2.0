@@ -179,3 +179,6 @@ Keep postcss.config.mjs.
 
 ## Build fix
 - Removed leftover MusclePreviewFigure type-signature tail that caused a JSX/TS parse error.
+
+## Final muscle preview syntax fix
+- Replaced the full MuscleRegion helper/component section to remove all partial leftover syntax.
