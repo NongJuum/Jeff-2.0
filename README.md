@@ -182,3 +182,16 @@ Keep postcss.config.mjs.
 
 ## Final muscle preview syntax fix
 - Replaced the full MuscleRegion helper/component section to remove all partial leftover syntax.
+
+
+## Athletic muscle preview + daily total
+- Replaced the bulky body map with a slimmer athletic-style muscle preview.
+- Added a "Today's Total" muscle map at the top of the preview card.
+- Today's total is calculated from all saved sets on the current day.
+- Primary regions are weighted more heavily than secondary regions.
+
+## Pro muscle preview + UI cleanup
+- Added slimmer athletic muscle map closer to the reference style.
+- Added day-level muscle overview card near the top of the day screen.
+- Day overview falls back to planned muscles when no saved sets exist yet.
+- Reduced mobile clutter and increased bottom padding to avoid nav overlap.
