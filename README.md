@@ -176,3 +176,6 @@ Keep postcss.config.mjs.
 ## Clean muscle preview graphic
 - Replaced the first stick-figure SVG with a cleaner silhouette-style SVG.
 - Larger shapes, less clutter, easier to read on mobile.
+
+## Build fix
+- Removed leftover MusclePreviewFigure type-signature tail that caused a JSX/TS parse error.
