@@ -661,6 +661,275 @@ function normalizeSetInputs(raw: SetInput[], sets: number) {
   return [...raw, ...createDefaultSetInputs(Math.max(0, sets - raw.length))];
 }
 
+
+type MuscleRegion =
+  | "chest"
+  | "upperChest"
+  | "frontDelts"
+  | "sideDelts"
+  | "rearDelts"
+  | "biceps"
+  | "triceps"
+  | "lats"
+  | "midBack"
+  | "upperBack"
+  | "erectors"
+  | "abs"
+  | "obliques"
+  | "glutes"
+  | "quads"
+  | "hamstrings"
+  | "calves";
+
+const MUSCLE_REGION_LABELS: Record<MuscleRegion, string> = {
+  chest: "Chest",
+  upperChest: "Upper chest",
+  frontDelts: "Front delts",
+  sideDelts: "Side delts",
+  rearDelts: "Rear delts",
+  biceps: "Biceps",
+  triceps: "Triceps",
+  lats: "Lats",
+  midBack: "Mid back",
+  upperBack: "Upper back",
+  erectors: "Erectors",
+  abs: "Abs",
+  obliques: "Obliques",
+  glutes: "Glutes",
+  quads: "Quads",
+  hamstrings: "Hamstrings",
+  calves: "Calves",
+};
+
+const MUSCLE_ALIAS_MAP: Record<string, MuscleRegion[]> = {
+  "Chest": ["chest"],
+  "Upper chest": ["upperChest"],
+  "Front delts": ["frontDelts"],
+  "Side delts": ["sideDelts"],
+  "Rear delts": ["rearDelts"],
+  "Biceps": ["biceps"],
+  "Triceps": ["triceps"],
+  "Triceps long head": ["triceps"],
+  "Lats": ["lats"],
+  "Mid back": ["midBack"],
+  "Upper back": ["upperBack"],
+  "Erectors": ["erectors"],
+  "Abs": ["abs"],
+  "Glutes": ["glutes"],
+  "Quads": ["quads"],
+  "Hamstrings": ["hamstrings"],
+  "Calves": ["calves"],
+  "Grip": [],
+};
+
+function uniqueRegions(items: MuscleRegion[]) {
+  return Array.from(new Set(items));
+}
+
+function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movement" | "muscles">) {
+  const normalized = uniqueRegions(
+    exercise.muscles.flatMap((muscle) => MUSCLE_ALIAS_MAP[muscle] ?? [])
+  );
+
+  const movement = exercise.movement.toLowerCase();
+
+  const isIsolation =
+    exercise.group === "Arms" ||
+    exercise.group === "Abs & Calves" ||
+    movement.includes("flye") ||
+    movement.includes("raise") ||
+    movement.includes("curl") ||
+    movement.includes("extension") ||
+    movement.includes("pressdown") ||
+    movement.includes("lat isolation") ||
+    movement.includes("rear delt") ||
+    movement.includes("hamstring curl") ||
+    movement.includes("quad isolation") ||
+    movement.includes("glute isolation") ||
+    movement === "abs" ||
+    movement === "calves";
+
+  if (normalized.length <= 1 || isIsolation) {
+    return {
+      primary: normalized,
+      secondary: [] as MuscleRegion[],
+    };
+  }
+
+  let primaryCount = 1;
+
+  if (
+    exercise.group === "Back" ||
+    exercise.group === "Legs" ||
+    exercise.group === "Shoulders" ||
+    movement.includes("squat") ||
+    movement.includes("row") ||
+    movement.includes("vertical pull") ||
+    movement.includes("single leg") ||
+    movement.includes("shoulder press") ||
+    movement.includes("glute bridge")
+  ) {
+    primaryCount = Math.min(2, normalized.length);
+  }
+
+  return {
+    primary: normalized.slice(0, primaryCount),
+    secondary: normalized.slice(primaryCount),
+  };
+}
+
+function getMuscleRegionFill(
+  region: MuscleRegion,
+  primary: MuscleRegion[],
+  secondary: MuscleRegion[]
+) {
+  if (primary.includes(region)) return "#dc2626";
+  if (secondary.includes(region)) return "#fbbf24";
+  return "#52525b";
+}
+
+function MusclePreviewFigure({
+  side,
+  primary,
+  secondary,
+}: {
+  side: "front" | "back";
+  primary: MuscleRegion[];
+  secondary: MuscleRegion[];
+}) {
+  const fill = (region: MuscleRegion) => getMuscleRegionFill(region, primary, secondary);
+
+  return (
+    <svg viewBox="0 0 140 240" className="h-52 w-full" aria-hidden="true">
+      <g fill="none" stroke="#a1a1aa" strokeWidth="2">
+        <rect x="52" y="8" width="36" height="40" rx="16" />
+        <path d="M56 48 C48 54 44 61 43 70 L41 110 C40 124 46 138 55 150 L55 232" />
+        <path d="M84 48 C92 54 96 61 97 70 L99 110 C100 124 94 138 85 150 L85 232" />
+        <path d="M55 151 L44 228" />
+        <path d="M85 151 L96 228" />
+        <path d="M43 74 L23 115" />
+        <path d="M23 115 L18 162" />
+        <path d="M97 74 L117 115" />
+        <path d="M117 115 L122 162" />
+      </g>
+
+      {side === "front" ? (
+        <>
+          <ellipse cx="70" cy="86" rx="17" ry="10" fill={fill("upperChest")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="54" cy="95" rx="14" ry="12" fill={fill("chest")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="86" cy="95" rx="14" ry="12" fill={fill("chest")} stroke="#18181b" strokeWidth="1.5" />
+
+          <ellipse cx="40" cy="78" rx="10" ry="12" fill={fill("frontDelts")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="100" cy="78" rx="10" ry="12" fill={fill("frontDelts")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="34" cy="79" rx="7" ry="10" fill={fill("sideDelts")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="106" cy="79" rx="7" ry="10" fill={fill("sideDelts")} stroke="#18181b" strokeWidth="1.5" />
+
+          <ellipse cx="25" cy="116" rx="8" ry="17" fill={fill("biceps")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="115" cy="116" rx="8" ry="17" fill={fill("biceps")} stroke="#18181b" strokeWidth="1.5" />
+
+          <rect x="58" y="104" width="8" height="16" rx="4" fill={fill("abs")} stroke="#18181b" strokeWidth="1.3" />
+          <rect x="74" y="104" width="8" height="16" rx="4" fill={fill("abs")} stroke="#18181b" strokeWidth="1.3" />
+          <rect x="58" y="122" width="8" height="16" rx="4" fill={fill("abs")} stroke="#18181b" strokeWidth="1.3" />
+          <rect x="74" y="122" width="8" height="16" rx="4" fill={fill("abs")} stroke="#18181b" strokeWidth="1.3" />
+          <path d="M48 108 L57 140 L49 142 L42 113 Z" fill={fill("obliques")} stroke="#18181b" strokeWidth="1.3" />
+          <path d="M92 108 L83 140 L91 142 L98 113 Z" fill={fill("obliques")} stroke="#18181b" strokeWidth="1.3" />
+
+          <rect x="47" y="152" width="18" height="58" rx="9" fill={fill("quads")} stroke="#18181b" strokeWidth="1.5" />
+          <rect x="75" y="152" width="18" height="58" rx="9" fill={fill("quads")} stroke="#18181b" strokeWidth="1.5" />
+          <rect x="49" y="210" width="14" height="20" rx="7" fill={fill("calves")} stroke="#18181b" strokeWidth="1.5" />
+          <rect x="77" y="210" width="14" height="20" rx="7" fill={fill("calves")} stroke="#18181b" strokeWidth="1.5" />
+        </>
+      ) : (
+        <>
+          <path d="M53 74 C58 60 82 60 87 74 L95 100 L83 112 L57 112 L45 100 Z" fill={fill("upperBack")} stroke="#18181b" strokeWidth="1.5" />
+          <path d="M49 103 L58 145 L48 150 L39 116 Z" fill={fill("lats")} stroke="#18181b" strokeWidth="1.5" />
+          <path d="M91 103 L82 145 L92 150 L101 116 Z" fill={fill("lats")} stroke="#18181b" strokeWidth="1.5" />
+          <rect x="61" y="112" width="18" height="24" rx="8" fill={fill("midBack")} stroke="#18181b" strokeWidth="1.3" />
+          <rect x="63" y="136" width="5" height="20" rx="2.5" fill={fill("erectors")} stroke="#18181b" strokeWidth="1.2" />
+          <rect x="72" y="136" width="5" height="20" rx="2.5" fill={fill("erectors")} stroke="#18181b" strokeWidth="1.2" />
+
+          <ellipse cx="39" cy="78" rx="10" ry="12" fill={fill("rearDelts")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="101" cy="78" rx="10" ry="12" fill={fill("rearDelts")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="25" cy="116" rx="8" ry="17" fill={fill("triceps")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="115" cy="116" rx="8" ry="17" fill={fill("triceps")} stroke="#18181b" strokeWidth="1.5" />
+
+          <ellipse cx="58" cy="160" rx="12" ry="14" fill={fill("glutes")} stroke="#18181b" strokeWidth="1.5" />
+          <ellipse cx="82" cy="160" rx="12" ry="14" fill={fill("glutes")} stroke="#18181b" strokeWidth="1.5" />
+
+          <rect x="47" y="174" width="18" height="54" rx="9" fill={fill("hamstrings")} stroke="#18181b" strokeWidth="1.5" />
+          <rect x="75" y="174" width="18" height="54" rx="9" fill={fill("hamstrings")} stroke="#18181b" strokeWidth="1.5" />
+          <rect x="49" y="210" width="14" height="20" rx="7" fill={fill("calves")} stroke="#18181b" strokeWidth="1.5" />
+          <rect x="77" y="210" width="14" height="20" rx="7" fill={fill("calves")} stroke="#18181b" strokeWidth="1.5" />
+        </>
+      )}
+    </svg>
+  );
+}
+
+function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
+  const { primary, secondary } = getExercisePreviewRegions(exercise);
+  const primaryLabels = primary.map((item) => MUSCLE_REGION_LABELS[item]);
+  const secondaryLabels = secondary.map((item) => MUSCLE_REGION_LABELS[item]);
+
+  return (
+    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold uppercase text-zinc-500">Muscle Preview</p>
+          <p className="mt-1 text-sm text-zinc-400">Primary and secondary emphasis for this exercise</p>
+        </div>
+
+        <div className="hidden items-center gap-3 text-[11px] sm:flex">
+          <span className="inline-flex items-center gap-1.5 text-zinc-400">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Primary
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-zinc-400">
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Secondary
+          </span>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl bg-zinc-900 px-2 py-3">
+          <p className="mb-2 text-center text-[11px] font-bold uppercase text-zinc-500">Front</p>
+          <MusclePreviewFigure side="front" primary={primary} secondary={secondary} />
+        </div>
+
+        <div className="rounded-2xl bg-zinc-900 px-2 py-3">
+          <p className="mb-2 text-center text-[11px] font-bold uppercase text-zinc-500">Back</p>
+          <MusclePreviewFigure side="back" primary={primary} secondary={secondary} />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <div className="rounded-xl bg-zinc-900 px-3 py-3">
+          <p className="text-[11px] font-bold uppercase text-red-400">Primary</p>
+          <p className="mt-1 text-sm font-medium text-zinc-100">
+            {primaryLabels.length > 0 ? primaryLabels.join(", ") : "—"}
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-zinc-900 px-3 py-3">
+          <p className="text-[11px] font-bold uppercase text-amber-300">Secondary</p>
+          <p className="mt-1 text-sm font-medium text-zinc-100">
+            {secondaryLabels.length > 0 ? secondaryLabels.join(", ") : "—"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-2 flex items-center gap-3 text-[11px] text-zinc-500 sm:hidden">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Primary
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Secondary
+        </span>
+      </div>
+    </div>
+  );
+}
+
+
 export default function Page() {
   const initialUiState = readJson<PersistedUiState>(UI_STATE_KEY, {
     mode: "today",
@@ -1686,6 +1955,8 @@ export default function Page() {
                     <div className="mb-2 flex flex-wrap gap-1.5">
                       {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
                     </div>
+
+                    <ExerciseMusclePreviewCard exercise={exercise} />
 
                     {mode === "custom" && (
                       <details className="mb-3 rounded-xl bg-zinc-950 p-3">

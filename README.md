@@ -166,3 +166,9 @@ Keep postcss.config.mjs.
 - Added Short / Normal / Heavy rest modes per exercise.
 - Added −30s / +30s adjustment.
 - Machine compounds default closer to 2:30, free-weight compounds around 3:00, hinges around 3:30, isolation around 1:30.
+
+## Exercise Preview Muscle Graphic
+- Added an SVG muscle preview card for each exercise.
+- Shows front and back muscle maps.
+- Uses red for primary emphasis and yellow for secondary emphasis.
+- Based on the selected exercise identity, so substitutions update the preview too.
