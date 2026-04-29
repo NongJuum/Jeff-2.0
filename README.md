@@ -166,3 +166,26 @@ Keep postcss.config.mjs.
 - Added Short / Normal / Heavy rest modes per exercise.
 - Added −30s / +30s adjustment.
 - Machine compounds default closer to 2:30, free-weight compounds around 3:00, hinges around 3:30, isolation around 1:30.
+
+## Exercise Preview Muscle Graphic
+- Added an SVG muscle preview card for each exercise.
+- Shows front and back muscle maps.
+- Uses red for primary emphasis and yellow for secondary emphasis.
+- Based on the selected exercise identity, so substitutions update the preview too.
+
+## Clean muscle preview graphic
+- Replaced the first stick-figure SVG with a cleaner silhouette-style SVG.
+- Larger shapes, less clutter, easier to read on mobile.
+
+## Build fix
+- Removed leftover MusclePreviewFigure type-signature tail that caused a JSX/TS parse error.
+
+## Final muscle preview syntax fix
+- Replaced the full MuscleRegion helper/component section to remove all partial leftover syntax.
+
+## Compact step-by-step UI final
+- Removed duplicate top Today/Preset/Custom tabs.
+- Muscle overview is collapsed by default.
+- Exercise preview is now a small targeted thumbnail.
+- Records and rest timer are compact two-column cards.
+- Added extra bottom padding for the fixed mobile nav.
