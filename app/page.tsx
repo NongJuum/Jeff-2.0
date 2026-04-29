@@ -661,354 +661,6 @@ function normalizeSetInputs(raw: SetInput[], sets: number) {
   return [...raw, ...createDefaultSetInputs(Math.max(0, sets - raw.length))];
 }
 
-
-
-type MuscleRegion =
-  | "chest"
-  | "upperChest"
-  | "frontDelts"
-  | "sideDelts"
-  | "rearDelts"
-  | "biceps"
-  | "triceps"
-  | "lats"
-  | "midBack"
-  | "upperBack"
-  | "erectors"
-  | "abs"
-  | "obliques"
-  | "glutes"
-  | "quads"
-  | "hamstrings"
-  | "calves";
-
-type MuscleSummary = {
-  primary: MuscleRegion[];
-  secondary: MuscleRegion[];
-  summaryText: string;
-  hasData: boolean;
-  sourceLabel: string;
-};
-
-const MUSCLE_REGION_LABELS: Record<MuscleRegion, string> = {
-  chest: "Chest",
-  upperChest: "Upper chest",
-  frontDelts: "Front delts",
-  sideDelts: "Side delts",
-  rearDelts: "Rear delts",
-  biceps: "Biceps",
-  triceps: "Triceps",
-  lats: "Lats",
-  midBack: "Mid back",
-  upperBack: "Upper back",
-  erectors: "Erectors",
-  abs: "Abs",
-  obliques: "Obliques",
-  glutes: "Glutes",
-  quads: "Quads",
-  hamstrings: "Hamstrings",
-  calves: "Calves",
-};
-
-const MUSCLE_ALIAS_MAP: Record<string, MuscleRegion[]> = {
-  Chest: ["chest"],
-  "Upper chest": ["upperChest"],
-  "Front delts": ["frontDelts"],
-  "Side delts": ["sideDelts"],
-  "Rear delts": ["rearDelts"],
-  Biceps: ["biceps"],
-  Triceps: ["triceps"],
-  "Triceps long head": ["triceps"],
-  Lats: ["lats"],
-  "Mid back": ["midBack"],
-  "Upper back": ["upperBack"],
-  Erectors: ["erectors"],
-  Abs: ["abs"],
-  Glutes: ["glutes"],
-  Quads: ["quads"],
-  Hamstrings: ["hamstrings"],
-  Calves: ["calves"],
-  Grip: [],
-};
-
-function uniqueRegions(items: MuscleRegion[]) {
-  return Array.from(new Set(items));
-}
-
-function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movement" | "muscles">) {
-  const normalized = uniqueRegions(exercise.muscles.flatMap((muscle) => MUSCLE_ALIAS_MAP[muscle] ?? []));
-  const movement = exercise.movement.toLowerCase();
-
-  const isIsolation =
-    exercise.group === "Arms" ||
-    exercise.group === "Abs & Calves" ||
-    movement.includes("flye") ||
-    movement.includes("raise") ||
-    movement.includes("curl") ||
-    movement.includes("extension") ||
-    movement.includes("pressdown") ||
-    movement.includes("lat isolation") ||
-    movement.includes("rear delt") ||
-    movement.includes("hamstring curl") ||
-    movement.includes("quad isolation") ||
-    movement.includes("glute isolation") ||
-    movement === "abs" ||
-    movement === "calves";
-
-  if (normalized.length <= 1 || isIsolation) {
-    return { primary: normalized, secondary: [] as MuscleRegion[] };
-  }
-
-  let primaryCount = 1;
-  if (
-    exercise.group === "Back" ||
-    exercise.group === "Legs" ||
-    exercise.group === "Shoulders" ||
-    movement.includes("squat") ||
-    movement.includes("row") ||
-    movement.includes("vertical pull") ||
-    movement.includes("single leg") ||
-    movement.includes("shoulder press") ||
-    movement.includes("glute bridge")
-  ) {
-    primaryCount = Math.min(2, normalized.length);
-  }
-
-  return {
-    primary: normalized.slice(0, primaryCount),
-    secondary: normalized.slice(primaryCount),
-  };
-}
-
-function getMuscleRegionFill(region: MuscleRegion, primary: MuscleRegion[], secondary: MuscleRegion[]) {
-  if (primary.includes(region)) return "#dc2626";
-  if (secondary.includes(region)) return "#fbbf24";
-  return "#4b5563";
-}
-
-function getLocalDateKey(value: string | Date) {
-  const date = new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function summarizeRegionScores(scoreMap: Record<MuscleRegion, number>, sourceLabel: string): MuscleSummary {
-  const ranked = Object.entries(scoreMap)
-    .filter(([, score]) => score > 0)
-    .sort((a, b) => b[1] - a[1]) as [MuscleRegion, number][];
-
-  if (ranked.length === 0) {
-    return {
-      primary: [],
-      secondary: [],
-      summaryText: "No muscle data yet",
-      hasData: false,
-      sourceLabel,
-    };
-  }
-
-  const highest = ranked[0][1];
-  const primary = ranked
-    .filter(([, score]) => score >= Math.max(1, highest * 0.66))
-    .map(([region]) => region);
-  const secondary = ranked
-    .filter(([region, score]) => !primary.includes(region) && score >= 0.45)
-    .map(([region]) => region);
-  const orderedLabels = [...primary, ...secondary].map((region) => MUSCLE_REGION_LABELS[region]);
-
-  return {
-    primary,
-    secondary,
-    summaryText: orderedLabels.slice(0, 6).join(", "),
-    hasData: true,
-    sourceLabel,
-  };
-}
-
-function buildTodayMuscleSummary(logs: LogSet[], exerciseLookup: Record<string, Exercise>): MuscleSummary {
-  const todayKey = getLocalDateKey(new Date());
-  const scoreMap = {} as Record<MuscleRegion, number>;
-
-  for (const log of logs) {
-    if (getLocalDateKey(log.date) !== todayKey) continue;
-    const exercise = exerciseLookup[log.exerciseName];
-    if (!exercise) continue;
-
-    const { primary, secondary } = getExercisePreviewRegions(exercise);
-    const setWeight = log.reps >= 6 && log.reps <= 20 ? 1.15 : 1;
-
-    for (const region of primary) scoreMap[region] = (scoreMap[region] ?? 0) + setWeight;
-    for (const region of secondary) scoreMap[region] = (scoreMap[region] ?? 0) + setWeight * 0.55;
-  }
-
-  return summarizeRegionScores(scoreMap, "Based on saved sets today");
-}
-
-function buildPlannedMuscleSummary(exercises: PlanExercise[]): MuscleSummary {
-  const scoreMap = {} as Record<MuscleRegion, number>;
-
-  for (const exercise of exercises) {
-    const { primary, secondary } = getExercisePreviewRegions(exercise);
-    const setWeight = Math.max(1, exercise.sets * 0.8);
-
-    for (const region of primary) scoreMap[region] = (scoreMap[region] ?? 0) + setWeight;
-    for (const region of secondary) scoreMap[region] = (scoreMap[region] ?? 0) + setWeight * 0.55;
-  }
-
-  return summarizeRegionScores(scoreMap, "Planned from this day");
-}
-
-function MusclePreviewFigure({
-  side,
-  primary,
-  secondary,
-  compact = false,
-}: {
-  side: "front" | "back";
-  primary: MuscleRegion[];
-  secondary: MuscleRegion[];
-  compact?: boolean;
-}) {
-  const fill = (region: MuscleRegion) => getMuscleRegionFill(region, primary, secondary);
-  const stroke = "#0a0a0a";
-
-  return (
-    <svg viewBox="0 0 220 320" className={compact ? "h-40 w-full" : "h-56 w-full"} aria-hidden="true">
-      <g stroke="#d4d4d8" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <ellipse cx="110" cy="30" rx="22" ry="26" />
-        <path d="M98 58 C89 64 82 73 79 84 L72 130 C69 147 70 170 77 194 L92 246" />
-        <path d="M122 58 C131 64 138 73 141 84 L148 130 C151 147 150 170 143 194 L128 246" />
-        <path d="M79 84 L49 122" />
-        <path d="M141 84 L171 122" />
-        <path d="M49 122 L40 177" />
-        <path d="M171 122 L180 177" />
-        <path d="M96 194 L92 302" />
-        <path d="M124 194 L128 302" />
-        <path d="M102 302 L90 314" />
-        <path d="M118 302 L130 314" />
-      </g>
-
-      {side === "front" ? (
-        <>
-          <path d="M92 72 C98 66 104 64 110 68 C107 82 101 91 90 94 C88 86 88 77 92 72 Z" fill={fill("chest")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M128 72 C122 66 116 64 110 68 C113 82 119 91 130 94 C132 86 132 77 128 72 Z" fill={fill("chest")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M96 66 C102 61 118 61 124 66 C121 72 116 74 110 74 C104 74 99 72 96 66 Z" fill={fill("upperChest")} stroke={stroke} strokeWidth="2.2" />
-
-          <ellipse cx="82" cy="88" rx="10" ry="15" fill={fill("frontDelts")} stroke={stroke} strokeWidth="2.2" />
-          <ellipse cx="138" cy="88" rx="10" ry="15" fill={fill("frontDelts")} stroke={stroke} strokeWidth="2.2" />
-          <ellipse cx="67" cy="141" rx="8" ry="22" fill={fill("biceps")} stroke={stroke} strokeWidth="2.2" />
-          <ellipse cx="153" cy="141" rx="8" ry="22" fill={fill("biceps")} stroke={stroke} strokeWidth="2.2" />
-
-          <path d="M102 104 L118 104 C122 128 120 157 114 180 L106 180 C100 157 98 128 102 104 Z" fill={fill("abs")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M91 106 C96 121 96 147 93 167 C87 155 84 134 84 114 Z" fill={fill("obliques")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M129 106 C124 121 124 147 127 167 C133 155 136 134 136 114 Z" fill={fill("obliques")} stroke={stroke} strokeWidth="2.2" />
-
-          <path d="M97 196 C103 191 108 191 111 198 L108 266 C100 263 95 250 94 231 C94 217 94 202 97 196 Z" fill={fill("quads")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M123 196 C117 191 112 191 109 198 L112 266 C120 263 125 250 126 231 C126 217 126 202 123 196 Z" fill={fill("quads")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M96 259 C101 261 103 268 102 281 L92 281 C89 272 90 264 96 259 Z" fill={fill("calves")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M124 259 C119 261 117 268 118 281 L128 281 C131 272 130 264 124 259 Z" fill={fill("calves")} stroke={stroke} strokeWidth="2.2" />
-        </>
-      ) : (
-        <>
-          <path d="M94 70 C101 63 119 63 126 70 C130 83 131 99 129 114 L91 114 C89 99 90 83 94 70 Z" fill={fill("upperBack")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M94 110 C100 122 102 145 101 175 L89 182 C82 165 79 140 81 113 Z" fill={fill("lats")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M126 110 C120 122 118 145 119 175 L131 182 C138 165 141 140 139 113 Z" fill={fill("lats")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M103 118 L117 118 L115 159 L105 159 Z" fill={fill("midBack")} stroke={stroke} strokeWidth="2.2" />
-          <rect x="104" y="159" width="4.5" height="30" rx="2" fill={fill("erectors")} stroke={stroke} strokeWidth="2" />
-          <rect x="111.5" y="159" width="4.5" height="30" rx="2" fill={fill("erectors")} stroke={stroke} strokeWidth="2" />
-
-          <ellipse cx="82" cy="88" rx="10" ry="15" fill={fill("rearDelts")} stroke={stroke} strokeWidth="2.2" />
-          <ellipse cx="138" cy="88" rx="10" ry="15" fill={fill("rearDelts")} stroke={stroke} strokeWidth="2.2" />
-          <ellipse cx="67" cy="141" rx="8" ry="22" fill={fill("triceps")} stroke={stroke} strokeWidth="2.2" />
-          <ellipse cx="153" cy="141" rx="8" ry="22" fill={fill("triceps")} stroke={stroke} strokeWidth="2.2" />
-
-          <ellipse cx="101" cy="198" rx="10" ry="16" fill={fill("glutes")} stroke={stroke} strokeWidth="2.2" />
-          <ellipse cx="119" cy="198" rx="10" ry="16" fill={fill("glutes")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M97 212 C103 208 107 208 109 214 L107 266 C100 263 95 250 94 233 C94 224 94 216 97 212 Z" fill={fill("hamstrings")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M123 212 C117 208 113 208 111 214 L113 266 C120 263 125 250 126 233 C126 224 126 216 123 212 Z" fill={fill("hamstrings")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M96 259 C101 261 103 268 102 281 L92 281 C89 272 90 264 96 259 Z" fill={fill("calves")} stroke={stroke} strokeWidth="2.2" />
-          <path d="M124 259 C119 261 117 268 118 281 L128 281 C131 272 130 264 124 259 Z" fill={fill("calves")} stroke={stroke} strokeWidth="2.2" />
-        </>
-      )}
-    </svg>
-  );
-}
-
-function DayMuscleOverviewCard({ summary }: { summary: MuscleSummary }) {
-  return (
-    <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Day Muscle Overview</p>
-          <p className="mt-1 text-sm font-bold text-zinc-100">{summary.hasData ? summary.summaryText : "No data yet"}</p>
-          <p className="mt-1 text-[11px] text-zinc-500">{summary.sourceLabel}</p>
-        </div>
-        <div className="hidden items-center gap-3 text-[11px] sm:flex">
-          <span className="inline-flex items-center gap-1.5 text-zinc-400"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Primary</span>
-          <span className="inline-flex items-center gap-1.5 text-zinc-400"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Secondary</span>
-        </div>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-zinc-900 px-2 py-2">
-          <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Front</p>
-          <MusclePreviewFigure side="front" primary={summary.primary} secondary={summary.secondary} compact />
-        </div>
-        <div className="rounded-xl bg-zinc-900 px-2 py-2">
-          <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Back</p>
-          <MusclePreviewFigure side="back" primary={summary.primary} secondary={summary.secondary} compact />
-        </div>
-      </div>
-      <div className="mt-2 flex items-center gap-3 text-[11px] text-zinc-500 sm:hidden">
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Primary</span>
-        <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Secondary</span>
-      </div>
-    </div>
-  );
-}
-
-function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
-  const { primary, secondary } = getExercisePreviewRegions(exercise);
-  const primaryLabels = primary.map((item) => MUSCLE_REGION_LABELS[item]);
-  const secondaryLabels = secondary.map((item) => MUSCLE_REGION_LABELS[item]);
-
-  return (
-    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase text-zinc-500">Exercise Preview</p>
-          <p className="mt-1 text-xs text-zinc-500">Primary red, secondary yellow</p>
-        </div>
-        <div className="hidden items-center gap-3 text-[11px] sm:flex">
-          <span className="inline-flex items-center gap-1.5 text-zinc-400"><span className="h-2.5 w-2.5 rounded-full bg-red-600" /> Primary</span>
-          <span className="inline-flex items-center gap-1.5 text-zinc-400"><span className="h-2.5 w-2.5 rounded-full bg-amber-400" /> Secondary</span>
-        </div>
-      </div>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl bg-zinc-900 px-2 py-3">
-          <p className="mb-2 text-center text-[11px] font-bold uppercase text-zinc-500">Front</p>
-          <MusclePreviewFigure side="front" primary={primary} secondary={secondary} />
-        </div>
-        <div className="rounded-2xl bg-zinc-900 px-2 py-3">
-          <p className="mb-2 text-center text-[11px] font-bold uppercase text-zinc-500">Back</p>
-          <MusclePreviewFigure side="back" primary={primary} secondary={secondary} />
-        </div>
-      </div>
-      <div className="mt-3 grid gap-2 sm:grid-cols-2">
-        <div className="rounded-xl bg-zinc-900 px-3 py-3">
-          <p className="text-[11px] font-bold uppercase text-red-400">Primary</p>
-          <p className="mt-1 text-sm font-medium text-zinc-100">{primaryLabels.length > 0 ? primaryLabels.join(", ") : "—"}</p>
-        </div>
-        <div className="rounded-xl bg-zinc-900 px-3 py-3">
-          <p className="text-[11px] font-bold uppercase text-amber-300">Secondary</p>
-          <p className="mt-1 text-sm font-medium text-zinc-100">{secondaryLabels.length > 0 ? secondaryLabels.join(", ") : "—"}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Page() {
   const initialUiState = readJson<PersistedUiState>(UI_STATE_KEY, {
     mode: "today",
@@ -1299,25 +951,8 @@ export default function Page() {
     return latest;
   }, [logs]);
 
-  const exerciseLookup = useMemo(() => {
-    return exerciseLibrary.reduce<Record<string, Exercise>>((acc, item) => {
-      acc[item.name] = item;
-      return acc;
-    }, {});
-  }, []);
-
-  const loggedMuscleSummary = useMemo(() => {
-    return buildTodayMuscleSummary(logs, exerciseLookup);
-  }, [logs, exerciseLookup]);
-
-  const plannedMuscleSummary = useMemo(() => {
-    return buildPlannedMuscleSummary(day?.exercises ?? []);
-  }, [day]);
-
-  const activeMuscleSummary = loggedMuscleSummary.hasData ? loggedMuscleSummary : plannedMuscleSummary;
 
   const recentLogsByDate = useMemo(() => {
-
     return recentLogs.reduce<Record<string, LogSet[]>>((acc, item) => {
       const key = new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric" }).format(new Date(item.date));
       acc[key] = acc[key] ?? [];
@@ -1625,26 +1260,26 @@ export default function Page() {
   }[mode];
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-36 text-zinc-50 sm:pb-32">
-      <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-2.5 backdrop-blur">
+    <main className="min-h-screen bg-zinc-950 pb-28 text-zinc-50">
+      <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-3 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <img src="/hait-logo.png" alt="HA IT logo" className="h-8 w-8 rounded-xl bg-white object-contain p-1" />
+            <img src="/hait-logo.png" alt="HA IT logo" className="h-9 w-9 rounded-xl bg-white object-contain p-1" />
             <div>
               <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-300">
                 <Dumbbell size={14} /> HA IT
               </p>
-              <h1 className="text-base font-black leading-tight sm:text-lg">Workout Tracker</h1>
+              <h1 className="text-lg font-black leading-tight">Workout Tracker</h1>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-4 py-3">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-2.5 sm:p-3">
+      <section className="mx-auto max-w-5xl px-4 py-4">
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
           <p className="text-[10px] font-black uppercase tracking-wide text-emerald-300">{pageMeta.eyebrow}</p>
           <h2 className="mt-1 text-lg font-black">{pageMeta.title}</h2>
-          
+          <p className="mt-1 text-xs leading-5 text-zinc-500">{pageMeta.description}</p>
 
           {(mode === "today" || mode === "preset") && (
             <div className="mt-3 rounded-xl bg-zinc-950 p-3">
@@ -1691,14 +1326,14 @@ export default function Page() {
           )}
         </div>
 
-          <div className="mt-3 grid gap-2">
-            <div className="grid grid-cols-3 gap-2 rounded-xl bg-zinc-950 p-1">
+          <div className="grid gap-2">
+            <div className="grid grid-cols-3 gap-2 rounded-xl bg-zinc-950 p-1.5">
               {[
                 ["today", "Today"],
                 ["preset", "Preset"],
                 ["custom", "Custom"],
               ].map(([key, label]) => (
-                <button key={key} onClick={() => setMode(key as AppMode)} className={`rounded-xl py-2 text-sm font-semibold ${mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+                <button key={key} onClick={() => setMode(key as AppMode)} className={`rounded-xl py-2.5 text-sm font-bold ${mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
                   {label}
                 </button>
               ))}
@@ -1706,7 +1341,7 @@ export default function Page() {
           </div>
 
         {(mode === "today" || mode === "preset") && days === 5 && (
-          <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-2.5 sm:p-3">
+          <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
             <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
             <div className="grid grid-cols-2 gap-2">
               <button onClick={() => { setFiveDayMode("twoLegDays"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "twoLegDays" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"}`}>2 Leg Days</button>
@@ -1753,7 +1388,7 @@ export default function Page() {
         )}
 
         {mode === "library" && (
-          <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+          <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
             <div className="mb-4 flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-950 px-3 py-2">
               <Search size={18} className="text-zinc-500" />
               <input
@@ -1835,16 +1470,16 @@ export default function Page() {
         )}
 
         {(mode === "today" || mode === "preset" || mode === "custom") && (
-          <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1">
             {activePlan.map((item, index) => (
               <button key={item.id} onClick={() => {
                 if (isPresetLike) setSelectedDay(index);
                 else setSelectedCustomDay(index);
                 setActiveExerciseIndex(0);
-              }} className={`min-w-[124px] snap-start rounded-xl px-3 py-2 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+              }} className={`min-w-[136px] snap-start rounded-xl px-3 py-2.5 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
                 <CalendarDays size={16} />
                 <p className="mt-1 line-clamp-2 text-sm font-bold leading-5">{item.title}</p>
-                <p className="mt-1 hidden text-[11px] opacity-70 sm:block">{item.subtitle}</p>
+                <p className="mt-1 text-xs opacity-80">{item.subtitle}</p>
               </button>
             ))}
           </div>
@@ -1852,7 +1487,7 @@ export default function Page() {
 
         {(mode === "today" || mode === "preset" || mode === "custom") && day && (
           <>
-            <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+            <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
               {mode === "custom" ? (
                 <div className="mb-3 grid gap-3">
                   <div className="flex items-center gap-2">
@@ -1902,8 +1537,8 @@ export default function Page() {
                 </div>
               ) : (
                 <>
-                  <h2 className="text-lg font-black sm:text-xl">{day.title}</h2>
-                  <p className="mt-1 text-xs text-zinc-500 sm:text-sm">{day.subtitle}</p>
+                  <h2 className="text-xl font-black">{day.title}</h2>
+                  <p className="mt-1 text-sm text-zinc-400">{day.subtitle}</p>
                 </>
               )}
 
@@ -1912,15 +1547,13 @@ export default function Page() {
                   <span key={focus} className="rounded-full bg-zinc-800 px-2.5 py-1 text-[11px] font-medium text-zinc-300">{focus}</span>
                 ))}
               </div>
-
-              <DayMuscleOverviewCard summary={activeMuscleSummary} />
             </div>
 
-            <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+            <div className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-3">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold">Exercises</h3>
-                  
+                  <h3 className="text-sm font-bold">Exercises</h3>
+                  <p className="mt-1 text-[11px] text-zinc-500">เลือกท่าที่ต้องการ</p>
                 </div>
                 <button
                   onClick={() => setCompactList((value) => !value)}
@@ -1938,17 +1571,17 @@ export default function Page() {
                       setActiveExerciseIndex(index);
                       setCompactList(true);
                     }}
-                    className={`min-w-[92px] snap-start rounded-xl px-2.5 py-2 text-left text-xs ${
+                    className={`min-w-[96px] snap-start rounded-xl px-3 py-2.5 text-left text-xs ${
                       activeExerciseIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
                     }`}
                   >
-                    <span className="block text-[10px] font-bold">#{index + 1}</span>
-                    <span className="mt-1 line-clamp-2 block text-[13px] font-semibold leading-4.5">{item.name}</span>
+                    <span className="block text-[11px] font-bold">#{index + 1}</span>
+                    <span className="mt-1 line-clamp-3 block text-sm font-semibold leading-5">{item.name}</span>
                   </button>
                 ))}
               </div>
             </div>
-            <details className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+            <details className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
               <summary className="cursor-pointer text-xs font-bold text-zinc-300">Volume</summary>
               <p className="mt-2 text-xs text-zinc-400">Direct weekly sets</p>
               <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -1962,7 +1595,7 @@ export default function Page() {
             </details>
 
             {mode === "custom" && (
-              <details className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+              <details className="mt-4 rounded-3xl border border-zinc-800 bg-zinc-900 p-4">
                 <summary className="cursor-pointer text-xs font-bold text-zinc-300">
                   <Plus size={16} className="mr-2 inline" /> Add exercise
                 </summary>
@@ -2029,7 +1662,7 @@ export default function Page() {
                 const alternatives = getAlternatives(exercise);
 
                 return (
-                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-2.5 sm:p-3">
+                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap gap-2">
@@ -2053,8 +1686,6 @@ export default function Page() {
                     <div className="mb-2 flex flex-wrap gap-1.5">
                       {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
                     </div>
-
-                    <ExerciseMusclePreviewCard exercise={exercise} />
 
                     {mode === "custom" && (
                       <details className="mb-3 rounded-xl bg-zinc-950 p-3">
@@ -2173,7 +1804,7 @@ export default function Page() {
                           </p>
                         </div>
 
-                        <div className="mt-3 grid gap-2">
+                        <div className="grid gap-2">
                           <button
                             onClick={() => setRestTimerEnabled((value) => !value)}
                             className={`rounded-xl px-3 py-2 text-xs font-bold ${
@@ -2318,8 +1949,8 @@ export default function Page() {
         )}
       </section>
 
-      <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
-        <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1.5">
+      <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-1.5 backdrop-blur">
+        <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1">
           {[
             ["today", "Today"],
             ["preset", "Preset"],
@@ -2330,7 +1961,7 @@ export default function Page() {
             <button
               key={key}
               onClick={() => setMode(key as AppMode)}
-              className={`rounded-xl py-2.5 text-xs font-medium ${
+              className={`rounded-xl py-2.5 text-[11px] font-medium ${
                 mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"
               }`}
             >
