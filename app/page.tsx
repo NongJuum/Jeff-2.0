@@ -25,30 +25,10 @@ import {
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
 type AppMode = "today" | "preset" | "custom" | "history" | "library";
 
-type LoadType =
-  | "barbell" | "dumbbell" | "selectorized" | "plate-loaded"
-  | "smith" | "cable" | "bodyweight" | "specialty";
+type LoadType = "barbell" | "dumbbell" | "selectorized" | "plate-loaded" | "smith" | "cable" | "bodyweight" | "specialty";
 
-type Exercise = {
-  name: string;
-  group: MuscleGroup;
-  movement: string;
-  muscles: string[];
-  tier: "S+" | "S" | "A+" | "A";
-  load?: LoadType;
-};
-
-type PlanExercise = {
-  id: string;
-  name: string;
-  group: MuscleGroup;
-  sets: number;
-  reps: string;
-  warmup: boolean;
-  muscles: string[];
-  movement: string;
-  load?: LoadType;
-};
+type Exercise = { name: string; group: MuscleGroup; movement: string; muscles: string[]; tier: "S+" | "S" | "A+" | "A"; load: LoadType };
+type PlanExercise = { id: string; name: string; group: MuscleGroup; sets: number; reps: string; warmup: boolean; muscles: string[]; movement: string; load: LoadType };
 
 type DayPlan = {
   id: string;
@@ -207,137 +187,128 @@ function requestNotificationPermission() {
 }
 
 const exerciseLibrary: Exercise[] = [
-  { name: "Bench Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A" },
-  { name: "Cable Crossover", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A" },
-  { name: "DB Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A" },
-  { name: "Decline Bench Press", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A" },
-  { name: "Decline Machine Press", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A+" },
-  { name: "Flat DB Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A" },
-  { name: "High-to-Low Cable Flye", group: "Chest", movement: "chest flye", muscles: ["Lower chest"], tier: "A" },
-  { name: "Incline Barbell Bench Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "A" },
-  { name: "Incline DB Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+" },
-  { name: "Incline Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+" },
-  { name: "Incline Smith Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "A" },
+  // CHEST
+  { name: "Bench Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A", load: "barbell" },
+  { name: "Incline Barbell Bench Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "A", load: "barbell" },
+  { name: "Decline Bench Press", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A", load: "barbell" },
+  { name: "Flat DB Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A", load: "dumbbell" },
+  { name: "Incline DB Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+", load: "dumbbell" },
+  { name: "DB Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A", load: "dumbbell" },
+  { name: "Machine Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+", load: "selectorized" },
+  { name: "Incline Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+", load: "selectorized" },
+  { name: "Decline Machine Press", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A+", load: "selectorized" },
   { name: "Iso-Lateral Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+", load: "plate-loaded" },
   { name: "Iso-Lateral Incline Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+", load: "plate-loaded" },
-  { name: "Low-to-High Cable Flye", group: "Chest", movement: "chest flye", muscles: ["Upper chest"], tier: "A" },
-  { name: "Machine Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+" },
-  { name: "Machine Dip", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A" },
-  { name: "MTS Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S", load: "selectorized" },
-  { name: "MTS Incline Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S", load: "selectorized" },
-  { name: "Pec Deck", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S" },
-  { name: "Seated Cable Pec Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S" },
-  { name: "Smith Machine Floor Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Triceps", "Front delts"], tier: "A" },
-  { name: "Smith Machine Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A" },
-  { name: "Weighted Dip", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A" },
-
-  { name: "Assisted Pull Up Machine", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "A" },
-  { name: "Barbell Bent-Over Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Erectors"], tier: "A" },
-  { name: "Cable Lat Prayers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
-  { name: "Cable Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
-  { name: "Cable Rows", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
-  { name: "Chest Supported Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S+" },
-  { name: "Chest Supported T-Bar Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "S" },
-  { name: "DB Shrug", group: "Back", movement: "shrug", muscles: ["Upper traps"], tier: "A" },
-  { name: "Deficit Pendlay Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Erectors"], tier: "A" },
-  { name: "Iso-Lateral High Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Rear delts"], tier: "S", load: "plate-loaded" },
+  { name: "Smith Machine Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A", load: "smith" },
+  { name: "Incline Smith Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "A", load: "smith" },
+  { name: "Smith Machine Floor Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Triceps", "Front delts"], tier: "A", load: "smith" },
+  { name: "Pec Deck", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S", load: "selectorized" },
+  { name: "Seated Cable Pec Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S", load: "cable" },
+  { name: "Cable Crossover", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A", load: "cable" },
+  { name: "Low-to-High Cable Flye", group: "Chest", movement: "chest flye", muscles: ["Upper chest"], tier: "A", load: "cable" },
+  { name: "High-to-Low Cable Flye", group: "Chest", movement: "chest flye", muscles: ["Lower chest"], tier: "A", load: "cable" },
+  { name: "Weighted Dip", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A", load: "bodyweight" },
+  // BACK
+  { name: "Chest Supported Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S+", load: "dumbbell" },
+  { name: "Seal Row", group: "Back", movement: "row", muscles: ["Mid back", "Rear delts"], tier: "S", load: "barbell" },
+  { name: "Machine High Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Rear delts"], tier: "S", load: "plate-loaded" },
+  { name: "Chest Supported T-Bar Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "S", load: "plate-loaded" },
   { name: "Iso-Lateral Low Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "S", load: "plate-loaded" },
+  { name: "Cable Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S", load: "cable" },
+  { name: "Wide Grip Cable Row", group: "Back", movement: "row", muscles: ["Upper back", "Rear delts"], tier: "A", load: "cable" },
+  { name: "Barbell Bent-Over Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Erectors"], tier: "A", load: "barbell" },
+  { name: "Deficit Pendlay Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Erectors"], tier: "A", load: "barbell" },
+  { name: "Meadows Row", group: "Back", movement: "row", muscles: ["Lats", "Upper back"], tier: "A", load: "barbell" },
+  { name: "One Arm DB Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "A", load: "dumbbell" },
+  { name: "Kroc Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Grip"], tier: "A", load: "dumbbell" },
+  { name: "Neutral Grip Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S", load: "selectorized" },
   { name: "Iso-Lateral Pulldown", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S", load: "plate-loaded" },
-  { name: "Kroc Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Grip"], tier: "A" },
-  { name: "Machine High Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Rear delts"], tier: "S" },
-  { name: "Meadows Row", group: "Back", movement: "row", muscles: ["Lats", "Upper back"], tier: "A" },
-  { name: "MTS Lat Pulldown", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "A+", load: "selectorized" },
-  { name: "MTS Seated Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "A+", load: "selectorized" },
-  { name: "Neutral Grip Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S" },
-  { name: "One Arm DB Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "A" },
-  { name: "One Arm Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats"], tier: "A" },
-  { name: "Seal Row", group: "Back", movement: "row", muscles: ["Mid back", "Rear delts"], tier: "S" },
-  { name: "Smith Machine Shrug", group: "Back", movement: "shrug", muscles: ["Upper traps"], tier: "A" },
-  { name: "Straight Arm Pulldown", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
-  { name: "Weighted Pull Up", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S" },
-  { name: "Wide Grip Cable Row", group: "Back", movement: "row", muscles: ["Upper back", "Rear delts"], tier: "A" },
-  { name: "Widegrip Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "A" },
-  { name: "DB Pullovers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
-
-  { name: "45° Back Extension", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
-  { name: "45° Glute Hyperextension", group: "Legs", movement: "glute isolation", muscles: ["Glutes", "Hamstrings"], tier: "A" },
-  { name: "45° Leg Press", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
-  { name: "45° Leg Press High Foot", group: "Legs", movement: "glute press", muscles: ["Glutes", "Hamstrings", "Quads"], tier: "A" },
-  { name: "B-Stance RDL", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes"], tier: "A" },
-  { name: "Barbell Back Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
-  { name: "Belt Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S+" },
-  { name: "Bulgarian Split Squat", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "S" },
-  { name: "Cable Pull Through", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes"], tier: "A" },
-  { name: "Deadlift", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
-  { name: "Front Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
-  { name: "Hack Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S+" },
-  { name: "Kickbacks", group: "Legs", movement: "glute isolation", muscles: ["Glutes"], tier: "A" },
-  { name: "Leg Extension", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A" },
-  { name: "Lunges", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "A" },
-  { name: "Lying Leg Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "A" },
-  { name: "Machine Hip Abduction", group: "Legs", movement: "glute isolation", muscles: ["Glutes"], tier: "A" },
-  { name: "Machine Hip Adduction", group: "Legs", movement: "hip adduction", muscles: ["Adductors"], tier: "A" },
-  { name: "Machine Hip Thrust", group: "Legs", movement: "glute bridge", muscles: ["Glutes", "Hamstrings"], tier: "S" },
-  { name: "Nordic Hamstring Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "A" },
-  { name: "Pendulum Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S" },
-  { name: "Reverse Nordic", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A" },
-  { name: "Romanian Deadlift RDL", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
-  { name: "Seated Hamstring Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "S+" },
-  { name: "Sissy Squat", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A" },
-  { name: "Smith Machine Lunge FFE", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "A" },
-  { name: "Smith Machine RDL", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
-  { name: "Smith Machine Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
-  { name: "Smith Machine Squat Feet Forward", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
-  { name: "Step Ups High Box", group: "Legs", movement: "single leg", muscles: ["Glutes", "Quads"], tier: "A" },
-  { name: "Trap Bar Deadlift", group: "Legs", movement: "hinge", muscles: ["Quads", "Glutes", "Erectors"], tier: "A" },
-  { name: "V-Squat Machine", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
-
-  { name: "Atlantis Machine Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S" },
-  { name: "Barbell Overhead Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A" },
-  { name: "Behind Back Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S" },
-  { name: "Cable Y Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts", "Lower traps"], tier: "A" },
-  { name: "Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S+" },
-  { name: "DB Lateral Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
-  { name: "DB Rear Delt Flye", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A" },
-  { name: "Iso-Lateral Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A+", load: "plate-loaded" },
-  { name: "Lean In DB Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
-  { name: "Machine Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A" },
-  { name: "MTS Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A+", load: "selectorized" },
-  { name: "Reverse Cable Crossover", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A" },
-  { name: "Reverse Pec Deck", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "S" },
-  { name: "Rope Face Pull", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back", "Lower traps"], tier: "A" },
-  { name: "Seated DB Overhead Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A" },
-  { name: "Smith Machine Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A" },
-
-  { name: "1 Arm DB Overhead", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "A" },
-  { name: "Barbell Skullcrusher", group: "Arms", movement: "triceps extension", muscles: ["Triceps"], tier: "A" },
-  { name: "Cable Rope Hammer Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "Close-Grip Bench Press", group: "Arms", movement: "horizontal press", muscles: ["Triceps", "Chest", "Front delts"], tier: "A" },
-  { name: "DB Hammer Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "DB Preacher Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "DB Skullcrusher", group: "Arms", movement: "triceps extension", muscles: ["Triceps"], tier: "A" },
-  { name: "EZ Bar Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "Face Away Bayesian Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "Incline Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "Katana Cable", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "A" },
-  { name: "Machine Preacher Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "Machine Triceps Extension", group: "Arms", movement: "triceps extension", muscles: ["Triceps"], tier: "A" },
-  { name: "Overhead Cable Ext", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "S+" },
-  { name: "Rope Tricep Pushdown", group: "Arms", movement: "triceps pressdown", muscles: ["Triceps"], tier: "A" },
-  { name: "Standing DB Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "Straight Bar Cable Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
-  { name: "Triceps Pressdown Bar", group: "Arms", movement: "triceps pressdown", muscles: ["Triceps"], tier: "A" },
-
-  { name: "Ab Wheel Rollout", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A" },
-  { name: "Cable Crunch", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A" },
-  { name: "Captain's Chair Knee Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "S" },
-  { name: "Front Calf Muscle", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "A" },
-  { name: "Hanging Knee Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "S" },
-  { name: "Hanging Leg Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A" },
-  { name: "Leg Press Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "A" },
-  { name: "Machine Abs Crunch", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A" },
-  { name: "Seated Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "S" },
-  { name: "Standing Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "A" },
+  { name: "Widegrip Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "A", load: "selectorized" },
+  { name: "One Arm Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats"], tier: "A", load: "cable" },
+  { name: "Weighted Pull Up", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S", load: "bodyweight" },
+  { name: "Assisted Pull Up Machine", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "A", load: "selectorized" },
+  { name: "Straight Arm Pulldown", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A", load: "cable" },
+  { name: "Cable Lat Prayers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A", load: "cable" },
+  { name: "DB Pullovers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A", load: "dumbbell" },
+  { name: "DB Shrug", group: "Back", movement: "shrug", muscles: ["Upper traps"], tier: "A", load: "dumbbell" },
+  { name: "Smith Machine Shrug", group: "Back", movement: "shrug", muscles: ["Upper traps"], tier: "A", load: "smith" },
+  // LEGS
+  { name: "Hack Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S+", load: "specialty" },
+  { name: "Belt Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S+", load: "specialty" },
+  { name: "Pendulum Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S", load: "specialty" },
+  { name: "V-Squat Machine", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A", load: "specialty" },
+  { name: "Barbell Back Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A", load: "barbell" },
+  { name: "Front Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A", load: "barbell" },
+  { name: "Smith Machine Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A", load: "smith" },
+  { name: "Smith Machine Squat Feet Forward", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A", load: "smith" },
+  { name: "45° Leg Press", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A", load: "plate-loaded" },
+  { name: "45° Leg Press High Foot", group: "Legs", movement: "glute press", muscles: ["Glutes", "Hamstrings", "Quads"], tier: "A", load: "plate-loaded" },
+  { name: "Bulgarian Split Squat", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "S", load: "dumbbell" },
+  { name: "Smith Machine Lunge FFE", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "A", load: "smith" },
+  { name: "Lunges", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "A", load: "dumbbell" },
+  { name: "Step Ups High Box", group: "Legs", movement: "single leg", muscles: ["Glutes", "Quads"], tier: "A", load: "dumbbell" },
+  { name: "Leg Extension", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A", load: "selectorized" },
+  { name: "Reverse Nordic", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A", load: "bodyweight" },
+  { name: "Sissy Squat", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A", load: "bodyweight" },
+  { name: "Seated Hamstring Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "S+", load: "selectorized" },
+  { name: "Lying Leg Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "A", load: "selectorized" },
+  { name: "Nordic Hamstring Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "A", load: "bodyweight" },
+  { name: "Romanian Deadlift RDL", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A", load: "barbell" },
+  { name: "Smith Machine RDL", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A", load: "smith" },
+  { name: "B-Stance RDL", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes"], tier: "A", load: "dumbbell" },
+  { name: "Deadlift", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A", load: "barbell" },
+  { name: "Trap Bar Deadlift", group: "Legs", movement: "hinge", muscles: ["Quads", "Glutes", "Erectors"], tier: "A", load: "specialty" },
+  { name: "Cable Pull Through", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes"], tier: "A", load: "cable" },
+  { name: "45° Back Extension", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A", load: "bodyweight" },
+  { name: "45° Glute Hyperextension", group: "Legs", movement: "glute isolation", muscles: ["Glutes", "Hamstrings"], tier: "A", load: "bodyweight" },
+  { name: "Machine Hip Thrust", group: "Legs", movement: "glute bridge", muscles: ["Glutes", "Hamstrings"], tier: "S", load: "selectorized" },
+  { name: "Kickbacks", group: "Legs", movement: "glute isolation", muscles: ["Glutes"], tier: "A", load: "cable" },
+  { name: "Machine Hip Abduction", group: "Legs", movement: "glute isolation", muscles: ["Glutes"], tier: "A", load: "selectorized" },
+  { name: "Machine Hip Adduction", group: "Legs", movement: "hip adduction", muscles: ["Adductors"], tier: "A", load: "selectorized" },
+  // SHOULDERS
+  { name: "Machine Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A", load: "selectorized" },
+  { name: "Smith Machine Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A", load: "smith" },
+  { name: "Seated DB Overhead Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A", load: "dumbbell" },
+  { name: "Barbell Overhead Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A", load: "barbell" },
+  { name: "Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S+", load: "cable" },
+  { name: "Atlantis Machine Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S", load: "selectorized" },
+  { name: "Behind Back Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S", load: "cable" },
+  { name: "DB Lateral Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A", load: "dumbbell" },
+  { name: "Lean In DB Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A", load: "dumbbell" },
+  { name: "Cable Y Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts", "Lower traps"], tier: "A", load: "cable" },
+  { name: "Reverse Pec Deck", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "S", load: "selectorized" },
+  { name: "Reverse Cable Crossover", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A", load: "cable" },
+  { name: "Rope Face Pull", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back", "Lower traps"], tier: "A", load: "cable" },
+  { name: "DB Rear Delt Flye", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A", load: "dumbbell" },
+  // ARMS
+  { name: "Overhead Cable Ext", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "S+", load: "cable" },
+  { name: "Katana Cable", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "A", load: "cable" },
+  { name: "1 Arm DB Overhead", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "A", load: "dumbbell" },
+  { name: "Barbell Skullcrusher", group: "Arms", movement: "triceps extension", muscles: ["Triceps"], tier: "A", load: "barbell" },
+  { name: "DB Skullcrusher", group: "Arms", movement: "triceps extension", muscles: ["Triceps"], tier: "A", load: "dumbbell" },
+  { name: "Machine Triceps Extension", group: "Arms", movement: "triceps extension", muscles: ["Triceps"], tier: "A", load: "selectorized" },
+  { name: "Triceps Pressdown Bar", group: "Arms", movement: "triceps pressdown", muscles: ["Triceps"], tier: "A", load: "cable" },
+  { name: "Rope Tricep Pushdown", group: "Arms", movement: "triceps pressdown", muscles: ["Triceps"], tier: "A", load: "cable" },
+  { name: "Close-Grip Bench Press", group: "Arms", movement: "horizontal press", muscles: ["Triceps", "Chest", "Front delts"], tier: "A", load: "barbell" },
+  { name: "Face Away Bayesian Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "cable" },
+  { name: "Incline Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "dumbbell" },
+  { name: "Standing DB Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "dumbbell" },
+  { name: "EZ Bar Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "barbell" },
+  { name: "DB Preacher Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "dumbbell" },
+  { name: "Machine Preacher Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "selectorized" },
+  { name: "DB Hammer Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "dumbbell" },
+  { name: "Cable Rope Hammer Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "cable" },
+  { name: "Straight Bar Cable Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A", load: "cable" },
+  // ABS & CALVES
+  { name: "Cable Crunch", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A", load: "cable" },
+  { name: "Machine Abs Crunch", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A", load: "selectorized" },
+  { name: "Hanging Knee Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "S", load: "bodyweight" },
+  { name: "Captain's Chair Knee Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "S", load: "bodyweight" },
+  { name: "Hanging Leg Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A", load: "bodyweight" },
+  { name: "Ab Wheel Rollout", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A", load: "bodyweight" },
+  { name: "Seated Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "S", load: "selectorized" },
+  { name: "Standing Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "A", load: "selectorized" },
+  { name: "Leg Press Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "A", load: "plate-loaded" },
 ];
 
 const allGroups: MuscleGroup[] = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Abs & Calves"];
@@ -349,8 +320,8 @@ function findExercise(name: string) {
 const LOAD_LABELS: Record<LoadType, string> = {
   barbell: "Barbell",
   dumbbell: "Dumbbell",
-  selectorized: "Selectorized (Stack)",
-  "plate-loaded": "Plate-Loaded (Iso)",
+  selectorized: "Selectorized",
+  "plate-loaded": "Plate-Loaded Iso",
   smith: "Smith",
   cable: "Cable",
   bodyweight: "Bodyweight",
@@ -570,10 +541,14 @@ function makePresetPlans() {
       makeDay("Day 3 Full Body C", "Leg press, lower chest, row, glutes, delts, calves or abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["45° Leg Press", "High-to-Low Cable Flye", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
     ],
     4: [
-      makeDay("Day 1 Upper A", "Mid chest, lats, side delts, upper traps, triceps long", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "DB Shrug", "Overhead Cable Ext"]),
-      makeDay("Day 2 Lower A", "Quad bias, Hamstrings, Glutes, Soleus", ["Legs", "Abs & Calves"], ["Hack Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Seated Calf Raise"]),
-      makeDay("Day 3 Upper B", "Upper + lower chest, lat width, rear delts, lower traps, biceps", ["Chest", "Back", "Shoulders", "Arms"], ["Incline DB Press", "High-to-Low Cable Flye", "Widegrip Lat Pull Down", "Cable Row", "Reverse Pec Deck", "Rope Face Pull", "Face Away Bayesian Curl"]),
-      makeDay("Day 4 Lower B", "Hinge, Leg Press, Quads, Abs, Gastroc", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Lying Leg Curl", "Cable Crunch", "Standing Calf Raise"]),
+      makeDay("Day 1 Upper A", "Mid chest, lats, side delts, upper traps, triceps long", ["Chest", "Back", "Shoulders", "Arms"],
+        ["Iso-Lateral Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "DB Shrug", "Overhead Cable Ext"]),
+      makeDay("Day 2 Lower A", "Quad bias, hamstrings, glutes, soleus", ["Legs", "Abs & Calves"],
+        ["Belt Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Seated Calf Raise"]),
+      makeDay("Day 3 Upper B", "Upper+lower chest, lat width, rear delts, lower traps, biceps", ["Chest", "Back", "Shoulders", "Arms"],
+        ["Iso-Lateral Incline Press", "High-to-Low Cable Flye", "Widegrip Lat Pull Down", "Cable Row", "Reverse Pec Deck", "Rope Face Pull", "Face Away Bayesian Curl"]),
+      makeDay("Day 4 Lower B", "Hinge, leg press, quads, abs, gastroc", ["Legs", "Abs & Calves"],
+        ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Lying Leg Curl", "Cable Crunch", "Standing Calf Raise"]),
     ],
     5: [
       makeDay("Day 1 Chest + Back A", "Horizontal press, row, incline press, vertical pull, flye", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye"]),
@@ -909,15 +884,15 @@ const MUSCLE_ALIAS_MAP: Record<string, MuscleRegion[]> = {
   Lats: ["lats"],
   "Mid back": ["midBack"],
   "Upper back": ["upperBack"],
+  Erectors: ["erectors"],
   "Upper traps": ["upperTraps"],
   "Lower traps": ["lowerTraps"],
-  Erectors: ["erectors"],
   Abs: ["abs"],
   Glutes: ["glutes"],
   Quads: ["quads"],
   Hamstrings: ["hamstrings"],
   Calves: ["calves"],
-  Adductors: ["quads"],
+  Adductors: [],
   Grip: [],
 };
 
@@ -974,68 +949,32 @@ function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movem
   };
 }
 
-type StabilityClass = "plateloaded" | "selectorized" | "smith" | "cable" | "supported" | "free" | "unstable";
-
 // Jeff's logic: stability = how purely the target muscle is trained
-const FOCUS_EFFICIENCY: Record<StabilityClass, number> = {
-  plateloaded: 1.0,   // iso-lateral / converging arc / independent arms = purest focus
-  selectorized: 0.95, // stack machines (linked arms, fixed path)
+const FOCUS_EFFICIENCY: Record<LoadType, number> = {
+  "plate-loaded": 1.0,
+  specialty: 0.95,
+  selectorized: 0.95,
   smith: 0.9,
   cable: 0.85,
-  supported: 0.75,    // bench-supported free weights
-  free: 0.6,          // stabilizers cap output
-  unstable: 0.55,     // balance steals tension
+  dumbbell: 0.7,
+  barbell: 0.6,
+  bodyweight: 0.55,
 };
-
-const STABILITY_LABELS: Record<StabilityClass, string> = {
-  plateloaded: "Plate-loaded / Iso",
-  selectorized: "Selectorized stack",
-  smith: "Smith",
-  cable: "Cable",
-  supported: "Supported free weight",
-  free: "Free weight",
-  unstable: "High stability demand",
-};
-
-function getStabilityClass(ex: { name: string }): StabilityClass {
-  const n = ex.name.toLowerCase();
-  if (n.includes("iso-lateral") || n.includes("plate-loaded") || n.includes("hack squat") || n.includes("pendulum") || n.includes("leg press") || n.includes("belt squat") || n.includes("v-squat")) return "plateloaded";
-  if (n.includes("nordic") || n.includes("sissy") || n.includes("ab wheel") || n.includes("hanging") || n.includes("captain") || n.includes("pull up") || n.includes("kickback") || n.includes("split squat") || n.includes("lunge") || n.includes("step up") || n.includes("one arm") || n.includes("1 arm")) return "unstable";
-  if (n.includes("smith")) return "smith";
-  if (n.includes("machine") || n.includes("mts") || n.includes("pec deck") || n.includes("atlantis") || n.includes("leg extension") || n.includes("leg curl") || n.includes("hamstring curl") || n.includes("calf raise") || n.includes("hip abduction") || n.includes("hip adduction") || n.includes("hip thrust") || n.includes("abs crunch")) return "selectorized";
-  if (n.includes("cable") || n.includes("katana")) return "cable";
-  if (n.includes("chest supported") || n.includes("seated") || n.includes("lying") || n.includes("incline") || n.includes("decline") || n.includes("preacher") || n.includes("back extension") || n.includes("db press") || n.includes("seal row")) return "supported";
-  return "free";
-}
 
 function calculateMuscleMatchScore(
-  target: Pick<PlanExercise, "group" | "movement" | "muscles" | "name">,
+  target: Pick<PlanExercise, "group" | "movement" | "muscles" | "name" | "load">,
   candidate: Exercise
 ): number {
   if (target.group !== candidate.group) return -1;
-  const targetRegions = getExercisePreviewRegions(target);
-  const candidateRegions = getExercisePreviewRegions(candidate);
+  const t = getExercisePreviewRegions(target);
+  const c = getExercisePreviewRegions(candidate);
   let score = 0;
-
-  // FOCUS MUSCLE = MOST SCORE (dominant weight: +6 per primary match)
-  for (const region of targetRegions.primary) {
-    if (candidateRegions.primary.includes(region)) score += 6;
-    else if (candidateRegions.secondary.includes(region)) score += 2;
-  }
-  for (const region of targetRegions.secondary) {
-    if (candidateRegions.primary.includes(region)) score += 2;
-    else if (candidateRegions.secondary.includes(region)) score += 1;
-  }
-
-  // Movement pattern bonus
+  for (const r of t.primary) score += c.primary.includes(r) ? 6 : c.secondary.includes(r) ? 2 : 0; // FOCUS MUSCLE = MOST
+  for (const r of t.secondary) score += c.primary.includes(r) ? 2 : c.secondary.includes(r) ? 1 : 0;
   const related = getRelatedMovements(target.movement);
-  if (candidate.movement === target.movement) score += 2;
-  else if (related.includes(candidate.movement)) score += 1;
-
-  // JEFF'S MACHINE LOGIC: stability -> target-muscle focus efficiency
-  score += 2 * FOCUS_EFFICIENCY[getStabilityClass(candidate)];
-
-  // Tier tie-breaker
+  score += candidate.movement === target.movement ? 2 : related.includes(candidate.movement) ? 1 : 0;
+  score += 2 * FOCUS_EFFICIENCY[candidate.load]; // stability -> focus
+  if (candidate.load === target.load) score += 0.5; // same machine feel
   if (candidate.tier === "S+") score += 0.3;
   else if (candidate.tier === "S") score += 0.2;
   else if (candidate.tier === "A") score += 0.1;
@@ -2956,9 +2895,8 @@ export default function Page() {
                       (substituteMap[substituteModalExercise.id] === candidate.name ||
                         (!substituteMap[substituteModalExercise.id] && substituteModalExercise.name === candidate.name)));
 
+                  const focusPct = Math.round(FOCUS_EFFICIENCY[candidate.load] * 100);
                   const isRelatedMovement = getRelatedMovements(substituteModalExercise.movement).includes(candidate.movement);
-                  const stab = getStabilityClass(candidate);
-                  const focusPct = Math.round(FOCUS_EFFICIENCY[stab] * 100);
 
                   const tierStyles = {
                     "S+": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
@@ -2992,20 +2930,10 @@ export default function Page() {
                         </div>
                         <p className="mt-1 text-xs text-zinc-400">
                           {candidate.group} · {candidate.movement}
-                          <span className={`ml-1.5 inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-black ${
-                            focusPct >= 95
-                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                              : focusPct >= 75
-                                ? "border-zinc-700 bg-zinc-900 text-zinc-300"
-                                : "border-amber-500/30 bg-amber-500/10 text-amber-300"
-                          }`}>
-                            {STABILITY_LABELS[stab]} · {focusPct}%
+                          {isRelatedMovement && <span className="ml-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">Same Movement</span>}
+                          <span className={`ml-1.5 rounded-md border px-1.5 py-0.5 text-[10px] font-black ${focusPct >= 90 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : focusPct >= 70 ? "border-zinc-700 bg-zinc-900 text-zinc-300" : "border-amber-500/30 bg-amber-500/10 text-amber-300"}`}>
+                            {LOAD_LABELS[candidate.load]} · {focusPct}%
                           </span>
-                          {isRelatedMovement && (
-                            <span className="ml-1.5 inline-flex items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">
-                              Same Movement
-                            </span>
-                          )}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-zinc-500">
                           {candidate.muscles.join(", ")}
