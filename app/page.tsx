@@ -205,8 +205,8 @@ const exerciseLibrary: Exercise[] = [
   { name: "Cable Crossover", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A" },
   { name: "DB Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A" },
   { name: "Flat DB Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A" },
-  { name: "Incline DB Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S" },
-  { name: "Incline Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S" },
+  { name: "Incline DB Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+" },
+  { name: "Incline Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+" },
   { name: "Incline Smith Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "A" },
   { name: "Machine Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+" },
   { name: "Pec Deck", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S" },
@@ -217,7 +217,7 @@ const exerciseLibrary: Exercise[] = [
   { name: "Cable Lat Prayers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
   { name: "Cable Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
   { name: "Cable Rows", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
-  { name: "Chest Supported Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
+  { name: "Chest Supported Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S+" },
   { name: "Deficit Pendlay Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Erectors"], tier: "A" },
   { name: "Kroc Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Grip"], tier: "A" },
   { name: "Meadows Row", group: "Back", movement: "row", muscles: ["Lats", "Upper back"], tier: "A" },
@@ -246,7 +246,7 @@ const exerciseLibrary: Exercise[] = [
   { name: "Pendulum Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S" },
   { name: "Reverse Nordic", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A" },
   { name: "Romanian Deadlift RDL", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
-  { name: "Seated Hamstring Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "S" },
+  { name: "Seated Hamstring Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "S+" },
   { name: "Sissy Squat", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A" },
   { name: "Smith Machine Lunge FFE", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "A" },
   { name: "Smith Machine Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
@@ -425,10 +425,10 @@ function makePresetPlans() {
       makeDay("Day 3 Full Body C", "Leg press, chest isolation, row, glutes, delts, calves or abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["45° Leg Press", "Seated Cable Pec Flye", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
     ],
     4: [
-      makeDay("Day 1 Upper A", "Press, row, pulldown, chest isolation, delts, triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye", "Cable Lat Raise", "Overhead Cable Ext"]),
-      makeDay("Day 2 Lower A", "Quad bias with hamstrings, glutes, calves", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Machine Hip Thrust", "Leg Extension", "Front Calf Muscle"]),
-      makeDay("Day 3 Upper B", "Incline press, row, lat isolation, rear delts, biceps, triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Incline DB Press", "Cable Row", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl", "Triceps Pressdown Bar"]),
-      makeDay("Day 4 Lower B", "Posterior bias with quads, abs, calves", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press", "Lying Leg Curl", "Bulgarian Split Squat", "Cable Crunch", "Front Calf Muscle"]),
+      makeDay("Day 1 Upper A", "Chest focus, Back thickness, Side delts, Triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "Overhead Cable Ext"]),
+      makeDay("Day 2 Lower A", "Quad bias, Hamstrings, Glutes, Calves", ["Legs", "Abs & Calves"], ["Hack Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Front Calf Muscle"]),
+      makeDay("Day 3 Upper B", "Upper chest, Lat width, Rear delts, Biceps", ["Chest", "Back", "Shoulders", "Arms"], ["Incline DB Press", "Pec Deck", "Widegrip Lat Pull Down", "Cable Row", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
+      makeDay("Day 4 Lower B", "Hinge, Leg Press, Quads, Abs", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Lying Leg Curl", "Cable Crunch", "Front Calf Muscle"]),
     ],
     5: [
       makeDay("Day 1 Chest + Back A", "Horizontal press, row, incline press, vertical pull, flye", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye"]),
@@ -558,7 +558,7 @@ function getRestSeconds(exercise: PlanExercise) {
     movement.includes("isolation") ||
     movement.includes("rear delt")
   ) {
-    return 90;
+    return 120;
   }
 
   return 120;
