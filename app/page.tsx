@@ -6,6 +6,7 @@ import {
   Check,
   ChevronDown,
   ClipboardList,
+  Download,
   Dumbbell,
   Flame,
   Library,
@@ -18,6 +19,7 @@ import {
   Sparkles,
   Trash2,
   Trophy,
+  X,
 } from "lucide-react";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
@@ -64,9 +66,11 @@ type SetInput = {
 
 type RestTimerState = {
   exerciseId: string | null;
+  exerciseName?: string;
   secondsLeft: number;
   totalSeconds: number;
   running: boolean;
+  targetEndTimestamp?: number;
 };
 
 type RestMode = "short" | "normal" | "heavy";
@@ -104,6 +108,7 @@ const SET_INPUTS_KEY = "haitSetInputsV5";
 const CUSTOM_PLANS_KEY = "haitCustomPlansV2";
 const SUBSTITUTE_KEY = "haitSubstitutionsV1";
 const LATEST_LOGS_KEY = "trainingLatestV2";
+const REST_TIMER_KEY = "haitRestTimerV1";
 
 function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -129,8 +134,70 @@ function writeLocalJson<T>(key: string, value: T) {
 function writeSessionJson<T>(key: string, value: T) {
   if (typeof window === "undefined") return;
   try {
-    window.sessionStorage.setItem(key, JSON.stringify(value));
-  } catch { /* quota exceeded or private mode */ }
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch { /* fallback to local storage */ }
+}
+
+function playRestDoneChime() {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    const now = ctx.currentTime;
+
+    // First chime note (F#5 - 739.99 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(739.99, now);
+    gain1.gain.setValueAtTime(0.2, now);
+    gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.38);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.38);
+
+    // Second harmonious higher note (B5 - 987.77 Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(987.77, now + 0.16);
+    gain2.gain.setValueAtTime(0.25, now + 0.16);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.16);
+    osc2.stop(now + 0.65);
+  } catch {
+    // AudioContext blocked or user hasn't interacted yet
+  }
+}
+
+function notifyRestDone(exerciseName?: string) {
+  playRestDoneChime();
+  if (typeof navigator !== "undefined" && "vibrate" in navigator && typeof navigator.vibrate === "function") {
+    try {
+      navigator.vibrate([200, 100, 200, 100, 300]);
+    } catch {}
+  }
+  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification("⏰ Rest Finished!", {
+        body: exerciseName ? `Time for your next set of ${exerciseName}!` : "Time for your next set!",
+        icon: "/icon-192.png",
+      });
+    } catch {}
+  }
+}
+
+function requestNotificationPermission() {
+  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission().catch(() => {});
+  }
 }
 
 const exerciseLibrary: Exercise[] = [
@@ -613,8 +680,9 @@ function getWeeklyVolumeSummary(plan: DayPlan[]) {
 }
 
 function normalizeSetInputs(raw: SetInput[], sets: number) {
-  if (raw.length >= sets) return raw;
-  return [...raw, ...createDefaultSetInputs(Math.max(0, sets - raw.length))];
+  if (raw.length > sets) return raw.slice(0, sets);
+  if (raw.length < sets) return [...raw, ...createDefaultSetInputs(sets - raw.length)];
+  return raw;
 }
 
 
@@ -894,35 +962,50 @@ function DayMuscleOverviewCard({ summary }: { summary: MuscleSummary }) {
 }
 
 function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
+  const [showDiagram, setShowDiagram] = useState(false);
   const { primary, secondary } = getExercisePreviewRegions(exercise);
   const primaryLabels = primary.map((item) => MUSCLE_REGION_LABELS[item]);
   const secondaryLabels = secondary.map((item) => MUSCLE_REGION_LABELS[item]);
 
   return (
     <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase text-zinc-500">Muscle</p>
-          <p className="mt-1 text-xs text-zinc-500">
-            <span className="text-red-400">{primaryLabels.length > 0 ? primaryLabels.join(", ") : "—"}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Target Muscles</p>
+          <p className="mt-0.5 truncate text-xs">
+            <span className="font-semibold text-red-400">{primaryLabels.length > 0 ? primaryLabels.join(", ") : "—"}</span>
             {secondaryLabels.length > 0 ? <span> · <span className="text-amber-300">{secondaryLabels.join(", ")}</span></span> : null}
           </p>
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-zinc-500">
-          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-600" /> P</span>
-          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" /> S</span>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowDiagram((prev) => !prev)}
+          className="shrink-0 rounded-xl bg-zinc-900 px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
+          aria-expanded={showDiagram}
+          aria-label={showDiagram ? "Hide muscle diagram" : "Show muscle diagram"}
+        >
+          {showDiagram ? "Hide Map" : "View Map"}
+        </button>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-zinc-900 px-2 py-2">
-          <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Front</p>
-          <MusclePreviewFigure side="front" primary={primary} secondary={secondary} compact />
+
+      {showDiagram && (
+        <div className="mt-3 pt-2 border-t border-zinc-800/80">
+          <div className="mb-2 flex items-center justify-end gap-3 text-[10px] text-zinc-500">
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-600" /> Primary</span>
+            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" /> Secondary</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-zinc-900 px-2 py-2">
+              <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Front</p>
+              <MusclePreviewFigure side="front" primary={primary} secondary={secondary} compact />
+            </div>
+            <div className="rounded-xl bg-zinc-900 px-2 py-2">
+              <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Back</p>
+              <MusclePreviewFigure side="back" primary={primary} secondary={secondary} compact />
+            </div>
+          </div>
         </div>
-        <div className="rounded-xl bg-zinc-900 px-2 py-2">
-          <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Back</p>
-          <MusclePreviewFigure side="back" primary={primary} secondary={secondary} compact />
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -947,7 +1030,19 @@ export default function Page() {
   const [selectedDay, setSelectedDay] = useState(initialUiState.selectedDay);
   const [logs, setLogs] = useState<LogSet[]>([]);
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
-  const [restTimer, setRestTimer] = useState<RestTimerState>({ exerciseId: null, secondsLeft: 0, totalSeconds: 0, running: false });
+  const [restTimer, setRestTimer] = useState<RestTimerState>(() => {
+    const saved = readJson<RestTimerState | null>(REST_TIMER_KEY, null);
+    if (saved && saved.running && saved.targetEndTimestamp) {
+      const remaining = Math.max(0, Math.ceil((saved.targetEndTimestamp - Date.now()) / 1000));
+      if (remaining > 0) {
+        return {
+          ...saved,
+          secondsLeft: remaining,
+        };
+      }
+    }
+    return { exerciseId: null, secondsLeft: 0, totalSeconds: 0, running: false };
+  });
   const [restTimerEnabled, setRestTimerEnabled] = useState(true);
   const [restModeMap, setRestModeMap] = useState<Record<string, RestMode>>({});
   const [customRestMap, setCustomRestMap] = useState<Record<string, number>>({});
@@ -963,6 +1058,11 @@ export default function Page() {
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
   const [compactList, setCompactList] = useState(true);
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
+
+  // Substitution Modal State
+  const [substituteModalExercise, setSubstituteModalExercise] = useState<PlanExercise | null>(null);
+  const [substituteSearch, setSubstituteSearch] = useState("");
+  const [substituteFilter, setSubstituteFilter] = useState<"movement" | "group" | "all">("movement");
 
   const presetPlans = useMemo(() => makePresetPlans(), []);
   const fiveDayLegOncePlan = useMemo(() => makeFiveDayLegOncePlan(), []);
@@ -984,6 +1084,10 @@ export default function Page() {
       const parsed = JSON.parse(raw) as LogSet[];
       setLogs(parsed);
     }
+    // Register service worker for offline gym PWA
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
   }, []);
 
   useEffect(() => {
@@ -1001,9 +1105,20 @@ export default function Page() {
     });
   }, [mode, days, selectedDay, fiveDayMode, showHistory, showLibrary, selectedCustomPlan?.id, selectedCustomDay]);
 
-  useEffect(() => writeSessionJson(SET_INPUTS_KEY, inputs), [inputs]);
+  useEffect(() => writeLocalJson(SET_INPUTS_KEY, inputs), [inputs]);
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
-  useEffect(() => writeSessionJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
+  useEffect(() => writeLocalJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
+
+  // Persist rest timer state for resilience against refresh
+  useEffect(() => {
+    if (restTimer.running && restTimer.secondsLeft > 0) {
+      writeLocalJson(REST_TIMER_KEY, restTimer);
+    } else {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(REST_TIMER_KEY);
+      }
+    }
+  }, [restTimer]);
 
   // Save scroll position on page hide / background (mobile-safe)
   useEffect(() => {
@@ -1092,39 +1207,69 @@ export default function Page() {
     return records;
   }, [logs]);
 
+  // Robust timestamp-based interval + visibility sync (no drift on tab backgrounding/phone lock)
   useEffect(() => {
-    if (!restTimer.running || restTimer.secondsLeft <= 0) return;
+    if (!restTimer.running || !restTimer.targetEndTimestamp) return;
 
-    const intervalId = window.setInterval(() => {
-      setRestTimer((current) => {
-        if (!current.running) return current;
+    const tick = () => {
+      const now = Date.now();
+      const remaining = Math.max(0, Math.ceil((restTimer.targetEndTimestamp! - now) / 1000));
 
-        const nextSeconds = Math.max(0, current.secondsLeft - 1);
-
-        return {
+      if (remaining <= 0) {
+        notifyRestDone(restTimer.exerciseName);
+        setRestTimer((current) => ({
           ...current,
-          secondsLeft: nextSeconds,
-          running: nextSeconds > 0,
-        };
-      });
-    }, 1000);
+          running: false,
+          secondsLeft: 0,
+          targetEndTimestamp: undefined,
+        }));
+      } else {
+        setRestTimer((current) => {
+          if (!current.running) return current;
+          return {
+            ...current,
+            secondsLeft: remaining,
+          };
+        });
+      }
+    };
 
-    return () => window.clearInterval(intervalId);
-  }, [restTimer.running, restTimer.secondsLeft]);
+    tick();
+    const intervalId = window.setInterval(tick, 500);
+
+    const onVisibilityOrFocus = () => {
+      if (!document.hidden) {
+        tick();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityOrFocus);
+    window.addEventListener("focus", onVisibilityOrFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityOrFocus);
+      window.removeEventListener("focus", onVisibilityOrFocus);
+    };
+  }, [restTimer.running, restTimer.targetEndTimestamp, restTimer.exerciseName]);
 
   const restProgress = restTimer.totalSeconds > 0 ? Math.round(((restTimer.totalSeconds - restTimer.secondsLeft) / restTimer.totalSeconds) * 100) : 0;
 
   function startRestTimer(exercise: PlanExercise) {
     if (!restTimerEnabled) return;
+    requestNotificationPermission();
 
     const mode = restModeMap[exercise.id] ?? "normal";
     const seconds = customRestMap[exercise.id] ?? getRestSecondsByMode(exercise, mode);
+    const targetEnd = Date.now() + seconds * 1000;
 
     setRestTimer({
       exerciseId: exercise.id,
+      exerciseName: exercise.name,
       secondsLeft: seconds,
       totalSeconds: seconds,
       running: true,
+      targetEndTimestamp: targetEnd,
     });
   }
 
@@ -1139,10 +1284,22 @@ export default function Page() {
     }));
 
     setRestTimer((currentTimer) => {
-      if (currentTimer.exerciseId !== exercise.id || currentTimer.running) return currentTimer;
+      if (currentTimer.exerciseId !== exercise.id) return currentTimer;
+
+      if (currentTimer.running && currentTimer.targetEndTimestamp) {
+        const newSecondsLeft = Math.max(5, currentTimer.secondsLeft + deltaSeconds);
+        const newTargetEnd = Date.now() + newSecondsLeft * 1000;
+        return {
+          ...currentTimer,
+          secondsLeft: newSecondsLeft,
+          totalSeconds: Math.max(currentTimer.totalSeconds, newSecondsLeft),
+          targetEndTimestamp: newTargetEnd,
+        };
+      }
 
       return {
         exerciseId: exercise.id,
+        exerciseName: exercise.name,
         secondsLeft: next,
         totalSeconds: next,
         running: false,
@@ -1168,6 +1325,7 @@ export default function Page() {
 
       return {
         exerciseId: exercise.id,
+        exerciseName: exercise.name,
         secondsLeft: seconds,
         totalSeconds: seconds,
         running: false,
@@ -1180,7 +1338,11 @@ export default function Page() {
       ...current,
       running: false,
       secondsLeft: 0,
+      targetEndTimestamp: undefined,
     }));
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(REST_TIMER_KEY);
+    }
   }
 
   const prMap = useMemo(() => {
@@ -1260,11 +1422,64 @@ export default function Page() {
     });
   }, [exerciseSearch, exerciseGroupFilter]);
 
+  const substituteCandidates = useMemo(() => {
+    if (!substituteModalExercise) return [];
+    const keyword = substituteSearch.trim().toLowerCase();
+    const relatedMovements = getRelatedMovements(substituteModalExercise.movement);
+
+    let list = exerciseLibrary;
+    if (substituteFilter === "movement") {
+      list = exerciseLibrary.filter(
+        (ex) =>
+          ex.group === substituteModalExercise.group &&
+          (relatedMovements.includes(ex.movement) || ex.name === substituteModalExercise.name)
+      );
+      if (list.length <= 1) {
+        list = exerciseLibrary.filter((ex) => ex.group === substituteModalExercise.group);
+      }
+    } else if (substituteFilter === "group") {
+      list = exerciseLibrary.filter((ex) => ex.group === substituteModalExercise.group);
+    }
+
+    if (keyword) {
+      list = list.filter(
+        (ex) =>
+          ex.name.toLowerCase().includes(keyword) ||
+          ex.movement.toLowerCase().includes(keyword) ||
+          ex.group.toLowerCase().includes(keyword) ||
+          ex.muscles.some((m) => m.toLowerCase().includes(keyword))
+      );
+    }
+
+    return list;
+  }, [substituteModalExercise, substituteSearch, substituteFilter]);
+
+  const handleSetInputKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    exercise: PlanExercise,
+    baseExerciseId: string,
+    setIndex: number,
+    field: "weightLbs" | "reps"
+  ) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (field === "weightLbs") {
+        const repsInput = document.getElementById(`rep-input-${baseExerciseId}-${setIndex}`);
+        repsInput?.focus();
+      } else if (field === "reps") {
+        saveSingleSet(exercise, setIndex);
+        const nextWeightInput = document.getElementById(`weight-input-${baseExerciseId}-${setIndex + 1}`);
+        if (nextWeightInput) {
+          nextWeightInput.focus();
+        }
+      }
+    }
+  };
 
   function addManualSet(exerciseId: string, defaultSets: number) {
     setInputs((old) => {
       const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
-      return {
+      const nextInputs = {
         ...old,
         [exerciseId]: [
           ...current,
@@ -1275,6 +1490,8 @@ export default function Page() {
           },
         ],
       };
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
+      return nextInputs;
     });
   }
 
@@ -1284,10 +1501,12 @@ export default function Page() {
 
       if (current.length <= 1) return old;
 
-      return {
+      const nextInputs = {
         ...old,
         [exerciseId]: current.slice(0, -1),
       };
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
+      return nextInputs;
     });
   }
 
@@ -1311,7 +1530,7 @@ export default function Page() {
         [exerciseId]: updated,
       };
 
-      writeSessionJson(SET_INPUTS_KEY, nextInputs);
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
     });
   }
@@ -1338,9 +1557,12 @@ export default function Page() {
       };
 
       setLogs((old) => {
-        const without = old.filter(l => l.exerciseName !== logSet.exerciseName);
+        const without = old.filter(l => l.exerciseName !== logSet.exerciseName || l.setNumber !== logSet.setNumber);
         return [...without, logSet];
       });
+
+      // Auto start rest timer on completing working set
+      startRestTimer(exercise);
     }
 
     setInputs((old) => {
@@ -1351,12 +1573,10 @@ export default function Page() {
         [exercise.id]: updated,
       };
 
-      writeSessionJson(SET_INPUTS_KEY, nextInputs);
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
     });
   }
-
-
 
   function saveAllSets(exercise: PlanExercise) {
     const exerciseInputs = normalizeSetInputs(inputs[exercise.id] ?? createDefaultSetInputs(exercise.sets), exercise.sets);
@@ -1374,10 +1594,15 @@ export default function Page() {
       .map(({ alreadySaved, ...item }) => item);
 
     if (validSets.length > 0) {
-      const latest = validSets[validSets.length - 1];
       setLogs((old) => {
-        const without = old.filter(l => l.exerciseName !== latest.exerciseName);
-        return [...without, latest];
+        const without = old.filter(
+          (l) =>
+            !(
+              l.exerciseName === exercise.name &&
+              validSets.some((v) => v.setNumber === l.setNumber)
+            )
+        );
+        return [...without, ...validSets];
       });
       startRestTimer(exercise);
     }
@@ -1388,9 +1613,31 @@ export default function Page() {
         [exercise.id]: createDefaultSetInputs(exercise.sets),
       };
 
-      writeSessionJson(SET_INPUTS_KEY, nextInputs);
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
     });
+  }
+
+  function exportLogsToCsv() {
+    if (logs.length === 0) return;
+    const headers = ["Date", "Exercise", "Set", "Weight (lbs)", "Reps"];
+    const rows = logs.map((log) => [
+      new Date(log.date).toISOString().replace("T", " ").slice(0, 19),
+      `"${log.exerciseName.replace(/"/g, '""')}"`,
+      log.setNumber,
+      log.weightLbs,
+      log.reps,
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `workout_history_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 
   function clearHistory() {
@@ -1631,7 +1878,24 @@ export default function Page() {
                 <h3 className="flex items-center gap-2 text-lg font-black"><ClipboardList size={18} /> History Log</h3>
                 <p className="mt-0.5 text-[11px] text-zinc-500">Temporary record from the last 14 days only.</p>
               </div>
-              {recentLogs.length > 0 && <button onClick={clearHistory} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Clear history"><Trash2 size={18} /></button>}
+              {recentLogs.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={exportLogsToCsv}
+                    className="flex items-center gap-1.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                    aria-label="Export history to CSV"
+                  >
+                    <Download size={15} /> Export CSV
+                  </button>
+                  <button
+                    onClick={clearHistory}
+                    className="rounded-2xl border border-red-500/40 bg-red-500/10 p-2.5 text-red-300 transition hover:bg-red-500/20"
+                    aria-label="Clear history"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              )}
             </div>
 
             {recentLogs.length === 0 ? (
@@ -2001,31 +2265,26 @@ export default function Page() {
                       </details>
                     )}
 
-                    {alternatives.length > 0 && (
-                      <details className="mb-3 rounded-xl bg-zinc-950 p-3">
-                        <summary className="cursor-pointer text-xs font-bold text-zinc-300">
-                          <RotateCcw size={14} className="mr-2 inline" /> Substitute
-                        </summary>
-
-                        <div className="mt-3">
-                          <select
-                            value={exercise.name}
-                            onChange={(event) => substituteExercise(baseExercise, event.target.value)}
-                            className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm font-medium outline-none"
-                          >
-                            <option value={exercise.name}>{exercise.name}</option>
-                            {alternatives.map((name) => (
-                              <option key={name} value={name}>
-                                {name}
-                              </option>
-                            ))}
-                          </select>
-                          <p className="mt-2 text-[11px] text-zinc-500">
-                            Preset = session only, Custom = saved to plan.
-                          </p>
-                        </div>
-                      </details>
-                    )}
+                    <div className="mb-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSubstituteModalExercise(baseExercise);
+                          setSubstituteSearch("");
+                          setSubstituteFilter("movement");
+                        }}
+                        className="flex w-full items-center justify-between gap-2 rounded-xl bg-zinc-950 px-3.5 py-3 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                        aria-label={`Substitute ${exercise.name}`}
+                      >
+                        <span className="flex items-center gap-2">
+                          <RotateCcw size={14} className="text-emerald-400" />
+                          <span>Substitute Exercise</span>
+                        </span>
+                        <span className="rounded-lg bg-zinc-900 px-2 py-1 text-[11px] text-zinc-400">
+                          {selectedSubstitute ? "Modified" : "Choose"}
+                        </span>
+                      </button>
+                    </div>
 
                     <div className="mb-3 grid gap-2 sm:grid-cols-2">
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
@@ -2039,10 +2298,78 @@ export default function Page() {
                       </div>
 
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <div className="flex items-start justify-between gap-2"><div><p className="text-xs font-bold uppercase text-zinc-500">Rest</p><p className="mt-1 text-2xl font-black text-emerald-300">{restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0 ? formatRestTime(restTimer.secondsLeft) : formatRestTime(selectedRestSeconds)}</p></div><div className="flex gap-2"><button onClick={() => setRestTimerEnabled((value) => !value)} className={`rounded-xl px-3 py-2 text-xs font-bold ${restTimerEnabled ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-400"}`} type="button">{restTimerEnabled ? "On" : "Off"}</button><button onClick={() => (restTimer.exerciseId === baseExercise.id && restTimer.running ? stopRestTimer() : startRestTimer({ ...exercise, id: baseExercise.id }))} className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300" type="button">{restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop" : "Start"}</button></div></div>
-                        <div className="mt-3 grid grid-cols-3 gap-2">{[["short", "Short"], ["normal", "Normal"], ["heavy", "Heavy"]].map(([mode, label]) => (<button key={mode} onClick={() => setRestMode({ ...exercise, id: baseExercise.id }, mode as RestMode)} className={`rounded-xl px-2 py-2 text-xs font-bold ${restMode === mode ? "bg-zinc-50 text-zinc-950" : "bg-zinc-900 text-zinc-400"}`} type="button">{label}</button>))}</div>
-                        <div className="mt-2 grid grid-cols-2 gap-2"><button onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, -30)} className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300" type="button">−30s</button><button onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, 30)} className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300" type="button">+30s</button></div>
-                        {restTimer.exerciseId === baseExercise.id && restTimer.totalSeconds > 0 && (<div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900"><div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${restProgress}%` }} /></div>)}
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-bold uppercase text-zinc-500">Rest</p>
+                            <p className="mt-1 text-2xl font-black text-emerald-300">
+                              {restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0
+                                ? formatRestTime(restTimer.secondsLeft)
+                                : formatRestTime(selectedRestSeconds)}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setRestTimerEnabled((value) => !value)}
+                              className={`rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                                restTimerEnabled ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-400"
+                              }`}
+                              aria-label={restTimerEnabled ? "Disable rest timer" : "Enable rest timer"}
+                              type="button"
+                            >
+                              {restTimerEnabled ? "On" : "Off"}
+                            </button>
+                            <button
+                              onClick={() =>
+                                restTimer.exerciseId === baseExercise.id && restTimer.running
+                                  ? stopRestTimer()
+                                  : startRestTimer({ ...exercise, id: baseExercise.id })
+                              }
+                              className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                              aria-label={restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop rest timer" : "Start rest timer"}
+                              type="button"
+                            >
+                              {restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop" : "Start"}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2">
+                          {[["short", "Short"], ["normal", "Normal"], ["heavy", "Heavy"]].map(([mode, label]) => (
+                            <button
+                              key={mode}
+                              onClick={() => setRestMode({ ...exercise, id: baseExercise.id }, mode as RestMode)}
+                              className={`rounded-xl px-2 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                                restMode === mode ? "bg-zinc-50 text-zinc-950" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+                              }`}
+                              aria-label={`Set rest preset ${label}`}
+                              type="button"
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-2">
+                          <button
+                            onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, -30)}
+                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            aria-label="Decrease rest by 30 seconds"
+                            type="button"
+                          >
+                            −30s
+                          </button>
+                          <button
+                            onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, 30)}
+                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            aria-label="Increase rest by 30 seconds"
+                            type="button"
+                          >
+                            +30s
+                          </button>
+                        </div>
+                        {restTimer.exerciseId === baseExercise.id && restTimer.totalSeconds > 0 && (
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
+                            <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${restProgress}%` }} />
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -2058,15 +2385,17 @@ export default function Page() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => removeManualSet(baseExercise.id, exercise.sets)}
-                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40"
+                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
                             disabled={setInputs.length <= 1}
+                            aria-label="Remove last set"
                             type="button"
                           >
                             − Set
                           </button>
                           <button
                             onClick={() => addManualSet(baseExercise.id, exercise.sets)}
-                            className="rounded-xl bg-emerald-400 px-3 py-2 text-xs font-bold text-zinc-950"
+                            className="rounded-xl bg-emerald-400 px-3 py-2 text-xs font-bold text-zinc-950 transition hover:bg-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            aria-label="Add additional set"
                             type="button"
                           >
                             + Set
@@ -2083,17 +2412,47 @@ export default function Page() {
 
                           return (
                             <div key={setIndex} className="grid grid-cols-[46px_1fr_1fr_42px] gap-2">
-                            <div className="flex items-center font-black text-zinc-400">{setIndex + 1}</div>
-                            <input inputMode="decimal" value={set.weightLbs} onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={latestSet ? String(latestSet.weightLbs) : "0"} />
-                            <input inputMode="numeric" value={set.reps} onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)} className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400" placeholder={latestSet ? String(latestSet.reps) : "0"} />
-                            <button onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex)} className={`rounded-2xl border ${set.done ? "border-emerald-400 bg-emerald-400 text-zinc-950" : "border-zinc-700 bg-zinc-900 text-zinc-500"}`}>
-                              <Check size={18} className="mx-auto" />
-                            </button>
+                              <div className="flex items-center font-black text-zinc-400">{setIndex + 1}</div>
+                              <input
+                                id={`weight-input-${baseExercise.id}-${setIndex}`}
+                                inputMode="decimal"
+                                value={set.weightLbs}
+                                onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)}
+                                onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id }, baseExercise.id, setIndex, "weightLbs")}
+                                aria-label={`Weight in pounds for set ${setIndex + 1}`}
+                                className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
+                                placeholder={latestSet ? String(latestSet.weightLbs) : "0"}
+                              />
+                              <input
+                                id={`rep-input-${baseExercise.id}-${setIndex}`}
+                                inputMode="numeric"
+                                value={set.reps}
+                                onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)}
+                                onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id }, baseExercise.id, setIndex, "reps")}
+                                aria-label={`Reps for set ${setIndex + 1}`}
+                                className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
+                                placeholder={latestSet ? String(latestSet.reps) : "0"}
+                              />
+                              <button
+                                onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex)}
+                                aria-label={`Save set ${setIndex + 1}`}
+                                className={`rounded-2xl border transition active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                                  set.done
+                                    ? "border-emerald-400 bg-emerald-400 text-zinc-950 shadow-sm shadow-emerald-500/20"
+                                    : "border-zinc-700 bg-zinc-900 text-zinc-500 hover:border-zinc-600"
+                                }`}
+                              >
+                                <Check size={18} className="mx-auto" />
+                              </button>
                             </div>
                           );
                         })}
                       </div>
-                      <button onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99]">
+                      <button
+                        onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })}
+                        aria-label="Finish working sets and clear inputs"
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99] transition hover:bg-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                      >
                         <Save size={18} /> Finish & clear
                       </button>
                     </div>
@@ -2102,15 +2461,17 @@ export default function Page() {
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
                           onClick={() => setActiveExerciseIndex(Math.max(0, activeExerciseIndex - 1))}
-                          className="rounded-xl bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-300 disabled:opacity-40"
+                          className="rounded-xl bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
                           disabled={activeExerciseIndex === 0}
+                          aria-label="Go to previous exercise"
                         >
                           Previous
                         </button>
                         <button
                           onClick={() => setActiveExerciseIndex(Math.min(day.exercises.length - 1, activeExerciseIndex + 1))}
-                          className="rounded-xl bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-950 disabled:opacity-40"
+                          className="rounded-xl bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-950 disabled:opacity-40 transition hover:bg-zinc-200 focus-visible:ring-2 focus-visible:ring-emerald-400"
                           disabled={activeExerciseIndex >= day.exercises.length - 1}
+                          aria-label="Go to next exercise"
                         >
                           Next
                         </button>
@@ -2123,6 +2484,247 @@ export default function Page() {
           </>
         )}
       </section>
+
+      {/* Floating Sticky Rest Timer Pill (Mobile & Desktop) */}
+      {restTimer.running && restTimer.secondsLeft > 0 && (
+        <aside
+          aria-label="Active rest timer"
+          className="fixed bottom-16 left-3 right-3 z-40 mx-auto max-w-md rounded-2xl border border-emerald-500/40 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur-md transition-all duration-300"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                </span>
+                <p className="truncate text-xs font-bold text-zinc-400">
+                  {restTimer.exerciseName ? `Rest · ${restTimer.exerciseName}` : "Rest Timer"}
+                </p>
+              </div>
+              <p className="mt-0.5 text-xl font-black tracking-tight text-emerald-300">
+                {formatRestTime(restTimer.secondsLeft)}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const ex = day?.exercises.find((e) => e.id === restTimer.exerciseId) ?? {
+                    id: restTimer.exerciseId ?? "",
+                    name: restTimer.exerciseName ?? "",
+                    group: "Chest" as MuscleGroup,
+                    sets: 3,
+                    reps: "8-12",
+                    warmup: false,
+                    muscles: [],
+                    movement: "",
+                  };
+                  adjustRestSeconds(ex, 30);
+                }}
+                className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                aria-label="Add 30 seconds to rest timer"
+              >
+                +30s
+              </button>
+              <button
+                type="button"
+                onClick={stopRestTimer}
+                className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-red-400"
+                aria-label="Stop rest timer"
+              >
+                Stop
+              </button>
+            </div>
+          </div>
+
+          {restTimer.totalSeconds > 0 && (
+            <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-900">
+              <div
+                className="h-full rounded-full bg-emerald-400 transition-all duration-300 ease-linear"
+                style={{ width: `${restProgress}%` }}
+              />
+            </div>
+          )}
+        </aside>
+      )}
+
+      {/* Searchable Exercise Substitute Modal / Combobox */}
+      {substituteModalExercise && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="substitute-dialog-title"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 animate-in fade-in duration-200"
+        >
+          <div className="flex max-h-[85vh] w-full max-w-lg flex-col rounded-t-3xl sm:rounded-3xl border border-zinc-800 bg-zinc-950 shadow-2xl overflow-hidden">
+            {/* Modal Header */}
+            <div className="border-b border-zinc-800 px-5 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                    Substitute Exercise
+                  </p>
+                  <h3 id="substitute-dialog-title" className="mt-0.5 truncate text-lg font-black">
+                    {substituteModalExercise.name}
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSubstituteModalExercise(null)}
+                  className="rounded-xl bg-zinc-900 p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                  aria-label="Close substitution modal"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="mt-3 flex items-center gap-2 rounded-2xl border border-zinc-700 bg-zinc-900 px-3.5 py-2.5">
+                <Search size={16} className="text-zinc-400" />
+                <input
+                  autoFocus
+                  value={substituteSearch}
+                  onChange={(e) => setSubstituteSearch(e.target.value)}
+                  placeholder="Search replacement exercise..."
+                  className="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 outline-none"
+                  aria-label="Search replacement exercise"
+                />
+                {substituteSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setSubstituteSearch("")}
+                    className="text-zinc-500 hover:text-zinc-300"
+                    aria-label="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="mt-3 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSubstituteFilter("movement")}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
+                    substituteFilter === "movement"
+                      ? "bg-emerald-400 text-zinc-950"
+                      : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+                  }`}
+                >
+                  Related Movements
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubstituteFilter("group")}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
+                    substituteFilter === "group"
+                      ? "bg-emerald-400 text-zinc-950"
+                      : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+                  }`}
+                >
+                  {substituteModalExercise.group}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubstituteFilter("all")}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
+                    substituteFilter === "all"
+                      ? "bg-emerald-400 text-zinc-950"
+                      : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+                  }`}
+                >
+                  All Library
+                </button>
+              </div>
+            </div>
+
+            {/* Candidates List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {substituteCandidates.length === 0 ? (
+                <div className="py-8 text-center text-sm text-zinc-500">
+                  No matching exercises found. Try a different search term or category.
+                </div>
+              ) : (
+                substituteCandidates.map((candidate) => {
+                  const isSelected =
+                    (mode === "custom" && substituteModalExercise.name === candidate.name) ||
+                    (mode !== "custom" &&
+                      (substituteMap[substituteModalExercise.id] === candidate.name ||
+                        (!substituteMap[substituteModalExercise.id] && substituteModalExercise.name === candidate.name)));
+
+                  const tierStyles = {
+                    "S+": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+                    "S": "bg-teal-500/20 text-teal-300 border-teal-500/30",
+                    "A+": "bg-blue-500/20 text-blue-300 border-blue-500/30",
+                    "A": "bg-zinc-800 text-zinc-400 border-zinc-700",
+                  }[candidate.tier] ?? "bg-zinc-800 text-zinc-400 border-zinc-700";
+
+                  return (
+                    <button
+                      key={candidate.name}
+                      type="button"
+                      onClick={() => {
+                        substituteExercise(substituteModalExercise, candidate.name);
+                        setSubstituteModalExercise(null);
+                      }}
+                      className={`flex w-full items-center justify-between gap-3 rounded-2xl border p-3.5 text-left transition ${
+                        isSelected
+                          ? "border-emerald-500/50 bg-emerald-500/10 text-zinc-100"
+                          : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900"
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-sm text-zinc-100">{candidate.name}</p>
+                          <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${tierStyles}`}>
+                            {candidate.tier}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-zinc-400">
+                          {candidate.group} · {candidate.movement}
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] text-zinc-500">
+                          {candidate.muscles.join(", ")}
+                        </p>
+                      </div>
+
+                      {isSelected ? (
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-zinc-950">
+                          <Check size={16} />
+                        </span>
+                      ) : (
+                        <span className="shrink-0 rounded-xl bg-zinc-800 px-2.5 py-1.5 text-xs font-bold text-zinc-300 hover:bg-emerald-400 hover:text-zinc-950 transition">
+                          Select
+                        </span>
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            {mode !== "custom" && substituteMap[substituteModalExercise.id] && (
+              <div className="border-t border-zinc-800 bg-zinc-900/40 p-3 flex justify-between items-center">
+                <span className="text-xs text-zinc-400">Original: {substituteModalExercise.name}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    substituteExercise(substituteModalExercise, substituteModalExercise.name);
+                    setSubstituteModalExercise(null);
+                  }}
+                  className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs font-bold text-zinc-300 hover:bg-zinc-800 transition"
+                >
+                  Reset to Original
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
         <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1.5">

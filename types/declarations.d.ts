@@ -16,6 +16,15 @@ declare namespace React {
     stopPropagation(): void;
     [key: string]: any;
   }
+  export interface KeyboardEvent<T = any> {
+    key: string;
+    code: string;
+    target: T;
+    currentTarget: T;
+    preventDefault(): void;
+    stopPropagation(): void;
+    [key: string]: any;
+  }
   export function useState<T>(initialState: T | (() => T)): [T, (value: T | ((prev: T) => T)) => void];
   export function useEffect(effect: () => void | (() => void), deps?: readonly any[]): void;
   export function useMemo<T>(factory: () => T, deps: readonly any[] | undefined): T;
@@ -32,8 +41,8 @@ declare namespace JSX {
     children?: React.ReactNode;
     onChange?: (event: React.ChangeEvent<T>) => void;
     onClick?: (event: React.MouseEvent<T>) => void;
-    onKeyDown?: (event: any) => void;
-    onKeyUp?: (event: any) => void;
+    onKeyDown?: (event: React.KeyboardEvent<T>) => void;
+    onKeyUp?: (event: React.KeyboardEvent<T>) => void;
     onSubmit?: (event: any) => void;
     [key: string]: any;
   }
@@ -74,6 +83,15 @@ declare module "next" {
     icons?: any;
     [key: string]: any;
   }
+
+  export interface Viewport {
+    themeColor?: string;
+    width?: string;
+    initialScale?: number;
+    maximumScale?: number;
+    userScalable?: boolean;
+    [key: string]: any;
+  }
 }
 
 declare module "lucide-react" {
@@ -86,11 +104,14 @@ declare module "lucide-react" {
   }
   export type LucideIcon = (props: LucideProps) => any;
 
+  export const Bell: LucideIcon;
   export const CalendarDays: LucideIcon;
   export const Check: LucideIcon;
   export const ChevronDown: LucideIcon;
+  export const ChevronUp: LucideIcon;
   export const ClipboardList: LucideIcon;
   export const Dumbbell: LucideIcon;
+  export const Download: LucideIcon;
   export const Flame: LucideIcon;
   export const Library: LucideIcon;
   export const MinusCircle: LucideIcon;
@@ -100,6 +121,9 @@ declare module "lucide-react" {
   export const Save: LucideIcon;
   export const Search: LucideIcon;
   export const Sparkles: LucideIcon;
+  export const Timer: LucideIcon;
   export const Trash2: LucideIcon;
   export const Trophy: LucideIcon;
+  export const Volume2: LucideIcon;
+  export const X: LucideIcon;
 }
