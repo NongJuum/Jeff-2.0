@@ -974,81 +974,59 @@ function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movem
   };
 }
 
-type StabilityClass = "machine" | "cable" | "freeweight";
+type StabilityClass = "machine" | "smith" | "cable" | "supported" | "free" | "unstable";
 
-const STABILITY_LABELS: Record<StabilityClass, string> = {
-  machine: "Machine · high stability",
-  cable: "Cable · medium stability",
-  freeweight: "Free weight · stabilizer demand",
+// Jeff's logic: more stable = target muscle is the limiting factor = more "focus"
+const FOCUS_EFFICIENCY: Record<StabilityClass, number> = {
+  machine: 1.0,    // target muscle = limiting factor (100% focus)
+  smith: 0.9,
+  cable: 0.85,
+  supported: 0.75, // body supported, weight not guided
+  free: 0.6,       // stabilizers cap output
+  unstable: 0.55,  // balance demand steals tension
 };
 
 function getStabilityClass(ex: { name: string }): StabilityClass {
   const n = ex.name.toLowerCase();
+  if (n.includes("nordic") || n.includes("sissy") || n.includes("ab wheel") || n.includes("hanging") || n.includes("captain") || n.includes("pull up") || n.includes("kickback") || n.includes("split squat") || n.includes("lunge") || n.includes("step up") || n.includes("one arm") || n.includes("1 arm")) return "unstable";
+  if (n.includes("smith")) return "smith";
+  if (n.includes("machine") || n.includes("mts") || n.includes("iso-lateral") || n.includes("pec deck") || n.includes("atlantis") || n.includes("hack squat") || n.includes("pendulum") || n.includes("leg press") || n.includes("leg extension") || n.includes("leg curl") || n.includes("hamstring curl") || n.includes("calf raise") || n.includes("hip abduction") || n.includes("hip thrust") || n.includes("abs crunch") || n.includes("belt squat") || n.includes("v-squat")) return "machine";
   if (n.includes("cable") || n.includes("katana")) return "cable";
-  if (
-    n.includes("machine") || n.includes("smith") || n.includes("mts") || n.includes("iso-lateral") ||
-    n.includes("hack squat") || n.includes("pendulum") || n.includes("leg press") ||
-    n.includes("leg extension") || n.includes("leg curl") || n.includes("hamstring curl") ||
-    n.includes("pec deck") || n.includes("atlantis") || n.includes("calf raise") ||
-    n.includes("hip abduction") || n.includes("hip thrust") || n.includes("preacher") ||
-    n.includes("abs crunch") || n.includes("belt squat") || n.includes("v-squat")
-  ) return "machine";
-  return "freeweight";
+  if (n.includes("chest supported") || n.includes("seated") || n.includes("lying") || n.includes("incline") || n.includes("decline") || n.includes("bench") || n.includes("preacher") || n.includes("back extension") || n.includes("db press") || n.includes("seal row")) return "supported";
+  return "free";
 }
 
 function calculateMuscleMatchScore(
-  target: Pick<PlanExercise, "group" | "movement" | "muscles" | "name"> & { load?: LoadType },
+  target: Pick<PlanExercise, "group" | "movement" | "muscles" | "name">,
   candidate: Exercise
 ): number {
   if (target.group !== candidate.group) return -1;
-
   const targetRegions = getExercisePreviewRegions(target);
   const candidateRegions = getExercisePreviewRegions(candidate);
-
   let score = 0;
 
-  // Primary muscle matching (highest weight)
+  // FOCUS MUSCLE = MOST SCORE (dominant weight: +6 primary, +2 secondary)
   for (const region of targetRegions.primary) {
-    if (candidateRegions.primary.includes(region)) {
-      score += 4;
-    } else if (candidateRegions.secondary.includes(region)) {
-      score += 2;
-    }
+    if (candidateRegions.primary.includes(region)) score += 6;
+    else if (candidateRegions.secondary.includes(region)) score += 2;
   }
-
-  // Secondary muscle matching
   for (const region of targetRegions.secondary) {
-    if (candidateRegions.primary.includes(region)) {
-      score += 2;
-    } else if (candidateRegions.secondary.includes(region)) {
-      score += 1;
-    }
+    if (candidateRegions.primary.includes(region)) score += 2;
+    else if (candidateRegions.secondary.includes(region)) score += 1;
   }
 
   // Movement pattern bonus
   const related = getRelatedMovements(target.movement);
-  if (candidate.movement === target.movement) {
-    score += 2;
-  } else if (related.includes(candidate.movement)) {
-    score += 1;
-  }
+  if (candidate.movement === target.movement) score += 2;
+  else if (related.includes(candidate.movement)) score += 1;
 
-  // Stability / weight-system similarity bonus
-  const targetStability = getStabilityClass(target);
-  const candidateStability = getStabilityClass(candidate);
-  if (targetStability === candidateStability) score += 1.5;
-  else if (targetStability === "cable" || candidateStability === "cable") score += 0.5;
+  // JEFF'S MACHINE LOGIC: stability -> how purely the target muscle is trained
+  score += 2 * FOCUS_EFFICIENCY[getStabilityClass(candidate)];
 
-  // Same specific load type extra bonus
-  if (getLoadType(candidate) === getLoadType({ name: target.name, load: target.load })) {
-    score += 0.5;
-  }
-
-  // Tier bonus as slight tie breaker
+  // Tier tie-breaker
   if (candidate.tier === "S+") score += 0.3;
   else if (candidate.tier === "S") score += 0.2;
   else if (candidate.tier === "A") score += 0.1;
-
   return score;
 }
 
@@ -2967,6 +2945,7 @@ export default function Page() {
                         (!substituteMap[substituteModalExercise.id] && substituteModalExercise.name === candidate.name)));
 
                   const isRelatedMovement = getRelatedMovements(substituteModalExercise.movement).includes(candidate.movement);
+                  const focusPct = Math.round(FOCUS_EFFICIENCY[getStabilityClass(candidate)] * 100);
 
                   const tierStyles = {
                     "S+": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
@@ -3000,8 +2979,14 @@ export default function Page() {
                         </div>
                         <p className="mt-1 text-xs text-zinc-400">
                           {candidate.group} · {candidate.movement}
-                          <span className="ml-1.5 inline-flex items-center rounded-md border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold text-zinc-400">
-                            {STABILITY_LABELS[getStabilityClass(candidate)]}
+                          <span className={`ml-1.5 inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-black ${
+                            focusPct >= 85
+                              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+                              : focusPct >= 70
+                                ? "border-zinc-700 bg-zinc-900 text-zinc-300"
+                                : "border-amber-500/30 bg-amber-500/10 text-amber-300"
+                          }`}>
+                            {focusPct}% target focus
                           </span>
                           {isRelatedMovement && (
                             <span className="ml-1.5 inline-flex items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">
