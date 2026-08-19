@@ -974,23 +974,35 @@ function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movem
   };
 }
 
-type StabilityClass = "machine" | "smith" | "cable" | "supported" | "free" | "unstable";
+type StabilityClass = "plateloaded" | "selectorized" | "smith" | "cable" | "supported" | "free" | "unstable";
 
-// Jeff's logic: more stable = target muscle is the limiting factor = more "focus"
+// Jeff's logic: stability = how purely the target muscle is trained
 const FOCUS_EFFICIENCY: Record<StabilityClass, number> = {
-  machine: 1.0,    // target muscle = limiting factor (100% focus)
+  plateloaded: 1.0,   // iso-lateral / converging arc / independent arms = purest focus
+  selectorized: 0.95, // stack machines (linked arms, fixed path)
   smith: 0.9,
   cable: 0.85,
-  supported: 0.75, // body supported, weight not guided
-  free: 0.6,       // stabilizers cap output
-  unstable: 0.55,  // balance demand steals tension
+  supported: 0.75,    // bench-supported free weights
+  free: 0.6,          // stabilizers cap output
+  unstable: 0.55,     // balance steals tension
+};
+
+const STABILITY_LABELS: Record<StabilityClass, string> = {
+  plateloaded: "Plate-loaded / Iso",
+  selectorized: "Selectorized stack",
+  smith: "Smith",
+  cable: "Cable",
+  supported: "Supported free weight",
+  free: "Free weight",
+  unstable: "High stability demand",
 };
 
 function getStabilityClass(ex: { name: string }): StabilityClass {
   const n = ex.name.toLowerCase();
+  if (n.includes("iso-lateral") || n.includes("plate-loaded") || n.includes("hack squat") || n.includes("pendulum") || n.includes("leg press") || n.includes("belt squat") || n.includes("v-squat")) return "plateloaded";
   if (n.includes("nordic") || n.includes("sissy") || n.includes("ab wheel") || n.includes("hanging") || n.includes("captain") || n.includes("pull up") || n.includes("kickback") || n.includes("split squat") || n.includes("lunge") || n.includes("step up") || n.includes("one arm") || n.includes("1 arm")) return "unstable";
   if (n.includes("smith")) return "smith";
-  if (n.includes("machine") || n.includes("mts") || n.includes("iso-lateral") || n.includes("pec deck") || n.includes("atlantis") || n.includes("hack squat") || n.includes("pendulum") || n.includes("leg press") || n.includes("leg extension") || n.includes("leg curl") || n.includes("hamstring curl") || n.includes("calf raise") || n.includes("hip abduction") || n.includes("hip thrust") || n.includes("abs crunch") || n.includes("belt squat") || n.includes("v-squat")) return "machine";
+  if (n.includes("machine") || n.includes("mts") || n.includes("pec deck") || n.includes("atlantis") || n.includes("leg extension") || n.includes("leg curl") || n.includes("hamstring curl") || n.includes("calf raise") || n.includes("hip abduction") || n.includes("hip adduction") || n.includes("hip thrust") || n.includes("abs crunch")) return "selectorized";
   if (n.includes("cable") || n.includes("katana")) return "cable";
   if (n.includes("chest supported") || n.includes("seated") || n.includes("lying") || n.includes("incline") || n.includes("decline") || n.includes("bench") || n.includes("preacher") || n.includes("back extension") || n.includes("db press") || n.includes("seal row")) return "supported";
   return "free";
@@ -1005,7 +1017,7 @@ function calculateMuscleMatchScore(
   const candidateRegions = getExercisePreviewRegions(candidate);
   let score = 0;
 
-  // FOCUS MUSCLE = MOST SCORE (dominant weight: +6 primary, +2 secondary)
+  // FOCUS MUSCLE = MOST SCORE (dominant weight: +6 per primary match)
   for (const region of targetRegions.primary) {
     if (candidateRegions.primary.includes(region)) score += 6;
     else if (candidateRegions.secondary.includes(region)) score += 2;
@@ -1020,7 +1032,7 @@ function calculateMuscleMatchScore(
   if (candidate.movement === target.movement) score += 2;
   else if (related.includes(candidate.movement)) score += 1;
 
-  // JEFF'S MACHINE LOGIC: stability -> how purely the target muscle is trained
+  // JEFF'S MACHINE LOGIC: stability -> target-muscle focus efficiency
   score += 2 * FOCUS_EFFICIENCY[getStabilityClass(candidate)];
 
   // Tier tie-breaker
@@ -2945,7 +2957,8 @@ export default function Page() {
                         (!substituteMap[substituteModalExercise.id] && substituteModalExercise.name === candidate.name)));
 
                   const isRelatedMovement = getRelatedMovements(substituteModalExercise.movement).includes(candidate.movement);
-                  const focusPct = Math.round(FOCUS_EFFICIENCY[getStabilityClass(candidate)] * 100);
+                  const stab = getStabilityClass(candidate);
+                  const focusPct = Math.round(FOCUS_EFFICIENCY[stab] * 100);
 
                   const tierStyles = {
                     "S+": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
@@ -2980,13 +2993,13 @@ export default function Page() {
                         <p className="mt-1 text-xs text-zinc-400">
                           {candidate.group} · {candidate.movement}
                           <span className={`ml-1.5 inline-flex items-center rounded-md border px-1.5 py-0.5 text-[10px] font-black ${
-                            focusPct >= 85
+                            focusPct >= 95
                               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                              : focusPct >= 70
+                              : focusPct >= 75
                                 ? "border-zinc-700 bg-zinc-900 text-zinc-300"
                                 : "border-amber-500/30 bg-amber-500/10 text-amber-300"
                           }`}>
-                            {focusPct}% target focus
+                            {STABILITY_LABELS[stab]} · {focusPct}%
                           </span>
                           {isRelatedMovement && (
                             <span className="ml-1.5 inline-flex items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">
