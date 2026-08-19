@@ -218,22 +218,26 @@ const exerciseLibrary: Exercise[] = [
   { name: "Cable Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
   { name: "Cable Rows", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
   { name: "Chest Supported Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S+" },
+  { name: "DB Shrug", group: "Back", movement: "shrug", muscles: ["Upper back"], tier: "A" },
   { name: "Deficit Pendlay Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Erectors"], tier: "A" },
   { name: "Kroc Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Grip"], tier: "A" },
   { name: "Meadows Row", group: "Back", movement: "row", muscles: ["Lats", "Upper back"], tier: "A" },
   { name: "Neutral Grip Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S" },
   { name: "One Arm DB Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "A" },
   { name: "One Arm Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats"], tier: "A" },
+  { name: "Straight Arm Pulldown", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
   { name: "Weighted Pull Up", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S" },
   { name: "Wide Grip Cable Row", group: "Back", movement: "row", muscles: ["Upper back", "Rear delts"], tier: "A" },
   { name: "Widegrip Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "A" },
   { name: "DB Pullovers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
 
   { name: "45° Back Extension", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
+  { name: "45° Glute Hyperextension", group: "Legs", movement: "glute isolation", muscles: ["Glutes", "Hamstrings"], tier: "A" },
   { name: "45° Leg Press", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
   { name: "45° Leg Press High Foot", group: "Legs", movement: "glute press", muscles: ["Glutes", "Hamstrings", "Quads"], tier: "A" },
   { name: "Barbell Back Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
   { name: "Bulgarian Split Squat", group: "Legs", movement: "single leg", muscles: ["Quads", "Glutes"], tier: "S" },
+  { name: "Cable Pull Through", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes"], tier: "A" },
   { name: "Deadlift", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
   { name: "Front Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "A" },
   { name: "Hack Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S+" },
@@ -243,6 +247,7 @@ const exerciseLibrary: Exercise[] = [
   { name: "Lying Leg Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "A" },
   { name: "Machine Hip Abduction", group: "Legs", movement: "glute isolation", muscles: ["Glutes"], tier: "A" },
   { name: "Machine Hip Thrust", group: "Legs", movement: "glute bridge", muscles: ["Glutes", "Hamstrings"], tier: "S" },
+  { name: "Nordic Hamstring Curl", group: "Legs", movement: "hamstring curl", muscles: ["Hamstrings"], tier: "A" },
   { name: "Pendulum Squat", group: "Legs", movement: "squat press", muscles: ["Quads", "Glutes"], tier: "S" },
   { name: "Reverse Nordic", group: "Legs", movement: "quad isolation", muscles: ["Quads"], tier: "A" },
   { name: "Romanian Deadlift RDL", group: "Legs", movement: "hinge", muscles: ["Hamstrings", "Glutes", "Erectors"], tier: "A" },
@@ -257,6 +262,7 @@ const exerciseLibrary: Exercise[] = [
   { name: "Behind Back Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S" },
   { name: "Cable Y Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
   { name: "Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S+" },
+  { name: "DB Lateral Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
   { name: "Lean In DB Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
   { name: "Machine Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A" },
   { name: "Reverse Cable Crossover", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A" },
@@ -266,6 +272,8 @@ const exerciseLibrary: Exercise[] = [
 
   { name: "1 Arm DB Overhead", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "A" },
   { name: "Barbell Skullcrusher", group: "Arms", movement: "triceps extension", muscles: ["Triceps"], tier: "A" },
+  { name: "Cable Rope Hammer Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
+  { name: "DB Hammer Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
   { name: "DB Preacher Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
   { name: "DB Skullcrusher", group: "Arms", movement: "triceps extension", muscles: ["Triceps"], tier: "A" },
   { name: "EZ Bar Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
@@ -274,12 +282,20 @@ const exerciseLibrary: Exercise[] = [
   { name: "Katana Cable", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "A" },
   { name: "Machine Preacher Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
   { name: "Overhead Cable Ext", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "S+" },
+  { name: "Rope Tricep Pushdown", group: "Arms", movement: "triceps pressdown", muscles: ["Triceps"], tier: "A" },
   { name: "Standing DB Curl", group: "Arms", movement: "biceps curl", muscles: ["Biceps"], tier: "A" },
   { name: "Triceps Pressdown Bar", group: "Arms", movement: "triceps pressdown", muscles: ["Triceps"], tier: "A" },
 
+  { name: "Ab Wheel Rollout", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A" },
   { name: "Cable Crunch", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A" },
+  { name: "Captain's Chair Knee Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "S" },
   { name: "Front Calf Muscle", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "A" },
+  { name: "Hanging Knee Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "S" },
+  { name: "Hanging Leg Raise", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A" },
+  { name: "Leg Press Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "A" },
   { name: "Machine Abs Crunch", group: "Abs & Calves", movement: "abs", muscles: ["Abs"], tier: "A" },
+  { name: "Seated Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "S" },
+  { name: "Standing Calf Raise", group: "Abs & Calves", movement: "calves", muscles: ["Calves"], tier: "A" },
 ];
 
 const allGroups: MuscleGroup[] = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Abs & Calves"];
@@ -361,23 +377,42 @@ function getPrescription(exercise: Exercise) {
     "reverse cable crossover": { sets: 3, reps: "12 to 20", warmup: false },
     "rope face pull": { sets: 3, reps: "12 to 20", warmup: false },
 
-    "face away bayesian curl": { sets: 4, reps: "10 to 15", warmup: false },
-    "incline curl": { sets: 3, reps: "10 to 15", warmup: false },
-    "machine preacher curl": { sets: 3, reps: "10 to 15", warmup: false },
-    "db preacher curl": { sets: 3, reps: "10 to 15", warmup: false },
-    "ez bar curl": { sets: 3, reps: "8 to 12", warmup: false },
-    "standing db curl": { sets: 3, reps: "10 to 15", warmup: false },
-
     "overhead cable ext": { sets: 4, reps: "10 to 15", warmup: false },
     "katana cable": { sets: 3, reps: "10 to 15", warmup: false },
     "1 arm db overhead": { sets: 3, reps: "10 to 15", warmup: false },
     "barbell skullcrusher": { sets: 3, reps: "8 to 12", warmup: false },
     "db skullcrusher": { sets: 3, reps: "10 to 15", warmup: false },
     "triceps pressdown bar": { sets: 3, reps: "10 to 15", warmup: false },
+    "rope tricep pushdown": { sets: 3, reps: "10 to 15", warmup: false },
+
+    "face away bayesian curl": { sets: 4, reps: "10 to 15", warmup: false },
+    "incline curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "machine preacher curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "db preacher curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "ez bar curl": { sets: 3, reps: "8 to 12", warmup: false },
+    "standing db curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "db hammer curl": { sets: 3, reps: "10 to 15", warmup: false },
+    "cable rope hammer curl": { sets: 3, reps: "10 to 15", warmup: false },
+
+    "db lateral raise": { sets: 4, reps: "12 to 20", warmup: false },
+    "straight arm pulldown": { sets: 3, reps: "12 to 15", warmup: false },
+    "db shrug": { sets: 3, reps: "10 to 15", warmup: false },
+
+    "cable pull through": { sets: 3, reps: "10 to 15", warmup: false },
+    "nordic hamstring curl": { sets: 3, reps: "5 to 8", warmup: false },
+    "45° glute hyperextension": { sets: 3, reps: "10 to 15", warmup: false },
 
     "cable crunch": { sets: 3, reps: "10 to 15", warmup: false },
     "machine abs crunch": { sets: 3, reps: "10 to 15", warmup: false },
+    "hanging knee raise": { sets: 3, reps: "10 to 15", warmup: false },
+    "hanging leg raise": { sets: 3, reps: "8 to 12", warmup: false },
+    "captain's chair knee raise": { sets: 3, reps: "10 to 15", warmup: false },
+    "ab wheel rollout": { sets: 3, reps: "8 to 12", warmup: false },
+
     "front calf muscle": { sets: 4, reps: "8 to 15", warmup: false },
+    "seated calf raise": { sets: 4, reps: "10 to 15", warmup: false },
+    "leg press calf raise": { sets: 4, reps: "8 to 15", warmup: false },
+    "standing calf raise": { sets: 4, reps: "8 to 15", warmup: false },
   };
 
   if (individual[name]) return individual[name];
@@ -460,8 +495,8 @@ function recommendForGroups(groups: MuscleGroup[]) {
     if (!groups.includes("Chest")) names.push("Machine Shoulder Press");
     names.push("Cable Lat Raise", "Reverse Pec Deck");
   }
-  if (groups.includes("Arms")) names.push("Face Away Bayesian Curl", "Overhead Cable Ext");
-  if (groups.includes("Abs & Calves")) names.push("Cable Crunch", "Front Calf Muscle");
+  if (groups.includes("Arms")) names.push("Face Away Bayesian Curl", "DB Hammer Curl", "Overhead Cable Ext");
+  if (groups.includes("Abs & Calves")) names.push("Cable Crunch", "Hanging Knee Raise", "Seated Calf Raise");
 
   // Keep the day dense enough for hypertrophy but avoid junk volume.
   const maxExercises = groups.includes("Legs") ? 6 : groups.length >= 3 ? 7 : 6;
@@ -531,7 +566,7 @@ function getRestSeconds(exercise: PlanExercise) {
     name.includes("hack squat") ||
     name.includes("pendulum");
 
-  if (movement === "hinge" || name.includes("deadlift") || name.includes("rdl")) {
+  if ((movement === "hinge" && !name.includes("pull through")) || name.includes("deadlift") || name.includes("rdl")) {
     return 210;
   }
 
@@ -598,7 +633,8 @@ function formatShortDate(dateIso: string) {
 function getRelatedMovements(movement: string) {
   if (["horizontal press", "incline press"].includes(movement)) return ["horizontal press", "incline press"];
   if (["chest flye"].includes(movement)) return ["chest flye"];
-  if (["row"].includes(movement)) return ["row"];
+  if (["row"].includes(movement)) return ["row", "shrug"];
+  if (["shrug"].includes(movement)) return ["shrug", "row"];
   if (["vertical pull", "lat isolation"].includes(movement)) return ["vertical pull", "lat isolation"];
   if (["squat press", "quad isolation"].includes(movement)) return ["squat press", "quad isolation", "single leg"];
   if (["hinge", "hamstring curl"].includes(movement)) return ["hinge", "hamstring curl"];
