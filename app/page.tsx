@@ -974,6 +974,28 @@ function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movem
   };
 }
 
+type StabilityClass = "machine" | "cable" | "freeweight";
+
+const STABILITY_LABELS: Record<StabilityClass, string> = {
+  machine: "Machine · high stability",
+  cable: "Cable · medium stability",
+  freeweight: "Free weight · stabilizer demand",
+};
+
+function getStabilityClass(ex: { name: string }): StabilityClass {
+  const n = ex.name.toLowerCase();
+  if (n.includes("cable") || n.includes("katana")) return "cable";
+  if (
+    n.includes("machine") || n.includes("smith") || n.includes("mts") || n.includes("iso-lateral") ||
+    n.includes("hack squat") || n.includes("pendulum") || n.includes("leg press") ||
+    n.includes("leg extension") || n.includes("leg curl") || n.includes("hamstring curl") ||
+    n.includes("pec deck") || n.includes("atlantis") || n.includes("calf raise") ||
+    n.includes("hip abduction") || n.includes("hip thrust") || n.includes("preacher") ||
+    n.includes("abs crunch") || n.includes("belt squat") || n.includes("v-squat")
+  ) return "machine";
+  return "freeweight";
+}
+
 function calculateMuscleMatchScore(
   target: Pick<PlanExercise, "group" | "movement" | "muscles" | "name"> & { load?: LoadType },
   candidate: Exercise
@@ -1011,7 +1033,13 @@ function calculateMuscleMatchScore(
     score += 1;
   }
 
-  // Same weight system = similar feel & stability (small bonus)
+  // Stability / weight-system similarity bonus
+  const targetStability = getStabilityClass(target);
+  const candidateStability = getStabilityClass(candidate);
+  if (targetStability === candidateStability) score += 1.5;
+  else if (targetStability === "cable" || candidateStability === "cable") score += 0.5;
+
+  // Same specific load type extra bonus
   if (getLoadType(candidate) === getLoadType({ name: target.name, load: target.load })) {
     score += 0.5;
   }
@@ -2971,7 +2999,10 @@ export default function Page() {
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-zinc-400">
-                          {candidate.group} · {candidate.movement} · {LOAD_LABELS[getLoadType(candidate)]}
+                          {candidate.group} · {candidate.movement}
+                          <span className="ml-1.5 inline-flex items-center rounded-md border border-zinc-700 bg-zinc-900 px-1.5 py-0.5 text-[10px] font-bold text-zinc-400">
+                            {STABILITY_LABELS[getStabilityClass(candidate)]}
+                          </span>
                           {isRelatedMovement && (
                             <span className="ml-1.5 inline-flex items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">
                               Same Movement
