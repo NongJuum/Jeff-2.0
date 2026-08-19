@@ -2867,8 +2867,9 @@ export default function Page() {
                     sets: 3,
                     reps: "8-12",
                     warmup: false,
-                    muscles: [],
+                    muscles: [] as string[],
                     movement: "",
+                    load: "bodyweight" as LoadType,
                   };
                   adjustRestSeconds(ex, 30);
                 }}
