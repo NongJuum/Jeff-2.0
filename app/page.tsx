@@ -1249,6 +1249,210 @@ function sanitizeUiState(raw: PersistedUiState | null): PersistedUiState {
 }
 
 
+function epley1RM(weight: number, reps: number): number {
+  return reps <= 1 ? weight : weight * (1 + reps / 30);
+}
+
+type Challenge = { name: string; desc: string; done: boolean; progress: string };
+type PerformanceReport = {
+  score: number;
+  rank: string;
+  emoji: string;
+  message: string;
+  progress: number;
+  volume: number;
+  consistency: number;
+  completion: number;
+  challenges: Challenge[];
+  hasData: boolean;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePlan: DayPlan[]): PerformanceReport {
+  const now = Date.now();
+  const weekAgo = now - 7 * DAY_MS;
+  const thisWeek = logs.filter((l) => new Date(l.date).getTime() >= weekAgo);
+
+  if (thisWeek.length === 0) {
+    return {
+      score: 0,
+      rank: "—",
+      emoji: "🌱",
+      message: "สัปดาห์นี้ยังไม่มีเซตเลย เริ่มเซตแรกเพื่อปลุกคะแนนกันเลย!",
+      progress: 0,
+      volume: 0,
+      consistency: 0,
+      completion: 0,
+      challenges: [],
+      hasData: false,
+    };
+  }
+
+  // 1) STRENGTH: e1RM สัปดาห์นี้ vs สถิติเดิมทั้งหมด
+  const bestBefore = new Map<string, number>();
+  for (const l of logs) {
+    if (new Date(l.date).getTime() >= weekAgo) continue;
+    const e = epley1RM(l.weightLbs, l.reps);
+    bestBefore.set(l.exerciseName, Math.max(bestBefore.get(l.exerciseName) ?? 0, e));
+  }
+  const bestThis = new Map<string, number>();
+  for (const l of thisWeek) {
+    const e = epley1RM(l.weightLbs, l.reps);
+    bestThis.set(l.exerciseName, Math.max(bestThis.get(l.exerciseName) ?? 0, e));
+  }
+  let prCount = 0;
+  let progressSum = 0;
+  for (const [name, e] of bestThis) {
+    const prev = bestBefore.get(name);
+    if (!prev) {
+      progressSum += 90;
+      prCount++;
+    } else if (e > prev) {
+      progressSum += 100;
+      prCount++;
+    } else if (e >= prev * 0.95) {
+      progressSum += 80;
+    } else {
+      progressSum += 55;
+    }
+  }
+  const progress = progressSum / bestThis.size;
+
+  // 2) VOLUME: เซต/กล้ามเนื้อ สัปดาห์นี้ (โซนทอง 10–20 เซต)
+  const lib = exerciseLibrary.reduce<Record<string, Exercise>>((a, e) => {
+    a[e.name] = e;
+    return a;
+  }, {});
+  const muscleSets: Record<string, number> = {};
+  for (const l of thisWeek) {
+    const ex = lib[l.exerciseName];
+    if (!ex) continue;
+    for (const m of ex.muscles) {
+      const key =
+        m.includes("Upper chest") || m === "Chest" || m.includes("Lower chest")
+          ? "Chest"
+          : m.includes("Lats") || m.includes("back") || m.toLowerCase().includes("traps")
+            ? "Back"
+            : m.includes("Quads")
+              ? "Quads"
+              : m.includes("Hamstrings")
+                ? "Hamstrings"
+                : m.includes("Glutes")
+                  ? "Glutes"
+                  : m.includes("Side delts")
+                    ? "Side delts"
+                    : m.includes("Rear delts")
+                      ? "Rear delts"
+                      : m.includes("Biceps")
+                        ? "Biceps"
+                        : m.includes("Triceps")
+                          ? "Triceps"
+                          : m.includes("Abs")
+                            ? "Abs"
+                            : m.includes("Calves")
+                              ? "Calves"
+                              : null;
+      if (key) muscleSets[key] = (muscleSets[key] ?? 0) + 1;
+    }
+  }
+  const volEntries = Object.values(muscleSets);
+  const volume = volEntries.length
+    ? volEntries.reduce((s, n) => s + (n >= 10 && n <= 20 ? 100 : n < 10 ? (n / 10) * 100 : 85), 0) / volEntries.length
+    : 0;
+  const musclesOver10 = volEntries.filter((n) => n >= 10).length;
+
+  // 3) CONSISTENCY: วันฝึกจริง vs แผน
+  const uniqueDays = new Set(thisWeek.map((l) => getLocalDateKey(l.date))).size;
+  const consistency = Math.min(100, (uniqueDays / Math.max(1, plannedDays)) * 100);
+
+  // 4) COMPLETION: เซตจริง vs เซตแผนทั้งสัปดาห์
+  const plannedSets = activePlan.reduce((s, d) => s + d.exercises.reduce((x, e) => x + e.sets, 0), 0);
+  const completion = plannedSets > 0 ? Math.min(100, (thisWeek.length / plannedSets) * 100) : 0;
+
+  const score = Math.round(progress * 0.3 + volume * 0.3 + consistency * 0.25 + completion * 0.15);
+
+  // 🏅 Rank + 💙 คำให้กำลังใจ (คะแนนน้อย = กอดก่อน ไม่ด่า)
+  const info =
+    score >= 90
+      ? { rank: "S+", emoji: "🏆", message: "โหดมาก! สัปดาห์นี้คุณคือเครื่องจักร Progressive Overload ตัวจริง!" }
+      : score >= 80
+        ? { rank: "S", emoji: "🔥", message: "ยอดเยี่ยม! แรงดีต่อเนื่อง กล้ามเนื้อกำลังโตชัดๆ!" }
+        : score >= 70
+          ? { rank: "A+", emoji: "💪", message: "เก่งมาก! อีกนิดเดียวแตะระดับ S แล้ว ลุยต่อ!" }
+          : score >= 60
+            ? { rank: "A", emoji: "✅", message: "มั่นคงมาก! รักษาความสม่ำเสมอแบบนี้ต่อไป!" }
+            : score >= 45
+              ? { rank: "B+", emoji: "🌱", message: "กำลังมา! เพิ่มน้ำหนักทีละนิด หรือบวกอีก 1 เซตต่อท่า คะแนนก็พุ่งแล้ว!" }
+              : { rank: "B", emoji: "🤗", message: "สัปดาห์นี้เหนื่อยหน่อยไม่เป็นไร พักให้พอ นอนดีๆ แล้วกลับมาลุยใหม่ ร่างกายโตตอนพักนะ 💙" };
+
+  const challenges: Challenge[] = [
+    { name: "PR Hunter 🎯", desc: "ทำลายสถิติเดิมอย่างน้อย 1 ท่า", done: prCount >= 1, progress: `${Math.min(prCount, 1)}/1` },
+    { name: "Full House 🏠", desc: "เล่นครบเซตตามแผนทั้งสัปดาห์", done: completion >= 100, progress: `${thisWeek.length}/${plannedSets}` },
+    { name: "Volume King 👑", desc: "เก็บ 10+ เซต ใน 3 กลุ่มกล้ามเนื้อ", done: musclesOver10 >= 3, progress: `${Math.min(musclesOver10, 3)}/3` },
+    { name: "Show Up 📅", desc: "เข้ายิมครบตามที่เลือกไว้", done: uniqueDays >= plannedDays, progress: `${uniqueDays}/${plannedDays}` },
+  ];
+
+  return { score, ...info, progress, volume, consistency, completion, challenges, hasData: true };
+}
+
+function ScoreBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <div className="flex justify-between text-[10px] font-bold text-zinc-400">
+        <span>{label}</span>
+        <span>{Math.round(value)}</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-900">
+        <div
+          className={`h-full rounded-full ${value >= 80 ? "bg-emerald-400" : value >= 60 ? "bg-teal-400" : value >= 40 ? "bg-amber-400" : "bg-zinc-600"}`}
+          style={{ width: `${Math.min(100, value)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
+  return (
+    <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Weekly Performance</p>
+          <p className="mt-1 text-2xl font-black">{report.hasData ? `${report.score}/100` : "—/100"}</p>
+        </div>
+        <span className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xl font-black text-emerald-300">
+          {report.emoji} {report.rank}
+        </span>
+      </div>
+
+      {report.hasData && (
+        <>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <ScoreBar label="Strength ↑" value={report.progress} />
+            <ScoreBar label="Volume" value={report.volume} />
+            <ScoreBar label="Consistency" value={report.consistency} />
+            <ScoreBar label="Completion" value={report.completion} />
+          </div>
+          <div className="mt-3 space-y-2">
+            {report.challenges.map((c) => (
+              <div
+                key={c.name}
+                className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs ${c.done ? "bg-emerald-500/10 text-emerald-300" : "bg-zinc-950 text-zinc-400"}`}
+              >
+                <span className="font-bold">{c.done ? "✅" : "⬜"} {c.name}</span>
+                <span className="text-[10px] font-black">{c.progress}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      <p className="mt-3 rounded-xl bg-zinc-950 px-3 py-2 text-xs text-zinc-300">{report.message}</p>
+    </div>
+  );
+}
+
 export default function Page() {
   const initialUiState = sanitizeUiState(readJson<PersistedUiState | null>(UI_STATE_KEY, null));
 
@@ -1631,6 +1835,11 @@ export default function Page() {
   }, [recentLogs]);
 
   const weeklyVolumeSummary = useMemo(() => getWeeklyVolumeSummary(activePlan), [activePlan]);
+
+  const performanceReport = useMemo(
+    () => computeWeeklyPerformance(logs, days, activePlan),
+    [logs, days, activePlan]
+  );
 
   const filteredLibrary = useMemo(() => {
     const keyword = librarySearch.trim().toLowerCase();
@@ -2101,6 +2310,11 @@ export default function Page() {
             </div>
           )}
         </div>
+
+        {(mode === "today" || mode === "preset" || mode === "custom") && (
+          <WeeklyPerformanceCard report={performanceReport} />
+        )}
+
         {(mode === "today" || mode === "preset") && days === 5 && (
           <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
             <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
