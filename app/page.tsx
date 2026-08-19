@@ -1004,7 +1004,7 @@ function getStabilityClass(ex: { name: string }): StabilityClass {
   if (n.includes("smith")) return "smith";
   if (n.includes("machine") || n.includes("mts") || n.includes("pec deck") || n.includes("atlantis") || n.includes("leg extension") || n.includes("leg curl") || n.includes("hamstring curl") || n.includes("calf raise") || n.includes("hip abduction") || n.includes("hip adduction") || n.includes("hip thrust") || n.includes("abs crunch")) return "selectorized";
   if (n.includes("cable") || n.includes("katana")) return "cable";
-  if (n.includes("chest supported") || n.includes("seated") || n.includes("lying") || n.includes("incline") || n.includes("decline") || n.includes("bench") || n.includes("preacher") || n.includes("back extension") || n.includes("db press") || n.includes("seal row")) return "supported";
+  if (n.includes("chest supported") || n.includes("seated") || n.includes("lying") || n.includes("incline") || n.includes("decline") || n.includes("preacher") || n.includes("back extension") || n.includes("db press") || n.includes("seal row")) return "supported";
   return "free";
 }
 
