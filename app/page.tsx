@@ -1139,8 +1139,15 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
 }
 
 
-export default function Page() {
-  const initialUiState = readJson<PersistedUiState>(UI_STATE_KEY, {
+function safeCsvCell(value: string | number) {
+  let s = String(value);
+  if (/^[=+\-@]/.test(s)) s = `'${s}`;
+  if (/[",\n]/.test(s)) s = `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function sanitizeUiState(raw: PersistedUiState | null): PersistedUiState {
+  const fallback: PersistedUiState = {
     mode: "today",
     days: 4,
     selectedDay: 0,
@@ -1150,7 +1157,26 @@ export default function Page() {
     scrollY: 0,
     selectedCustomPlanId: null,
     selectedCustomDay: 0,
-  });
+  };
+  if (!raw || typeof raw !== "object") return fallback;
+  const modes: AppMode[] = ["today", "preset", "custom", "history", "library"];
+  const safeInt = (v: unknown) => (typeof v === "number" && Number.isInteger(v) && v >= 0 ? v : 0);
+  return {
+    mode: modes.includes(raw.mode) ? raw.mode : fallback.mode,
+    days: ([3, 4, 5] as const).includes(raw.days) ? raw.days : fallback.days,
+    selectedDay: safeInt(raw.selectedDay),
+    fiveDayMode: raw.fiveDayMode === "oneLegDay" ? "oneLegDay" : "twoLegDays",
+    showHistory: Boolean(raw.showHistory),
+    showLibrary: Boolean(raw.showLibrary),
+    scrollY: Number.isFinite(raw.scrollY) ? raw.scrollY : 0,
+    selectedCustomPlanId: typeof raw.selectedCustomPlanId === "string" ? raw.selectedCustomPlanId : null,
+    selectedCustomDay: safeInt(raw.selectedCustomDay),
+  };
+}
+
+
+export default function Page() {
+  const initialUiState = sanitizeUiState(readJson<PersistedUiState | null>(UI_STATE_KEY, null));
 
   const [mode, setMode] = useState<AppMode>(initialUiState.mode);
   const [days, setDays] = useState<3 | 4 | 5>(initialUiState.days);
@@ -1207,19 +1233,16 @@ export default function Page() {
   const day = activePlan[activeDayIndex] ?? activePlan[0];
 
   useEffect(() => {
-    const raw = window.localStorage.getItem(LATEST_LOGS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as LogSet[];
-      setLogs(parsed);
-    }
-    // Register service worker for offline gym PWA
+    const parsed = readJson<LogSet[]>(LATEST_LOGS_KEY, []);
+    if (Array.isArray(parsed)) setLogs(parsed);
+
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(LATEST_LOGS_KEY, JSON.stringify(logs));
+    writeLocalJson(LATEST_LOGS_KEY, logs);
   }, [logs]);
 
   // Persist UI state to localStorage on every state change
@@ -1687,7 +1710,7 @@ export default function Page() {
     const weightLbs = Number(item.weightLbs);
     const reps = Number(item.reps);
 
-    if (weightLbs <= 0 || reps <= 0) return;
+    if (!Number.isFinite(weightLbs) || !Number.isFinite(reps) || weightLbs <= 0 || reps <= 0) return;
 
     if (!item.done) {
       const logSet: LogSet = {
@@ -1733,7 +1756,7 @@ export default function Page() {
         date: new Date().toISOString(),
         alreadySaved: item.done,
       }))
-      .filter((item) => item.weightLbs > 0 && item.reps > 0 && !item.alreadySaved)
+      .filter((item) => Number.isFinite(item.weightLbs) && Number.isFinite(item.reps) && item.weightLbs > 0 && item.reps > 0 && !item.alreadySaved)
       .map(({ alreadySaved, ...item }) => item);
 
     if (validSets.length > 0) {
@@ -1765,13 +1788,13 @@ export default function Page() {
     if (logs.length === 0) return;
     const headers = ["Date", "Exercise", "Set", "Weight (lbs)", "Reps"];
     const rows = logs.map((log) => [
-      new Date(log.date).toISOString().replace("T", " ").slice(0, 19),
-      `"${log.exerciseName.replace(/"/g, '""')}"`,
-      log.setNumber,
-      log.weightLbs,
-      log.reps,
+      safeCsvCell(new Date(log.date).toISOString().replace("T", " ").slice(0, 19)),
+      safeCsvCell(log.exerciseName),
+      safeCsvCell(log.setNumber),
+      safeCsvCell(log.weightLbs),
+      safeCsvCell(log.reps),
     ]);
-    const csvContent = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
+    const csvContent = [headers.map(safeCsvCell).join(","), ...rows.map((row) => row.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
