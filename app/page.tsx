@@ -205,20 +205,23 @@ const exerciseLibrary: Exercise[] = [
   { name: "Cable Crossover", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A" },
   { name: "DB Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A" },
   { name: "Flat DB Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A" },
+  { name: "High-to-Low Cable Flye", group: "Chest", movement: "chest flye", muscles: ["Lower chest"], tier: "A" },
   { name: "Incline DB Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+" },
   { name: "Incline Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+" },
   { name: "Incline Smith Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "A" },
+  { name: "Low-to-High Cable Flye", group: "Chest", movement: "chest flye", muscles: ["Upper chest"], tier: "A" },
   { name: "Machine Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+" },
   { name: "Pec Deck", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S" },
   { name: "Seated Cable Pec Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S" },
   { name: "Smith Machine Floor Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Triceps", "Front delts"], tier: "A" },
   { name: "Smith Machine Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "A" },
+  { name: "Weighted Dip", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A" },
 
   { name: "Cable Lat Prayers", group: "Back", movement: "lat isolation", muscles: ["Lats"], tier: "A" },
   { name: "Cable Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
   { name: "Cable Rows", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S" },
   { name: "Chest Supported Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "S+" },
-  { name: "DB Shrug", group: "Back", movement: "shrug", muscles: ["Upper back"], tier: "A" },
+  { name: "DB Shrug", group: "Back", movement: "shrug", muscles: ["Upper traps"], tier: "A" },
   { name: "Deficit Pendlay Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Erectors"], tier: "A" },
   { name: "Kroc Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Grip"], tier: "A" },
   { name: "Meadows Row", group: "Back", movement: "row", muscles: ["Lats", "Upper back"], tier: "A" },
@@ -260,14 +263,14 @@ const exerciseLibrary: Exercise[] = [
 
   { name: "Atlantis Machine Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S" },
   { name: "Behind Back Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S" },
-  { name: "Cable Y Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
+  { name: "Cable Y Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts", "Lower traps"], tier: "A" },
   { name: "Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S+" },
   { name: "DB Lateral Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
   { name: "Lean In DB Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
   { name: "Machine Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A" },
   { name: "Reverse Cable Crossover", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A" },
   { name: "Reverse Pec Deck", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "S" },
-  { name: "Rope Face Pull", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A" },
+  { name: "Rope Face Pull", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back", "Lower traps"], tier: "A" },
   { name: "Seated DB Overhead Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A" },
 
   { name: "1 Arm DB Overhead", group: "Arms", movement: "triceps overhead", muscles: ["Triceps long head"], tier: "A" },
@@ -317,11 +320,14 @@ function getPrescription(exercise: Exercise) {
     "incline smith machine bench": { sets: 3, reps: "8 to 12", warmup: true },
     "smith machine press": { sets: 3, reps: "6 to 10", warmup: true },
     "smith machine floor press": { sets: 3, reps: "6 to 10", warmup: true },
+    "weighted dip": { sets: 3, reps: "8 to 12", warmup: true },
 
     "pec deck": { sets: 4, reps: "10 to 15", warmup: false },
     "seated cable pec flye": { sets: 4, reps: "10 to 15", warmup: false },
     "cable crossover": { sets: 3, reps: "12 to 20", warmup: false },
     "db flye": { sets: 3, reps: "10 to 15", warmup: false },
+    "high-to-low cable flye": { sets: 3, reps: "12 to 20", warmup: false },
+    "low-to-high cable flye": { sets: 3, reps: "12 to 20", warmup: false },
 
     "chest supported row": { sets: 3, reps: "8 to 12", warmup: true },
     "cable row": { sets: 3, reps: "8 to 12", warmup: true },
@@ -457,20 +463,20 @@ function makePresetPlans() {
     3: [
       makeDay("Day 1 Full Body A", "Squat, horizontal press, row, hamstrings, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Hack Squat", "Machine Chest Press", "Chest Supported Row", "Seated Hamstring Curl", "Cable Lat Raise", "Overhead Cable Ext"]),
       makeDay("Day 2 Full Body B", "Hinge, vertical pull, incline press, quads, rear delts, biceps", ["Legs", "Back", "Chest", "Shoulders", "Arms"], ["Romanian Deadlift RDL", "Neutral Grip Lat Pull Down", "Incline DB Press", "Leg Extension", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
-      makeDay("Day 3 Full Body C", "Leg press, chest isolation, row, glutes, delts, calves or abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["45° Leg Press", "Seated Cable Pec Flye", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
+      makeDay("Day 3 Full Body C", "Leg press, lower chest, row, glutes, delts, calves or abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["45° Leg Press", "High-to-Low Cable Flye", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
     ],
     4: [
-      makeDay("Day 1 Upper A", "Chest focus, Back thickness, Side delts, Triceps", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "Overhead Cable Ext"]),
-      makeDay("Day 2 Lower A", "Quad bias, Hamstrings, Glutes, Calves", ["Legs", "Abs & Calves"], ["Hack Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Front Calf Muscle"]),
-      makeDay("Day 3 Upper B", "Upper chest, Lat width, Rear delts, Biceps", ["Chest", "Back", "Shoulders", "Arms"], ["Incline DB Press", "Pec Deck", "Widegrip Lat Pull Down", "Cable Row", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
-      makeDay("Day 4 Lower B", "Hinge, Leg Press, Quads, Abs", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Lying Leg Curl", "Cable Crunch", "Front Calf Muscle"]),
+      makeDay("Day 1 Upper A", "Mid chest, lats, side delts, upper traps, triceps long", ["Chest", "Back", "Shoulders", "Arms"], ["Machine Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "DB Shrug", "Overhead Cable Ext"]),
+      makeDay("Day 2 Lower A", "Quad bias, Hamstrings, Glutes, Soleus", ["Legs", "Abs & Calves"], ["Hack Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Seated Calf Raise"]),
+      makeDay("Day 3 Upper B", "Upper + lower chest, lat width, rear delts, lower traps, biceps", ["Chest", "Back", "Shoulders", "Arms"], ["Incline DB Press", "High-to-Low Cable Flye", "Widegrip Lat Pull Down", "Cable Row", "Reverse Pec Deck", "Rope Face Pull", "Face Away Bayesian Curl"]),
+      makeDay("Day 4 Lower B", "Hinge, Leg Press, Quads, Abs, Gastroc", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Lying Leg Curl", "Cable Crunch", "Standing Calf Raise"]),
     ],
     5: [
       makeDay("Day 1 Chest + Back A", "Horizontal press, row, incline press, vertical pull, flye", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye"]),
-      makeDay("Day 2 Legs Quad Bias", "Squat press, leg curl, quad isolation, glute, calf", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Front Calf Muscle"]),
-      makeDay("Day 3 Shoulders + Arms", "Shoulder press, side delt, rear delt, biceps, triceps", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 4 Chest + Back B", "Row bias, lat isolation, chest press, flye, rear delt", ["Back", "Chest", "Shoulders"], ["Cable Row", "Cable Lat Prayers", "Incline Machine Bench", "Pec Deck", "Rope Face Pull"]),
-      makeDay("Day 5 Legs Posterior Bias", "Hinge, squat press, hamstring curl, glute, abs or calves", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Lying Leg Curl", "Machine Hip Thrust", "Cable Crunch", "Front Calf Muscle"]),
+      makeDay("Day 2 Legs Quad Bias", "Squat press, leg curl, quad isolation, glute, soleus", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Seated Calf Raise"]),
+      makeDay("Day 3 Shoulders + Arms", "Shoulder press, side delt, rear delt, lower traps, biceps, triceps long", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Cable Y Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+      makeDay("Day 4 Chest + Back B", "Row bias, lat isolation, lower chest, rear delt, upper traps", ["Back", "Chest", "Shoulders"], ["Cable Row", "Cable Lat Prayers", "High-to-Low Cable Flye", "Pec Deck", "Rope Face Pull", "DB Shrug"]),
+      makeDay("Day 5 Legs Posterior Bias", "Hinge, squat press, hamstring curl, glute, abs or calves", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Lying Leg Curl", "Machine Hip Thrust", "Cable Crunch", "Standing Calf Raise"]),
     ],
   } satisfies Record<3 | 4 | 5, DayPlan[]>;
 }
@@ -488,12 +494,12 @@ function makeFiveDayLegOncePlan() {
 function recommendForGroups(groups: MuscleGroup[]) {
   const names: string[] = [];
 
-  if (groups.includes("Chest")) names.push("Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye");
-  if (groups.includes("Back")) names.push("Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers");
+  if (groups.includes("Chest")) names.push("Machine Chest Press", "Incline DB Press", "High-to-Low Cable Flye", "Seated Cable Pec Flye");
+  if (groups.includes("Back")) names.push("Chest Supported Row", "Neutral Grip Lat Pull Down", "DB Shrug");
   if (groups.includes("Legs")) names.push("Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust");
   if (groups.includes("Shoulders")) {
     if (!groups.includes("Chest")) names.push("Machine Shoulder Press");
-    names.push("Cable Lat Raise", "Reverse Pec Deck");
+    names.push("Cable Lat Raise", "Reverse Pec Deck", "Rope Face Pull");
   }
   if (groups.includes("Arms")) names.push("Face Away Bayesian Curl", "DB Hammer Curl", "Overhead Cable Ext");
   if (groups.includes("Abs & Calves")) names.push("Cable Crunch", "Hanging Knee Raise", "Seated Calf Raise");
@@ -631,14 +637,15 @@ function formatShortDate(dateIso: string) {
 }
 
 function getRelatedMovements(movement: string) {
-  if (["horizontal press", "incline press"].includes(movement)) return ["horizontal press", "incline press"];
+  if (["horizontal press", "incline press", "decline press"].includes(movement)) return ["horizontal press", "incline press", "decline press"];
   if (["chest flye"].includes(movement)) return ["chest flye"];
-  if (["row"].includes(movement)) return ["row", "shrug"];
-  if (["shrug"].includes(movement)) return ["shrug", "row"];
+  if (["row"].includes(movement)) return ["row"];
+  if (["shrug"].includes(movement)) return ["shrug"];
   if (["vertical pull", "lat isolation"].includes(movement)) return ["vertical pull", "lat isolation"];
-  if (["squat press", "quad isolation"].includes(movement)) return ["squat press", "quad isolation", "single leg"];
-  if (["hinge", "hamstring curl"].includes(movement)) return ["hinge", "hamstring curl"];
-  if (["glute bridge", "glute isolation", "glute press"].includes(movement)) return ["glute bridge", "glute isolation", "glute press", "single leg"];
+  if (["squat press", "quad isolation", "single leg"].includes(movement)) return ["squat press", "quad isolation", "single leg"];
+  if (["hinge"].includes(movement)) return ["hinge"];
+  if (["hamstring curl"].includes(movement)) return ["hamstring curl"];
+  if (["glute bridge", "glute isolation", "glute press"].includes(movement)) return ["glute bridge", "glute isolation", "glute press"];
   if (["lateral raise"].includes(movement)) return ["lateral raise"];
   if (["rear delt"].includes(movement)) return ["rear delt"];
   if (["shoulder press"].includes(movement)) return ["shoulder press"];
@@ -651,18 +658,23 @@ function getRelatedMovements(movement: string) {
 
 function getAlternatives(exercise: PlanExercise) {
   const related = getRelatedMovements(exercise.movement);
-  const primary = exerciseLibrary.filter(
-    (candidate) =>
-      candidate.group === exercise.group &&
-      related.includes(candidate.movement) &&
-      candidate.name !== exercise.name
-  );
-
-  const fallback = exerciseLibrary.filter(
+  const candidates = exerciseLibrary.filter(
     (candidate) => candidate.group === exercise.group && candidate.name !== exercise.name
   );
 
-  return Array.from(new Set([...primary, ...fallback].map((candidate) => candidate.name))).slice(0, 8);
+  return candidates
+    .map((candidate) => ({
+      name: candidate.name,
+      score: calculateMuscleMatchScore(exercise, candidate),
+      isRelated: related.includes(candidate.movement),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => {
+      if (a.isRelated !== b.isRelated) return a.isRelated ? -1 : 1;
+      return b.score - a.score;
+    })
+    .map((item) => item.name)
+    .slice(0, 8);
 }
 
 function applyExerciseIdentity(base: PlanExercise, exerciseName: string): PlanExercise {
@@ -697,8 +709,8 @@ function getWeeklyVolumeSummary(plan: DayPlan[]) {
   for (const day of plan) {
     for (const exercise of day.exercises) {
       for (const muscle of exercise.muscles) {
-        if (muscle.includes("Upper chest") || muscle === "Chest") summary.Chest += exercise.sets;
-        if (muscle.includes("Lats") || muscle.includes("Mid back") || muscle.includes("Upper back")) summary.Back += exercise.sets;
+        if (muscle.includes("Upper chest") || muscle === "Chest" || muscle.includes("Lower chest")) summary.Chest += exercise.sets;
+        if (muscle.includes("Lats") || muscle.includes("Mid back") || muscle.includes("Upper back") || muscle.toLowerCase().includes("traps")) summary.Back += exercise.sets;
         if (muscle.includes("Quads")) summary.Quads += exercise.sets;
         if (muscle.includes("Hamstrings")) summary.Hamstrings += exercise.sets;
         if (muscle.includes("Glutes")) summary.Glutes += exercise.sets;
@@ -726,15 +738,19 @@ function normalizeSetInputs(raw: SetInput[], sets: number) {
 type MuscleRegion =
   | "chest"
   | "upperChest"
+  | "lowerChest"
   | "frontDelts"
   | "sideDelts"
   | "rearDelts"
   | "biceps"
   | "triceps"
+  | "tricepsLong"
   | "lats"
   | "midBack"
   | "upperBack"
   | "erectors"
+  | "upperTraps"
+  | "lowerTraps"
   | "abs"
   | "obliques"
   | "glutes"
@@ -751,17 +767,21 @@ type MuscleSummary = {
 };
 
 const MUSCLE_REGION_LABELS: Record<MuscleRegion, string> = {
-  chest: "Chest",
+  chest: "Chest (mid)",
   upperChest: "Upper chest",
+  lowerChest: "Lower chest",
   frontDelts: "Front delts",
   sideDelts: "Side delts",
   rearDelts: "Rear delts",
   biceps: "Biceps",
-  triceps: "Triceps",
+  triceps: "Triceps (lat/med)",
+  tricepsLong: "Triceps long head",
   lats: "Lats",
   midBack: "Mid back",
   upperBack: "Upper back",
   erectors: "Erectors",
+  upperTraps: "Upper traps",
+  lowerTraps: "Lower traps",
   abs: "Abs",
   obliques: "Obliques",
   glutes: "Glutes",
@@ -773,15 +793,18 @@ const MUSCLE_REGION_LABELS: Record<MuscleRegion, string> = {
 const MUSCLE_ALIAS_MAP: Record<string, MuscleRegion[]> = {
   Chest: ["chest"],
   "Upper chest": ["upperChest"],
+  "Lower chest": ["lowerChest"],
   "Front delts": ["frontDelts"],
   "Side delts": ["sideDelts"],
   "Rear delts": ["rearDelts"],
   Biceps: ["biceps"],
   Triceps: ["triceps"],
-  "Triceps long head": ["triceps"],
+  "Triceps long head": ["tricepsLong"],
   Lats: ["lats"],
   "Mid back": ["midBack"],
   "Upper back": ["upperBack"],
+  "Upper traps": ["upperTraps"],
+  "Lower traps": ["lowerTraps"],
   Erectors: ["erectors"],
   Abs: ["abs"],
   Glutes: ["glutes"],
@@ -842,6 +865,51 @@ function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movem
     primary: normalized.slice(0, primaryCount),
     secondary: normalized.slice(primaryCount),
   };
+}
+
+function calculateMuscleMatchScore(
+  target: Pick<PlanExercise, "group" | "movement" | "muscles" | "name">,
+  candidate: Exercise
+): number {
+  if (target.group !== candidate.group) return -1;
+
+  const targetRegions = getExercisePreviewRegions(target);
+  const candidateRegions = getExercisePreviewRegions(candidate);
+
+  let score = 0;
+
+  // Primary muscle matching (highest weight)
+  for (const region of targetRegions.primary) {
+    if (candidateRegions.primary.includes(region)) {
+      score += 4;
+    } else if (candidateRegions.secondary.includes(region)) {
+      score += 2;
+    }
+  }
+
+  // Secondary muscle matching
+  for (const region of targetRegions.secondary) {
+    if (candidateRegions.primary.includes(region)) {
+      score += 2;
+    } else if (candidateRegions.secondary.includes(region)) {
+      score += 1;
+    }
+  }
+
+  // Movement pattern bonus
+  const related = getRelatedMovements(target.movement);
+  if (candidate.movement === target.movement) {
+    score += 2;
+  } else if (related.includes(candidate.movement)) {
+    score += 1;
+  }
+
+  // Tier bonus as slight tie breaker
+  if (candidate.tier === "S+") score += 0.3;
+  else if (candidate.tier === "S") score += 0.2;
+  else if (candidate.tier === "A") score += 0.1;
+
+  return score;
 }
 
 function getMuscleRegionFill(region: MuscleRegion, primary: MuscleRegion[], secondary: MuscleRegion[]) {
@@ -934,8 +1002,12 @@ function MusclePreviewFigure({
           <path d="M84 78 C92 70 104 69 110 78 L110 103 C100 111 87 109 79 99 C78 90 79 83 84 78 Z" fill={fill("chest")} stroke={stroke} strokeWidth="3" />
           <path d="M136 78 C128 70 116 69 110 78 L110 103 C120 111 133 109 141 99 C142 90 141 83 136 78 Z" fill={fill("chest")} stroke={stroke} strokeWidth="3" />
           <path d="M90 70 C98 65 122 65 130 70 C127 77 119 81 110 81 C101 81 93 77 90 70 Z" fill={fill("upperChest")} stroke={stroke} strokeWidth="3" />
+          <path d="M110 103 C100 111 87 109 79 99 C78 104 80 109 85 112 C93 117 103 115 110 111 Z" fill={fill("lowerChest")} stroke={stroke} strokeWidth="3" />
+          <path d="M110 103 C120 111 133 109 141 99 C142 104 140 109 135 112 C127 117 117 115 110 111 Z" fill={fill("lowerChest")} stroke={stroke} strokeWidth="3" />
           <path d="M67 74 C55 79 48 91 49 105 C62 107 75 99 80 87 C78 79 74 75 67 74 Z" fill={fill("frontDelts")} stroke={stroke} strokeWidth="3" />
           <path d="M153 74 C165 79 172 91 171 105 C158 107 145 99 140 87 C142 79 146 75 153 74 Z" fill={fill("frontDelts")} stroke={stroke} strokeWidth="3" />
+          <path d="M46 84 C42 92 42 100 46 106 C52 104 55 96 54 88 C52 84 49 82 46 84 Z" fill={fill("sideDelts")} stroke={stroke} strokeWidth="3" />
+          <path d="M174 84 C178 92 178 100 174 106 C168 104 165 96 166 88 C168 84 171 82 174 84 Z" fill={fill("sideDelts")} stroke={stroke} strokeWidth="3" />
           <path d="M50 102 C41 113 39 133 46 145 C57 140 62 122 57 106 Z" fill={fill("biceps")} stroke={stroke} strokeWidth="3" />
           <path d="M170 102 C179 113 181 133 174 145 C163 140 158 122 163 106 Z" fill={fill("biceps")} stroke={stroke} strokeWidth="3" />
           <path d="M96 108 L124 108 C130 125 128 145 119 160 L101 160 C92 145 90 125 96 108 Z" fill={fill("abs")} stroke={stroke} strokeWidth="3" />
@@ -949,6 +1021,8 @@ function MusclePreviewFigure({
       ) : (
         <>
           <path d="M82 72 C94 62 126 62 138 72 C145 86 148 103 145 119 L75 119 C72 103 75 86 82 72 Z" fill={fill("upperBack")} stroke={stroke} strokeWidth="3" />
+          <path d="M96 60 C102 56 118 56 124 60 C132 68 144 73 154 75 C148 81 138 81 130 77 C122 73 114 71 110 71 C106 71 98 73 90 77 C82 81 72 81 66 75 C76 73 88 68 96 60 Z" fill={fill("upperTraps")} stroke={stroke} strokeWidth="3" />
+          <path d="M101 138 L119 138 L115 158 L105 158 Z" fill={fill("lowerTraps")} stroke={stroke} strokeWidth="3" />
           <path d="M76 114 C87 120 96 135 99 160 L82 168 C72 149 65 127 67 112 Z" fill={fill("lats")} stroke={stroke} strokeWidth="3" />
           <path d="M144 114 C133 120 124 135 121 160 L138 168 C148 149 155 127 153 112 Z" fill={fill("lats")} stroke={stroke} strokeWidth="3" />
           <path d="M96 122 L124 122 L119 158 L101 158 Z" fill={fill("midBack")} stroke={stroke} strokeWidth="3" />
@@ -958,6 +1032,8 @@ function MusclePreviewFigure({
           <path d="M153 74 C165 79 172 91 171 105 C158 107 145 99 140 87 C142 79 146 75 153 74 Z" fill={fill("rearDelts")} stroke={stroke} strokeWidth="3" />
           <path d="M50 102 C41 113 39 133 46 145 C57 140 62 122 57 106 Z" fill={fill("triceps")} stroke={stroke} strokeWidth="3" />
           <path d="M170 102 C179 113 181 133 174 145 C163 140 158 122 163 106 Z" fill={fill("triceps")} stroke={stroke} strokeWidth="3" />
+          <path d="M57 106 C62 122 57 140 46 145 C49 147 53 147 56 144 C63 132 63 115 59 106 Z" fill={fill("tricepsLong")} stroke={stroke} strokeWidth="3" />
+          <path d="M163 106 C158 122 163 140 174 145 C171 147 167 147 164 144 C157 132 157 115 161 106 Z" fill={fill("tricepsLong")} stroke={stroke} strokeWidth="3" />
           <path d="M86 162 C98 158 109 166 110 178 C105 191 93 198 80 192 C73 179 76 168 86 162 Z" fill={fill("glutes")} stroke={stroke} strokeWidth="3" />
           <path d="M134 162 C122 158 111 166 110 178 C115 191 127 198 140 192 C147 179 144 168 134 162 Z" fill={fill("glutes")} stroke={stroke} strokeWidth="3" />
           <path d="M82 190 C94 190 102 198 102 214 L98 244 L82 244 C76 225 74 203 82 190 Z" fill={fill("hamstrings")} stroke={stroke} strokeWidth="3" />
@@ -1463,18 +1539,30 @@ export default function Page() {
     const keyword = substituteSearch.trim().toLowerCase();
     const relatedMovements = getRelatedMovements(substituteModalExercise.movement);
 
-    let list = exerciseLibrary;
+    let list: Exercise[] = [];
     if (substituteFilter === "movement") {
-      list = exerciseLibrary.filter(
-        (ex) =>
-          ex.group === substituteModalExercise.group &&
-          (relatedMovements.includes(ex.movement) || ex.name === substituteModalExercise.name)
-      );
-      if (list.length <= 1) {
-        list = exerciseLibrary.filter((ex) => ex.group === substituteModalExercise.group);
-      }
+      const groupCandidates = exerciseLibrary.filter((ex) => ex.group === substituteModalExercise.group);
+      const scored = groupCandidates
+        .map((ex) => ({
+          exercise: ex,
+          score: calculateMuscleMatchScore(substituteModalExercise, ex),
+          isRelatedMovement: relatedMovements.includes(ex.movement),
+        }))
+        .filter((item) => item.score > 0 && (item.isRelatedMovement || item.exercise.name === substituteModalExercise.name))
+        .sort((a, b) => b.score - a.score);
+
+      list = scored.length > 0 ? scored.map((item) => item.exercise) : groupCandidates;
     } else if (substituteFilter === "group") {
-      list = exerciseLibrary.filter((ex) => ex.group === substituteModalExercise.group);
+      const groupCandidates = exerciseLibrary.filter((ex) => ex.group === substituteModalExercise.group);
+      list = groupCandidates
+        .map((ex) => ({
+          exercise: ex,
+          score: calculateMuscleMatchScore(substituteModalExercise, ex),
+        }))
+        .sort((a, b) => b.score - a.score)
+        .map((item) => item.exercise);
+    } else {
+      list = exerciseLibrary;
     }
 
     if (keyword) {
@@ -1833,7 +1921,7 @@ export default function Page() {
 
   return (
     <main className="min-h-screen bg-zinc-950 pb-40 text-zinc-50 sm:pb-32">
-      <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-2.5 backdrop-blur">
+      <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-2.5 backdrop-blur pt-[calc(env(safe-area-inset-top)+0.625rem)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <img src="/hait-logo.png" alt="HA IT logo" className="h-8 w-8 rounded-xl bg-white object-contain p-1" />
