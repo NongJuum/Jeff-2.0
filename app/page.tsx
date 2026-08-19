@@ -627,6 +627,114 @@ function youtubeSearch(query: string) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 }
 
+// Free public-domain form photos (start & end position)
+const DEMO_IMG_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises";
+
+const DEMO_IMAGE_IDS: Record<string, string> = {
+  // Chest
+  "Bench Press": "Bench_Press_-_Barbell",
+  "Flat DB Press": "Dumbbell_Bench_Press",
+  "Incline DB Press": "Incline_Dumbbell_Bench_Press",
+  "Smith Machine Press": "Smith_Machine_Bench_Press",
+  "Smith Machine Floor Press": "Floor_Press",
+  "Pec Deck": "Butterfly",
+  "Cable Crossover": "Cable_Crossover",
+  "Seated Cable Pec Flye": "Flat_Bench_Cable_Flyes",
+  // Back
+  "Cable Row": "Elevated_Cable_Rows",
+  "One Arm DB Row": "One-Arm_Dumbbell_Row",
+  "Weighted Pull Up": "Pullups",
+  "DB Shrug": "Dumbbell_Shrugs",
+  // Legs
+  "Barbell Back Squat": "Barbell_Squat",
+  "Front Squat": "Front_Squat",
+  "Hack Squat": "Hack_Squat",
+  "Smith Machine Squat": "Smith_Machine_Squat",
+  "45° Leg Press": "Leg_Press",
+  "Leg Extension": "Leg_Extensions",
+  "Lying Leg Curl": "Lying_Leg_Curl",
+  "Seated Hamstring Curl": "Seated_Leg_Curl",
+  "Nordic Hamstring Curl": "Floor_Glute-Ham_Raise",
+  "Deadlift": "Deadlift",
+  "Romanian Deadlift RDL": "Romanian_Deadlift",
+  "Bulgarian Split Squat": "Bulgarian_Split_Squat",
+  "Lunges": "Dumbbell_Lunges",
+  "Step Ups High Box": "Dumbbell_Step_Ups",
+  "Kickbacks": "Glute_Kickback",
+  "Machine Hip Thrust": "Barbell_Hip_Thrust",
+  "45° Back Extension": "Back_Extension",
+  "Standing Calf Raise": "Standing_Calf_Raises",
+  "Seated Calf Raise": "Seated_Calf_Raise",
+  // Shoulders
+  "Seated DB Overhead Press": "Arnold_Dumbbell_Press",
+  "DB Lateral Raise": "Side_Lateral_Raise",
+  "Reverse Pec Deck": "Reverse_Flyes",
+  "Rope Face Pull": "Face_Pull",
+  // Arms
+  "Standing DB Curl": "Dumbbell_Bicep_Curl",
+  "EZ Bar Curl": "EZ-Bar_Curl",
+  "Incline Curl": "Alternate_Incline_Dumbbell_Curl",
+  "DB Hammer Curl": "Alternate_Hammer_Curl",
+  "Barbell Skullcrusher": "EZ-Bar_Skullcrusher",
+  "Triceps Pressdown Bar": "Triceps_Pushdown",
+  // Abs
+  "Machine Abs Crunch": "Ab_Crunch_Machine",
+  "Ab Wheel Rollout": "Ab_Roller",
+  "Cable Crunch": "Cable_Crunch",
+  "Hanging Leg Raise": "Hanging_Leg_Raise",
+};
+
+function ExerciseDemoImage({ name }: { name: string }) {
+  const [show, setShow] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const id = DEMO_IMAGE_IDS[name];
+  if (!id || failed) return null; // no photo in DB -> silently hide (YouTube button still works)
+
+  return (
+    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Form Guide</p>
+        {!show && (
+          <button
+            type="button"
+            onClick={() => setShow(true)}
+            className="rounded-xl bg-zinc-900 px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:bg-zinc-800"
+          >
+            Show
+          </button>
+        )}
+      </div>
+      {show && (
+        <>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <div>
+              <p className="mb-1 text-center text-[10px] font-bold uppercase text-zinc-500">Start</p>
+              <img
+                src={`${DEMO_IMG_BASE}/${id}/0.jpg`}
+                alt={`${name} start position`}
+                loading="lazy"
+                onError={() => setFailed(true)}
+                className="w-full rounded-xl bg-zinc-900 object-contain"
+              />
+            </div>
+            <div>
+              <p className="mb-1 text-center text-[10px] font-bold uppercase text-zinc-500">Finish</p>
+              <img
+                src={`${DEMO_IMG_BASE}/${id}/1.jpg`}
+                alt={`${name} finish position`}
+                loading="lazy"
+                onError={() => setFailed(true)}
+                className="w-full rounded-xl bg-zinc-900 object-contain"
+              />
+            </div>
+          </div>
+          <p className="mt-2 text-[10px] text-zinc-600">Images: free-exercise-db (public domain)</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function roundToFive(value: number) {
   return Math.round(value / 5) * 5;
 }
@@ -2468,6 +2576,7 @@ export default function Page() {
                     </div>
 
                     <ExerciseMusclePreviewCard exercise={exercise} />
+                    <ExerciseDemoImage name={exercise.name} />
 
                     {mode === "custom" && (
                       <details className="mb-3 rounded-xl bg-zinc-950 p-3">
