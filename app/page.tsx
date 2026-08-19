@@ -913,8 +913,23 @@ function calculateMuscleMatchScore(
 }
 
 function getMuscleRegionFill(region: MuscleRegion, primary: MuscleRegion[], secondary: MuscleRegion[]) {
-  if (primary.includes(region)) return "#dc2626";
-  if (secondary.includes(region)) return "#fbbf24";
+  const check = (r: MuscleRegion) => {
+    if (primary.includes(r)) return 1;
+    if (secondary.includes(r)) return 2;
+    if (r === "chest" && (primary.includes("lowerChest") || primary.includes("chest"))) return 1;
+    if (r === "chest" && (secondary.includes("lowerChest") || secondary.includes("chest"))) return 2;
+    if (r === "upperBack" && (primary.includes("upperTraps") || primary.includes("upperBack"))) return 1;
+    if (r === "upperBack" && (secondary.includes("upperTraps") || secondary.includes("upperBack"))) return 2;
+    if (r === "midBack" && (primary.includes("lowerTraps") || primary.includes("midBack"))) return 1;
+    if (r === "midBack" && (secondary.includes("lowerTraps") || secondary.includes("midBack"))) return 2;
+    if (r === "triceps" && (primary.includes("tricepsLong") || primary.includes("triceps"))) return 1;
+    if (r === "triceps" && (secondary.includes("tricepsLong") || secondary.includes("triceps"))) return 2;
+    return 0;
+  };
+
+  const res = check(region);
+  if (res === 1) return "#dc2626";
+  if (res === 2) return "#fbbf24";
   return "#52525b";
 }
 
@@ -990,57 +1005,58 @@ function MusclePreviewFigure({
 
   return (
     <svg viewBox="0 0 220 320" className={compact ? "h-28 w-full" : "h-40 w-full"} aria-hidden="true">
-      <g>
-        <rect x="82" y="12" width="56" height="52" rx="24" fill="#18181b" stroke="#a1a1aa" strokeWidth="3" />
-        <path d="M72 68 C84 58 136 58 148 68 C164 84 170 122 160 156 C151 188 142 224 134 244 L86 244 C78 224 69 188 60 156 C50 122 56 84 72 68 Z" fill="#18181b" stroke="#a1a1aa" strokeWidth="3" />
-        <path d="M66 82 C42 96 31 122 26 160" fill="none" stroke="#a1a1aa" strokeWidth="7" strokeLinecap="round" />
-        <path d="M154 82 C178 96 189 122 194 160" fill="none" stroke="#a1a1aa" strokeWidth="7" strokeLinecap="round" />
+      {/* ===== Body silhouette (head, neck, torso, arms, legs) ===== */}
+      <g fill="#18181b" stroke="#71717a" strokeWidth="2.5" strokeLinejoin="round">
+        <circle cx="110" cy="25" r="14" />
+        <path d="M103 37 C105 42 115 42 117 37 L119 49 L101 49 Z" />
+        <path d="M80 51 C92 47 128 47 140 51 C149 55 153 64 153 76 C153 94 149 114 145 132 C142 147 139 158 137 168 L83 168 C81 158 78 147 75 132 C71 114 67 94 67 76 C67 64 71 55 80 51 Z" />
+        <path d="M67 55 C58 59 51 68 48 80 C45 94 44 110 46 126 C48 142 51 158 55 172 C56 177 60 180 64 179 C68 178 70 174 69 169 C66 156 63 142 62 128 C61 114 61 100 63 88 C65 77 68 67 73 60 Z" />
+        <path d="M153 55 C162 59 169 68 172 80 C175 94 176 110 174 126 C172 142 169 158 165 172 C164 177 160 180 156 179 C152 178 150 174 151 169 C154 156 157 142 158 128 C159 114 159 100 157 88 C155 77 152 67 147 60 Z" />
+        <path d="M83 170 C80 188 80 206 84 222 C86 231 88 240 89 249 C90 264 91 282 92 300 L104 300 C104 284 104 268 104 252 C104 242 106 232 108 223 C111 207 111 188 109 170 Z" />
+        <path d="M137 170 C140 188 140 206 136 222 C134 231 132 240 131 249 C130 264 129 282 128 300 L116 300 C116 284 116 268 116 252 C116 242 114 232 112 223 C109 207 109 188 111 170 Z" />
       </g>
 
       {side === "front" ? (
-        <>
-          <path d="M84 78 C92 70 104 69 110 78 L110 103 C100 111 87 109 79 99 C78 90 79 83 84 78 Z" fill={fill("chest")} stroke={stroke} strokeWidth="3" />
-          <path d="M136 78 C128 70 116 69 110 78 L110 103 C120 111 133 109 141 99 C142 90 141 83 136 78 Z" fill={fill("chest")} stroke={stroke} strokeWidth="3" />
-          <path d="M90 70 C98 65 122 65 130 70 C127 77 119 81 110 81 C101 81 93 77 90 70 Z" fill={fill("upperChest")} stroke={stroke} strokeWidth="3" />
-          <path d="M110 103 C100 111 87 109 79 99 C78 104 80 109 85 112 C93 117 103 115 110 111 Z" fill={fill("lowerChest")} stroke={stroke} strokeWidth="3" />
-          <path d="M110 103 C120 111 133 109 141 99 C142 104 140 109 135 112 C127 117 117 115 110 111 Z" fill={fill("lowerChest")} stroke={stroke} strokeWidth="3" />
-          <path d="M67 74 C55 79 48 91 49 105 C62 107 75 99 80 87 C78 79 74 75 67 74 Z" fill={fill("frontDelts")} stroke={stroke} strokeWidth="3" />
-          <path d="M153 74 C165 79 172 91 171 105 C158 107 145 99 140 87 C142 79 146 75 153 74 Z" fill={fill("frontDelts")} stroke={stroke} strokeWidth="3" />
-          <path d="M46 84 C42 92 42 100 46 106 C52 104 55 96 54 88 C52 84 49 82 46 84 Z" fill={fill("sideDelts")} stroke={stroke} strokeWidth="3" />
-          <path d="M174 84 C178 92 178 100 174 106 C168 104 165 96 166 88 C168 84 171 82 174 84 Z" fill={fill("sideDelts")} stroke={stroke} strokeWidth="3" />
-          <path d="M50 102 C41 113 39 133 46 145 C57 140 62 122 57 106 Z" fill={fill("biceps")} stroke={stroke} strokeWidth="3" />
-          <path d="M170 102 C179 113 181 133 174 145 C163 140 158 122 163 106 Z" fill={fill("biceps")} stroke={stroke} strokeWidth="3" />
-          <path d="M96 108 L124 108 C130 125 128 145 119 160 L101 160 C92 145 90 125 96 108 Z" fill={fill("abs")} stroke={stroke} strokeWidth="3" />
-          <path d="M78 108 C86 122 88 144 84 160 C75 150 68 128 70 112 Z" fill={fill("obliques")} stroke={stroke} strokeWidth="3" />
-          <path d="M142 108 C134 122 132 144 136 160 C145 150 152 128 150 112 Z" fill={fill("obliques")} stroke={stroke} strokeWidth="3" />
-          <path d="M80 166 C94 166 104 174 105 190 L101 238 C88 235 78 218 75 197 C73 184 74 174 80 166 Z" fill={fill("quads")} stroke={stroke} strokeWidth="3" />
-          <path d="M140 166 C126 166 116 174 115 190 L119 238 C132 235 142 218 145 197 C147 184 146 174 140 166 Z" fill={fill("quads")} stroke={stroke} strokeWidth="3" />
-          <path d="M84 218 C94 219 101 228 101 244 L82 244 C79 235 80 225 84 218 Z" fill={fill("calves")} stroke={stroke} strokeWidth="3" />
-          <path d="M136 218 C126 219 119 228 119 244 L138 244 C141 235 140 225 136 218 Z" fill={fill("calves")} stroke={stroke} strokeWidth="3" />
-        </>
+        <g stroke={stroke} strokeWidth="2" strokeLinejoin="round">
+          <path d="M74 55 C68 58 63 65 61 73 C66 76 73 73 78 66 C77 61 76 57 74 55 Z" fill={fill("frontDelts")} />
+          <path d="M146 55 C152 58 157 65 159 73 C154 76 147 73 142 66 C143 61 144 57 146 55 Z" fill={fill("frontDelts")} />
+          <path d="M60 62 C54 69 50 78 49 88 C54 89 60 84 63 76 C62 71 61 66 60 62 Z" fill={fill("sideDelts")} />
+          <path d="M160 62 C166 69 170 78 171 88 C166 89 160 84 157 76 C158 71 159 66 160 62 Z" fill={fill("sideDelts")} />
+          <path d="M85 60 C93 56 103 57 109 63 L109 74 C100 72 91 68 85 64 Z" fill={fill("upperChest")} />
+          <path d="M135 60 C127 56 117 57 111 63 L111 74 C120 72 129 68 135 64 Z" fill={fill("upperChest")} />
+          <path d="M83 66 C91 64 102 68 109 76 L109 98 C99 102 89 99 83 91 C80 83 81 72 83 66 Z" fill={fill("chest")} />
+          <path d="M137 66 C129 64 118 68 111 76 L111 98 C121 102 131 99 137 91 C140 83 139 72 137 66 Z" fill={fill("chest")} />
+          <path d="M56 92 C51 100 49 112 51 122 C55 126 61 124 64 116 C65 106 62 97 56 92 Z" fill={fill("biceps")} />
+          <path d="M164 92 C169 100 171 112 169 122 C165 126 159 124 156 116 C155 106 158 97 164 92 Z" fill={fill("biceps")} />
+          <path d="M97 104 L123 104 C126 120 126 138 122 154 L98 154 C94 138 94 120 97 104 Z" fill={fill("abs")} />
+          <path d="M84 106 C88 118 89 134 87 148 C82 140 79 124 80 110 Z" fill={fill("obliques")} />
+          <path d="M136 106 C132 118 131 134 133 148 C138 140 141 124 140 110 Z" fill={fill("obliques")} />
+          <path d="M85 174 C94 172 103 176 105 186 C106 200 105 216 103 230 C96 232 89 228 86 218 C83 204 83 188 85 174 Z" fill={fill("quads")} />
+          <path d="M135 174 C126 172 117 176 115 186 C114 200 115 216 117 230 C124 232 131 228 134 218 C137 204 137 188 135 174 Z" fill={fill("quads")} />
+          <path d="M90 246 C95 246 99 252 99 260 C99 270 97 280 96 288 L91 288 C89 276 88 260 90 246 Z" fill={fill("calves")} />
+          <path d="M130 246 C125 246 121 252 121 260 C121 270 123 280 124 288 L129 288 C131 276 132 260 130 246 Z" fill={fill("calves")} />
+        </g>
       ) : (
-        <>
-          <path d="M82 72 C94 62 126 62 138 72 C145 86 148 103 145 119 L75 119 C72 103 75 86 82 72 Z" fill={fill("upperBack")} stroke={stroke} strokeWidth="3" />
-          <path d="M96 60 C102 56 118 56 124 60 C132 68 144 73 154 75 C148 81 138 81 130 77 C122 73 114 71 110 71 C106 71 98 73 90 77 C82 81 72 81 66 75 C76 73 88 68 96 60 Z" fill={fill("upperTraps")} stroke={stroke} strokeWidth="3" />
-          <path d="M101 138 L119 138 L115 158 L105 158 Z" fill={fill("lowerTraps")} stroke={stroke} strokeWidth="3" />
-          <path d="M76 114 C87 120 96 135 99 160 L82 168 C72 149 65 127 67 112 Z" fill={fill("lats")} stroke={stroke} strokeWidth="3" />
-          <path d="M144 114 C133 120 124 135 121 160 L138 168 C148 149 155 127 153 112 Z" fill={fill("lats")} stroke={stroke} strokeWidth="3" />
-          <path d="M96 122 L124 122 L119 158 L101 158 Z" fill={fill("midBack")} stroke={stroke} strokeWidth="3" />
-          <path d="M103 156 L109 156 L107 190 L98 190 Z" fill={fill("erectors")} stroke={stroke} strokeWidth="3" />
-          <path d="M111 156 L117 156 L122 190 L113 190 Z" fill={fill("erectors")} stroke={stroke} strokeWidth="3" />
-          <path d="M67 74 C55 79 48 91 49 105 C62 107 75 99 80 87 C78 79 74 75 67 74 Z" fill={fill("rearDelts")} stroke={stroke} strokeWidth="3" />
-          <path d="M153 74 C165 79 172 91 171 105 C158 107 145 99 140 87 C142 79 146 75 153 74 Z" fill={fill("rearDelts")} stroke={stroke} strokeWidth="3" />
-          <path d="M50 102 C41 113 39 133 46 145 C57 140 62 122 57 106 Z" fill={fill("triceps")} stroke={stroke} strokeWidth="3" />
-          <path d="M170 102 C179 113 181 133 174 145 C163 140 158 122 163 106 Z" fill={fill("triceps")} stroke={stroke} strokeWidth="3" />
-          <path d="M57 106 C62 122 57 140 46 145 C49 147 53 147 56 144 C63 132 63 115 59 106 Z" fill={fill("tricepsLong")} stroke={stroke} strokeWidth="3" />
-          <path d="M163 106 C158 122 163 140 174 145 C171 147 167 147 164 144 C157 132 157 115 161 106 Z" fill={fill("tricepsLong")} stroke={stroke} strokeWidth="3" />
-          <path d="M86 162 C98 158 109 166 110 178 C105 191 93 198 80 192 C73 179 76 168 86 162 Z" fill={fill("glutes")} stroke={stroke} strokeWidth="3" />
-          <path d="M134 162 C122 158 111 166 110 178 C115 191 127 198 140 192 C147 179 144 168 134 162 Z" fill={fill("glutes")} stroke={stroke} strokeWidth="3" />
-          <path d="M82 190 C94 190 102 198 102 214 L98 244 L82 244 C76 225 74 203 82 190 Z" fill={fill("hamstrings")} stroke={stroke} strokeWidth="3" />
-          <path d="M138 190 C126 190 118 198 118 214 L122 244 L138 244 C144 225 146 203 138 190 Z" fill={fill("hamstrings")} stroke={stroke} strokeWidth="3" />
-          <path d="M84 220 C94 221 100 229 99 244 L82 244 C79 235 80 225 84 220 Z" fill={fill("calves")} stroke={stroke} strokeWidth="3" />
-          <path d="M136 220 C126 221 120 229 121 244 L138 244 C141 235 140 225 136 220 Z" fill={fill("calves")} stroke={stroke} strokeWidth="3" />
-        </>
+        <g stroke={stroke} strokeWidth="2" strokeLinejoin="round">
+          <path d="M96 50 C102 46 118 46 124 50 C132 58 142 62 150 64 C144 70 134 70 126 66 C119 62 113 60 110 60 C107 60 101 62 94 66 C86 70 76 70 70 64 C78 62 88 58 96 50 Z" fill={fill("upperBack")} />
+          <path d="M92 74 L128 74 C126 86 124 96 121 104 L99 104 C96 96 94 86 92 74 Z" fill={fill("midBack")} />
+          <path d="M78 78 C84 84 90 94 93 108 C94 118 93 128 90 136 C82 128 76 114 74 100 C74 92 75 84 78 78 Z" fill={fill("lats")} />
+          <path d="M142 78 C136 84 130 94 127 108 C126 118 127 128 130 136 C138 128 144 114 146 100 C146 92 145 84 142 78 Z" fill={fill("lats")} />
+          <path d="M101 136 L108 136 C107 148 106 158 105 166 L99 166 C99 156 100 146 101 136 Z" fill={fill("erectors")} />
+          <path d="M119 136 L112 136 C113 148 114 158 115 166 L121 166 C121 156 120 146 119 136 Z" fill={fill("erectors")} />
+          <path d="M74 55 C68 58 63 65 61 73 C66 76 73 73 78 66 C77 61 76 57 74 55 Z" fill={fill("rearDelts")} />
+          <path d="M146 55 C152 58 157 65 159 73 C154 76 147 73 142 66 C143 61 144 57 146 55 Z" fill={fill("rearDelts")} />
+          <path d="M60 62 C54 69 50 78 49 88 C54 89 60 84 63 76 C62 71 61 66 60 62 Z" fill={fill("rearDelts")} />
+          <path d="M160 62 C166 69 170 78 171 88 C166 89 160 84 157 76 C158 71 159 66 160 62 Z" fill={fill("rearDelts")} />
+          <path d="M56 92 C51 100 49 112 51 122 C55 126 61 124 64 116 C65 106 62 97 56 92 Z" fill={fill("triceps")} />
+          <path d="M164 92 C169 100 171 112 169 122 C165 126 159 124 156 116 C155 106 158 97 164 92 Z" fill={fill("triceps")} />
+          <path d="M86 170 C96 168 106 172 108 180 C107 190 100 196 92 194 C85 190 83 180 86 170 Z" fill={fill("glutes")} />
+          <path d="M134 170 C124 168 114 172 112 180 C113 190 120 196 128 194 C135 190 137 180 134 170 Z" fill={fill("glutes")} />
+          <path d="M86 198 C94 196 102 200 104 208 C104 220 102 232 100 240 C93 240 87 234 85 224 C84 214 84 206 86 198 Z" fill={fill("hamstrings")} />
+          <path d="M134 198 C126 196 118 200 116 208 C116 220 118 232 120 240 C127 240 133 234 135 224 C136 214 136 206 134 198 Z" fill={fill("hamstrings")} />
+          <path d="M89 246 C94 244 100 246 102 252 C102 262 100 272 98 280 L92 280 C90 268 88 256 89 246 Z" fill={fill("calves")} />
+          <path d="M131 246 C126 244 120 246 118 252 C118 262 120 272 122 280 L128 280 C130 268 132 256 131 246 Z" fill={fill("calves")} />
+        </g>
       )}
     </svg>
   );
@@ -1539,31 +1555,34 @@ export default function Page() {
     const keyword = substituteSearch.trim().toLowerCase();
     const relatedMovements = getRelatedMovements(substituteModalExercise.movement);
 
-    let list: Exercise[] = [];
-    if (substituteFilter === "movement") {
-      const groupCandidates = exerciseLibrary.filter((ex) => ex.group === substituteModalExercise.group);
-      const scored = groupCandidates
-        .map((ex) => ({
-          exercise: ex,
-          score: calculateMuscleMatchScore(substituteModalExercise, ex),
-          isRelatedMovement: relatedMovements.includes(ex.movement),
-        }))
-        .filter((item) => item.score > 0 && (item.isRelatedMovement || item.exercise.name === substituteModalExercise.name))
-        .sort((a, b) => b.score - a.score);
+    const ranked = exerciseLibrary.map((ex) => ({
+      exercise: ex,
+      score: calculateMuscleMatchScore(substituteModalExercise, ex),
+      isRelatedMovement: relatedMovements.includes(ex.movement),
+    }));
 
-      list = scored.length > 0 ? scored.map((item) => item.exercise) : groupCandidates;
+    let listRanked = ranked;
+    if (substituteFilter === "movement") {
+      const filtered = ranked.filter(
+        (item) =>
+          item.exercise.group === substituteModalExercise.group &&
+          (item.isRelatedMovement || item.exercise.name === substituteModalExercise.name) &&
+          item.score > 0
+      );
+      listRanked = filtered.length > 0 ? filtered : ranked.filter((item) => item.exercise.group === substituteModalExercise.group);
     } else if (substituteFilter === "group") {
-      const groupCandidates = exerciseLibrary.filter((ex) => ex.group === substituteModalExercise.group);
-      list = groupCandidates
-        .map((ex) => ({
-          exercise: ex,
-          score: calculateMuscleMatchScore(substituteModalExercise, ex),
-        }))
-        .sort((a, b) => b.score - a.score)
-        .map((item) => item.exercise);
-    } else {
-      list = exerciseLibrary;
+      listRanked = ranked.filter((item) => item.exercise.group === substituteModalExercise.group);
     }
+
+    // RELATED MOVEMENT FIRST, then current exercise on top, then by muscle score
+    listRanked.sort((a, b) => {
+      if (a.exercise.name === substituteModalExercise.name) return -1;
+      if (b.exercise.name === substituteModalExercise.name) return 1;
+      if (a.isRelatedMovement !== b.isRelatedMovement) return a.isRelatedMovement ? -1 : 1;
+      return b.score - a.score;
+    });
+
+    let list = listRanked.map((item) => item.exercise);
 
     if (keyword) {
       list = list.filter(
@@ -2779,6 +2798,8 @@ export default function Page() {
                       (substituteMap[substituteModalExercise.id] === candidate.name ||
                         (!substituteMap[substituteModalExercise.id] && substituteModalExercise.name === candidate.name)));
 
+                  const isRelatedMovement = getRelatedMovements(substituteModalExercise.movement).includes(candidate.movement);
+
                   const tierStyles = {
                     "S+": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
                     "S": "bg-teal-500/20 text-teal-300 border-teal-500/30",
@@ -2797,7 +2818,9 @@ export default function Page() {
                       className={`flex w-full items-center justify-between gap-3 rounded-2xl border p-3.5 text-left transition ${
                         isSelected
                           ? "border-emerald-500/50 bg-emerald-500/10 text-zinc-100"
-                          : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900"
+                          : isRelatedMovement
+                            ? "border-emerald-500/25 bg-emerald-500/5 text-zinc-300 hover:border-emerald-500/40 hover:bg-zinc-900"
+                            : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900"
                       }`}
                     >
                       <div className="min-w-0 flex-1">
@@ -2809,6 +2832,11 @@ export default function Page() {
                         </div>
                         <p className="mt-1 text-xs text-zinc-400">
                           {candidate.group} · {candidate.movement}
+                          {isRelatedMovement && (
+                            <span className="ml-1.5 inline-flex items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">
+                              Same Movement
+                            </span>
+                          )}
                         </p>
                         <p className="mt-0.5 truncate text-[11px] text-zinc-500">
                           {candidate.muscles.join(", ")}
