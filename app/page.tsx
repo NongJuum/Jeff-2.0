@@ -530,7 +530,16 @@ function toPlanExercise(name: string): PlanExercise {
 }
 
 function makeDay(title: string, subtitle: string, focus: MuscleGroup[], exerciseNames: string[]): DayPlan {
-  return { id: makeId("day"), title, subtitle, focus, exercises: exerciseNames.map(toPlanExercise) };
+  return {
+    id: makeId("day"),
+    title,
+    subtitle,
+    focus,
+    exercises: exerciseNames
+      .map((n) => exerciseLibrary.find((e) => e.name === n))
+      .filter((e): e is Exercise => Boolean(e))
+      .map((e) => toPlanExercise(e.name)),
+  };
 }
 
 function makePresetPlans() {
@@ -538,24 +547,20 @@ function makePresetPlans() {
     3: [
       makeDay("Day 1 Full Body A", "Squat, horizontal press, row, hamstrings, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Hack Squat", "Machine Chest Press", "Chest Supported Row", "Seated Hamstring Curl", "Cable Lat Raise", "Overhead Cable Ext"]),
       makeDay("Day 2 Full Body B", "Hinge, vertical pull, incline press, quads, rear delts, biceps", ["Legs", "Back", "Chest", "Shoulders", "Arms"], ["Romanian Deadlift RDL", "Neutral Grip Lat Pull Down", "Incline DB Press", "Leg Extension", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
-      makeDay("Day 3 Full Body C", "Leg press, lower chest, row, glutes, delts, calves or abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["45° Leg Press", "High-to-Low Cable Flye", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
+      makeDay("Day 3 Full Body C", "Belt squat, lower chest, row, glutes, delts, abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["Belt Squat", "Decline Machine Press", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
     ],
     4: [
-      makeDay("Day 1 Upper A", "Mid chest, lats, side delts, upper traps, triceps long", ["Chest", "Back", "Shoulders", "Arms"],
-        ["Iso-Lateral Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "DB Shrug", "Overhead Cable Ext"]),
-      makeDay("Day 2 Lower A", "Quad bias, hamstrings, glutes, soleus", ["Legs", "Abs & Calves"],
-        ["Belt Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Seated Calf Raise"]),
-      makeDay("Day 3 Upper B", "Upper+lower chest, lat width, rear delts, lower traps, biceps", ["Chest", "Back", "Shoulders", "Arms"],
-        ["Iso-Lateral Incline Press", "High-to-Low Cable Flye", "Widegrip Lat Pull Down", "Cable Row", "Reverse Pec Deck", "Rope Face Pull", "Face Away Bayesian Curl"]),
-      makeDay("Day 4 Lower B", "Hinge, leg press, quads, abs, gastroc", ["Legs", "Abs & Calves"],
-        ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Lying Leg Curl", "Cable Crunch", "Standing Calf Raise"]),
+      makeDay("Day 1 Upper A", "Mid chest, lats, side delts, upper traps, triceps long", ["Chest", "Back", "Shoulders", "Arms"], ["Iso-Lateral Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "DB Shrug", "Overhead Cable Ext"]),
+      makeDay("Day 2 Lower A", "Quad bias, hamstrings, glutes, soleus", ["Legs", "Abs & Calves"], ["Belt Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Seated Calf Raise"]),
+      makeDay("Day 3 Upper B", "Upper+lower chest, lat width, rear delts, lower traps, biceps", ["Chest", "Back", "Shoulders", "Arms"], ["Iso-Lateral Incline Press", "Decline Machine Press", "Iso-Lateral Pulldown", "Cable Row", "Reverse Pec Deck", "Rope Face Pull", "Face Away Bayesian Curl"]),
+      makeDay("Day 4 Lower B", "Hinge, glute press, quads, hamstrings, abs, gastroc", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Seated Hamstring Curl", "Cable Crunch", "Standing Calf Raise"]),
     ],
     5: [
       makeDay("Day 1 Chest + Back A", "Horizontal press, row, incline press, vertical pull, flye", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye"]),
       makeDay("Day 2 Legs Quad Bias", "Squat press, leg curl, quad isolation, glute, soleus", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Seated Calf Raise"]),
       makeDay("Day 3 Shoulders + Arms", "Shoulder press, side delt, rear delt, lower traps, biceps, triceps long", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Cable Y Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 4 Chest + Back B", "Row bias, lat isolation, lower chest, rear delt, upper traps", ["Back", "Chest", "Shoulders"], ["Cable Row", "Cable Lat Prayers", "High-to-Low Cable Flye", "Pec Deck", "Rope Face Pull", "DB Shrug"]),
-      makeDay("Day 5 Legs Posterior Bias", "Hinge, squat press, hamstring curl, glute, abs or calves", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Lying Leg Curl", "Machine Hip Thrust", "Cable Crunch", "Standing Calf Raise"]),
+      makeDay("Day 4 Chest + Back B", "Row bias, lat isolation, lower chest, rear delt, upper traps", ["Back", "Chest", "Shoulders"], ["Cable Row", "Straight Arm Pulldown", "Decline Machine Press", "Pec Deck", "Rope Face Pull", "DB Shrug"]),
+      makeDay("Day 5 Legs Posterior Bias", "Hinge, glute press, hamstring curl, glute, abs, gastroc", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Seated Hamstring Curl", "Machine Hip Thrust", "Cable Crunch", "Standing Calf Raise"]),
     ],
   } satisfies Record<3 | 4 | 5, DayPlan[]>;
 }
@@ -564,7 +569,7 @@ function makeFiveDayLegOncePlan() {
   return [
     makeDay("Day 1 Push", "Chest press, incline, flye, side delt, triceps", ["Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye", "Cable Lat Raise", "Overhead Cable Ext"]),
     makeDay("Day 2 Pull", "Row, pulldown, lat isolation, rear delt, biceps", ["Back", "Shoulders", "Arms"], ["Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
-    makeDay("Day 3 Legs Only", "Single weekly leg day with complete lower-body coverage", ["Legs", "Abs & Calves"], ["Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Front Calf Muscle"]),
+    makeDay("Day 3 Legs Only", "Single weekly leg day with complete lower-body coverage", ["Legs", "Abs & Calves"], ["Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Standing Calf Raise"]),
     makeDay("Day 4 Upper A", "Chest and back volume without extra leg fatigue", ["Chest", "Back", "Shoulders"], ["Incline Machine Bench", "Cable Row", "Pec Deck", "Widegrip Lat Pull Down", "Rope Face Pull"]),
     makeDay("Day 5 Upper B + Arms", "Upper pump with direct arm work", ["Back", "Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Chest Supported Row", "Cable Lat Raise", "Machine Preacher Curl", "Triceps Pressdown Bar"]),
   ];
@@ -625,114 +630,6 @@ function createStarterCustomPlan() {
 
 function youtubeSearch(query: string) {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
-}
-
-// Free public-domain form photos (start & end position)
-const DEMO_IMG_BASE = "https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises";
-
-const DEMO_IMAGE_IDS: Record<string, string> = {
-  // Chest
-  "Bench Press": "Bench_Press_-_Barbell",
-  "Flat DB Press": "Dumbbell_Bench_Press",
-  "Incline DB Press": "Incline_Dumbbell_Bench_Press",
-  "Smith Machine Press": "Smith_Machine_Bench_Press",
-  "Smith Machine Floor Press": "Floor_Press",
-  "Pec Deck": "Butterfly",
-  "Cable Crossover": "Cable_Crossover",
-  "Seated Cable Pec Flye": "Flat_Bench_Cable_Flyes",
-  // Back
-  "Cable Row": "Elevated_Cable_Rows",
-  "One Arm DB Row": "One-Arm_Dumbbell_Row",
-  "Weighted Pull Up": "Pullups",
-  "DB Shrug": "Dumbbell_Shrugs",
-  // Legs
-  "Barbell Back Squat": "Barbell_Squat",
-  "Front Squat": "Front_Squat",
-  "Hack Squat": "Hack_Squat",
-  "Smith Machine Squat": "Smith_Machine_Squat",
-  "45° Leg Press": "Leg_Press",
-  "Leg Extension": "Leg_Extensions",
-  "Lying Leg Curl": "Lying_Leg_Curl",
-  "Seated Hamstring Curl": "Seated_Leg_Curl",
-  "Nordic Hamstring Curl": "Floor_Glute-Ham_Raise",
-  "Deadlift": "Deadlift",
-  "Romanian Deadlift RDL": "Romanian_Deadlift",
-  "Bulgarian Split Squat": "Bulgarian_Split_Squat",
-  "Lunges": "Dumbbell_Lunges",
-  "Step Ups High Box": "Dumbbell_Step_Ups",
-  "Kickbacks": "Glute_Kickback",
-  "Machine Hip Thrust": "Barbell_Hip_Thrust",
-  "45° Back Extension": "Back_Extension",
-  "Standing Calf Raise": "Standing_Calf_Raises",
-  "Seated Calf Raise": "Seated_Calf_Raise",
-  // Shoulders
-  "Seated DB Overhead Press": "Arnold_Dumbbell_Press",
-  "DB Lateral Raise": "Side_Lateral_Raise",
-  "Reverse Pec Deck": "Reverse_Flyes",
-  "Rope Face Pull": "Face_Pull",
-  // Arms
-  "Standing DB Curl": "Dumbbell_Bicep_Curl",
-  "EZ Bar Curl": "EZ-Bar_Curl",
-  "Incline Curl": "Alternate_Incline_Dumbbell_Curl",
-  "DB Hammer Curl": "Alternate_Hammer_Curl",
-  "Barbell Skullcrusher": "EZ-Bar_Skullcrusher",
-  "Triceps Pressdown Bar": "Triceps_Pushdown",
-  // Abs
-  "Machine Abs Crunch": "Ab_Crunch_Machine",
-  "Ab Wheel Rollout": "Ab_Roller",
-  "Cable Crunch": "Cable_Crunch",
-  "Hanging Leg Raise": "Hanging_Leg_Raise",
-};
-
-function ExerciseDemoImage({ name }: { name: string }) {
-  const [show, setShow] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const id = DEMO_IMAGE_IDS[name];
-  if (!id || failed) return null; // no photo in DB -> silently hide (YouTube button still works)
-
-  return (
-    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Form Guide</p>
-        {!show && (
-          <button
-            type="button"
-            onClick={() => setShow(true)}
-            className="rounded-xl bg-zinc-900 px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:bg-zinc-800"
-          >
-            Show
-          </button>
-        )}
-      </div>
-      {show && (
-        <>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <div>
-              <p className="mb-1 text-center text-[10px] font-bold uppercase text-zinc-500">Start</p>
-              <img
-                src={`${DEMO_IMG_BASE}/${id}/0.jpg`}
-                alt={`${name} start position`}
-                loading="lazy"
-                onError={() => setFailed(true)}
-                className="w-full rounded-xl bg-zinc-900 object-contain"
-              />
-            </div>
-            <div>
-              <p className="mb-1 text-center text-[10px] font-bold uppercase text-zinc-500">Finish</p>
-              <img
-                src={`${DEMO_IMG_BASE}/${id}/1.jpg`}
-                alt={`${name} finish position`}
-                loading="lazy"
-                onError={() => setFailed(true)}
-                className="w-full rounded-xl bg-zinc-900 object-contain"
-              />
-            </div>
-          </div>
-          <p className="mt-2 text-[10px] text-zinc-600">Images: free-exercise-db (public domain)</p>
-        </>
-      )}
-    </div>
-  );
 }
 
 function roundToFive(value: number) {
@@ -2576,7 +2473,6 @@ export default function Page() {
                     </div>
 
                     <ExerciseMusclePreviewCard exercise={exercise} />
-                    <ExerciseDemoImage name={exercise.name} />
 
                     {mode === "custom" && (
                       <details className="mb-3 rounded-xl bg-zinc-950 p-3">
