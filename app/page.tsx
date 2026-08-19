@@ -2,19 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,  CalendarDays,
+  CalendarDays,
   Check,
   ChevronDown,
   ClipboardList,
   Dumbbell,
   Flame,
-  Library,  MinusCircle,
-  Pencil,
+  Library,
+  MinusCircle,
   PlayCircle,
   Plus,
   RotateCcw,
   Save,
-  Search,  Sparkles,
+  Search,
+  Sparkles,
   Trash2,
   Trophy,
 } from "lucide-react";
@@ -104,48 +105,32 @@ const CUSTOM_PLANS_KEY = "haitCustomPlansV2";
 const SUBSTITUTE_KEY = "haitSubstitutionsV1";
 const LATEST_LOGS_KEY = "trainingLatestV2";
 
-const isBrowser = () => typeof window !== "undefined";
-
 function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function readJson<T>(key: string, fallback: T): T {
-  if (!isBrowser()) return fallback;
-
+  if (typeof window === "undefined") return fallback;
   try {
-    const raw = window.sessionStorage.getItem(key) ?? window.localStorage.getItem(key);
+    const raw = window.localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
   } catch {
     return fallback;
   }
 }
 
-function writeSessionJson<T>(key: string, value: T) {
-  if (!isBrowser()) return;
-
-  try {
-    window.sessionStorage.setItem(key, JSON.stringify(value));
-  } catch {}
-}
-
-function persistSetInputsNow(nextInputs: Record<string, SetInput[]>) {
-  if (!isBrowser()) return;
-
-  try {
-    window.sessionStorage.setItem(SET_INPUTS_KEY, JSON.stringify(nextInputs));
-  } catch {
-    // Ignore storage errors.
-  }
-}
-
-
 function writeLocalJson<T>(key: string, value: T) {
-  if (!isBrowser()) return;
-
+  if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
-  } catch {}
+  } catch { /* quota exceeded or private mode */ }
+}
+
+function writeSessionJson<T>(key: string, value: T) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify(value));
+  } catch { /* quota exceeded or private mode */ }
 }
 
 const exerciseLibrary: Exercise[] = [
@@ -443,28 +428,6 @@ function inferDayCountFromText(text: string) {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 function createStarterCustomPlan() {
   return {
     id: makeId("plan"),
@@ -552,14 +515,6 @@ function getRestSecondsByMode(exercise: PlanExercise, mode: RestMode) {
 
 function createDefaultSetInputs(sets: number): SetInput[] {
   return Array.from({ length: sets }, () => ({ weightLbs: "", reps: "", done: false }));
-}
-
-function createEmptySetInput(): SetInput {
-  return {
-    weightLbs: "",
-    reps: "",
-    done: false,
-  };
 }
 
 function isWithinLastDays(dateIso: string, daysBack: number) {
@@ -1035,15 +990,12 @@ export default function Page() {
     window.localStorage.setItem(LATEST_LOGS_KEY, JSON.stringify(logs));
   }, [logs]);
 
+  // Persist UI state to localStorage on every state change
   useEffect(() => {
     writeLocalJson<PersistedUiState>(UI_STATE_KEY, {
-      mode,
-      days,
-      selectedDay,
-      fiveDayMode,
-      showHistory,
-      showLibrary,
-      scrollY: isBrowser() ? window.scrollY : 0,
+      mode, days, selectedDay, fiveDayMode,
+      showHistory, showLibrary,
+      scrollY: typeof window !== "undefined" ? window.scrollY : 0,
       selectedCustomPlanId: selectedCustomPlan?.id ?? null,
       selectedCustomDay,
     });
@@ -1053,30 +1005,26 @@ export default function Page() {
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
   useEffect(() => writeSessionJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
 
+  // Save scroll position on page hide / background (mobile-safe)
   useEffect(() => {
-    const saveScroll = () => {
+    const saveScrollState = () => {
       const current = readJson<PersistedUiState>(UI_STATE_KEY, {
-        mode,
-        days,
-        selectedDay,
-        fiveDayMode,
-        showHistory,
-        showLibrary,
-        scrollY: 0,
+        mode, days, selectedDay, fiveDayMode,
+        showHistory, showLibrary, scrollY: 0,
         selectedCustomPlanId: selectedCustomPlan?.id ?? null,
         selectedCustomDay,
       });
-      writeSessionJson<PersistedUiState>(UI_STATE_KEY, { ...current, scrollY: window.scrollY });
+      writeLocalJson<PersistedUiState>(UI_STATE_KEY, { ...current, scrollY: window.scrollY });
     };
-
-    window.addEventListener("pagehide", saveScroll);
-    window.addEventListener("visibilitychange", saveScroll);
-    window.addEventListener("beforeunload", saveScroll);
+    const onVisChange = () => { if (document.hidden) saveScrollState(); };
+    window.addEventListener("beforeunload", saveScrollState);
+    window.addEventListener("pagehide", saveScrollState);
+    document.addEventListener("visibilitychange", onVisChange);
     return () => {
-      saveScroll();
-      window.removeEventListener("pagehide", saveScroll);
-      window.removeEventListener("visibilitychange", saveScroll);
-      window.removeEventListener("beforeunload", saveScroll);
+      saveScrollState();
+      window.removeEventListener("beforeunload", saveScrollState);
+      window.removeEventListener("pagehide", saveScrollState);
+      document.removeEventListener("visibilitychange", onVisChange);
     };
   }, [mode, days, selectedDay, fiveDayMode, showHistory, showLibrary, selectedCustomPlan?.id, selectedCustomDay]);
 
@@ -1245,36 +1193,10 @@ export default function Page() {
     return best;
   }, [recordsMap]);
 
-  // Compute and persist workout stats (max weight, best reps, best volume) for each exercise
-  function computeStats(logs: LogSet[], exerciseLookup: Record<string, Exercise>) {
-    const stats: Record<string, { maxWeight?: LogSet; bestReps?: LogSet; bestVolume?: LogSet }> = {};
-    for (const log of logs) {
-      const exercise = exerciseLookup[log.exerciseName];
-      if (!exercise) continue;
-      const key = exercise.name;
-      const current = stats[key] ?? {};
-      if (!current.maxWeight || (log.weightLbs > (current.maxWeight.weightLbs ?? 0))) {
-        current.maxWeight = log;
-      }
-      if (!current.bestReps || log.reps > (current.bestReps?.reps ?? 0)) {
-        current.bestReps = log;
-      }
-      const volume = (log.weightLbs ?? 0) * (log.reps ?? 0);
-      const bestVol = current.bestVolume ? (current.bestVolume.weightLbs ?? 0) * (current.bestVolume.reps ?? 0) : 0;
-      if (volume > bestVol) {
-        current.bestVolume = log;
-      }
-      stats[key] = current;
-    }
-    return stats;
-  }
-
-  // Persist stats whenever logs change
+  // Persist computed stats whenever logs change (reuses recordsMap — no duplicate work)
   useEffect(() => {
-    const exerciseLookup = Object.fromEntries(exerciseLibrary.map((ex) => [ex.name, ex] as const));
-    const stats = computeStats(logs, exerciseLookup);
-    window.localStorage.setItem("trainingStatsV2", JSON.stringify(stats));
-  }, [logs]);
+    writeLocalJson("trainingStatsV2", recordsMap);
+  }, [recordsMap]);
 
   const recentLogs = useMemo(() => logs.filter((item) => isWithinLastDays(item.date, 14)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [logs]);
 
@@ -1389,7 +1311,7 @@ export default function Page() {
         [exerciseId]: updated,
       };
 
-      persistSetInputsNow(nextInputs);
+      writeSessionJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
     });
   }
@@ -1429,7 +1351,7 @@ export default function Page() {
         [exercise.id]: updated,
       };
 
-      persistSetInputsNow(nextInputs);
+      writeSessionJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
     });
   }
@@ -1452,13 +1374,11 @@ export default function Page() {
       .map(({ alreadySaved, ...item }) => item);
 
     if (validSets.length > 0) {
-      if (validSets.length > 0) {
-        const latest = validSets[validSets.length - 1];
-        setLogs((old) => {
-          const without = old.filter(l => l.exerciseName !== latest.exerciseName);
-          return [...without, latest];
-        });
-      }
+      const latest = validSets[validSets.length - 1];
+      setLogs((old) => {
+        const without = old.filter(l => l.exerciseName !== latest.exerciseName);
+        return [...without, latest];
+      });
       startRestTimer(exercise);
     }
 
@@ -1468,7 +1388,7 @@ export default function Page() {
         [exercise.id]: createDefaultSetInputs(exercise.sets),
       };
 
-      persistSetInputsNow(nextInputs);
+      writeSessionJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
     });
   }
