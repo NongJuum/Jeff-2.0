@@ -102,6 +102,7 @@ const UI_STATE_KEY = "haitUiStateV5";
 const SET_INPUTS_KEY = "haitSetInputsV5";
 const CUSTOM_PLANS_KEY = "haitCustomPlansV2";
 const SUBSTITUTE_KEY = "haitSubstitutionsV1";
+const LATEST_LOGS_KEY = "trainingLatestV2";
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -1023,19 +1024,19 @@ export default function Page() {
   const day = activePlan[activeDayIndex] ?? activePlan[0];
 
   useEffect(() => {
-    const raw = window.localStorage.getItem("trainingLogsV2");
+    const raw = window.localStorage.getItem(LATEST_LOGS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as LogSet[];
-      setLogs(parsed.filter((item) => isWithinLastDays(item.date, 14)));
+      setLogs(parsed);
     }
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("trainingLogsV2", JSON.stringify(logs.filter((item) => isWithinLastDays(item.date, 14))));
+    window.localStorage.setItem(LATEST_LOGS_KEY, JSON.stringify(logs));
   }, [logs]);
 
   useEffect(() => {
-    writeSessionJson<PersistedUiState>(UI_STATE_KEY, {
+    writeLocalJson<PersistedUiState>(UI_STATE_KEY, {
       mode,
       days,
       selectedDay,
@@ -1244,6 +1245,37 @@ export default function Page() {
     return best;
   }, [recordsMap]);
 
+  // Compute and persist workout stats (max weight, best reps, best volume) for each exercise
+  function computeStats(logs: LogSet[], exerciseLookup: Record<string, Exercise>) {
+    const stats: Record<string, { maxWeight?: LogSet; bestReps?: LogSet; bestVolume?: LogSet }> = {};
+    for (const log of logs) {
+      const exercise = exerciseLookup[log.exerciseName];
+      if (!exercise) continue;
+      const key = exercise.name;
+      const current = stats[key] ?? {};
+      if (!current.maxWeight || (log.weightLbs > (current.maxWeight.weightLbs ?? 0))) {
+        current.maxWeight = log;
+      }
+      if (!current.bestReps || log.reps > (current.bestReps?.reps ?? 0)) {
+        current.bestReps = log;
+      }
+      const volume = (log.weightLbs ?? 0) * (log.reps ?? 0);
+      const bestVol = current.bestVolume ? (current.bestVolume.weightLbs ?? 0) * (current.bestVolume.reps ?? 0) : 0;
+      if (volume > bestVol) {
+        current.bestVolume = log;
+      }
+      stats[key] = current;
+    }
+    return stats;
+  }
+
+  // Persist stats whenever logs change
+  useEffect(() => {
+    const exerciseLookup = Object.fromEntries(exerciseLibrary.map((ex) => [ex.name, ex] as const));
+    const stats = computeStats(logs, exerciseLookup);
+    window.localStorage.setItem("trainingStatsV2", JSON.stringify(stats));
+  }, [logs]);
+
   const recentLogs = useMemo(() => logs.filter((item) => isWithinLastDays(item.date, 14)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [logs]);
 
   const lastSetMap = useMemo(() => {
@@ -1383,7 +1415,10 @@ export default function Page() {
         date: new Date().toISOString(),
       };
 
-      setLogs((old) => [...old, logSet]);
+      setLogs((old) => {
+        const without = old.filter(l => l.exerciseName !== logSet.exerciseName);
+        return [...without, logSet];
+      });
     }
 
     setInputs((old) => {
@@ -1417,7 +1452,13 @@ export default function Page() {
       .map(({ alreadySaved, ...item }) => item);
 
     if (validSets.length > 0) {
-      setLogs((old) => [...old, ...validSets]);
+      if (validSets.length > 0) {
+        const latest = validSets[validSets.length - 1];
+        setLogs((old) => {
+          const without = old.filter(l => l.exerciseName !== latest.exerciseName);
+          return [...without, latest];
+        });
+      }
       startRestTimer(exercise);
     }
 
@@ -1434,7 +1475,7 @@ export default function Page() {
 
   function clearHistory() {
     setLogs([]);
-    window.localStorage.removeItem("trainingLogsV2");
+    window.localStorage.removeItem(LATEST_LOGS_KEY);
   }
 
   function createNewCustomPlan() {

@@ -1,0 +1,19 @@
+# macOS metadata files
+._*
+
+# Node modules
+node_modules/
+
+# Build output
+.next/
+dist/
+out/
+
+# Environment files
+.env
+.env.local
+# Updated git user.email configuration
+
+# OS‑specific files
+.DS_Store
+Thumbs.db
