@@ -25,12 +25,17 @@ import {
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
 type AppMode = "today" | "preset" | "custom" | "history" | "library";
 
+type LoadType =
+  | "barbell" | "dumbbell" | "selectorized" | "plate-loaded"
+  | "smith" | "cable" | "bodyweight" | "specialty";
+
 type Exercise = {
   name: string;
   group: MuscleGroup;
   movement: string;
   muscles: string[];
   tier: "S+" | "S" | "A+" | "A";
+  load?: LoadType;
 };
 
 type PlanExercise = {
@@ -42,6 +47,7 @@ type PlanExercise = {
   warmup: boolean;
   muscles: string[];
   movement: string;
+  load?: LoadType;
 };
 
 type DayPlan = {
@@ -212,9 +218,13 @@ const exerciseLibrary: Exercise[] = [
   { name: "Incline DB Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+" },
   { name: "Incline Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+" },
   { name: "Incline Smith Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "A" },
+  { name: "Iso-Lateral Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+", load: "plate-loaded" },
+  { name: "Iso-Lateral Incline Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+", load: "plate-loaded" },
   { name: "Low-to-High Cable Flye", group: "Chest", movement: "chest flye", muscles: ["Upper chest"], tier: "A" },
   { name: "Machine Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+" },
   { name: "Machine Dip", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A" },
+  { name: "MTS Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S", load: "selectorized" },
+  { name: "MTS Incline Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S", load: "selectorized" },
   { name: "Pec Deck", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S" },
   { name: "Seated Cable Pec Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "S" },
   { name: "Smith Machine Floor Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Triceps", "Front delts"], tier: "A" },
@@ -230,9 +240,14 @@ const exerciseLibrary: Exercise[] = [
   { name: "Chest Supported T-Bar Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "S" },
   { name: "DB Shrug", group: "Back", movement: "shrug", muscles: ["Upper traps"], tier: "A" },
   { name: "Deficit Pendlay Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Erectors"], tier: "A" },
+  { name: "Iso-Lateral High Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Rear delts"], tier: "S", load: "plate-loaded" },
+  { name: "Iso-Lateral Low Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "S", load: "plate-loaded" },
+  { name: "Iso-Lateral Pulldown", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S", load: "plate-loaded" },
   { name: "Kroc Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Grip"], tier: "A" },
   { name: "Machine High Row", group: "Back", movement: "row", muscles: ["Upper back", "Lats", "Rear delts"], tier: "S" },
   { name: "Meadows Row", group: "Back", movement: "row", muscles: ["Lats", "Upper back"], tier: "A" },
+  { name: "MTS Lat Pulldown", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "A+", load: "selectorized" },
+  { name: "MTS Seated Row", group: "Back", movement: "row", muscles: ["Mid back", "Lats", "Rear delts"], tier: "A+", load: "selectorized" },
   { name: "Neutral Grip Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats", "Upper back", "Biceps"], tier: "S" },
   { name: "One Arm DB Row", group: "Back", movement: "row", muscles: ["Lats", "Mid back"], tier: "A" },
   { name: "One Arm Lat Pull Down", group: "Back", movement: "vertical pull", muscles: ["Lats"], tier: "A" },
@@ -284,8 +299,10 @@ const exerciseLibrary: Exercise[] = [
   { name: "Cable Lat Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "S+" },
   { name: "DB Lateral Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
   { name: "DB Rear Delt Flye", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A" },
+  { name: "Iso-Lateral Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A+", load: "plate-loaded" },
   { name: "Lean In DB Raise", group: "Shoulders", movement: "lateral raise", muscles: ["Side delts"], tier: "A" },
   { name: "Machine Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A" },
+  { name: "MTS Shoulder Press", group: "Shoulders", movement: "shoulder press", muscles: ["Front delts", "Side delts", "Triceps"], tier: "A+", load: "selectorized" },
   { name: "Reverse Cable Crossover", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "A" },
   { name: "Reverse Pec Deck", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back"], tier: "S" },
   { name: "Rope Face Pull", group: "Shoulders", movement: "rear delt", muscles: ["Rear delts", "Upper back", "Lower traps"], tier: "A" },
@@ -327,6 +344,35 @@ const allGroups: MuscleGroup[] = ["Chest", "Back", "Legs", "Shoulders", "Arms", 
 
 function findExercise(name: string) {
   return exerciseLibrary.find((exercise) => exercise.name === name) ?? exerciseLibrary[0];
+}
+
+const LOAD_LABELS: Record<LoadType, string> = {
+  barbell: "Barbell",
+  dumbbell: "Dumbbell",
+  selectorized: "Selectorized (Stack)",
+  "plate-loaded": "Plate-Loaded (Iso)",
+  smith: "Smith",
+  cable: "Cable",
+  bodyweight: "Bodyweight",
+  specialty: "Specialty",
+};
+
+function getLoadType(ex: { name: string; load?: LoadType }): LoadType {
+  if (ex.load) return ex.load; // explicit tag wins
+  const n = ex.name.toLowerCase();
+  if (n.includes("smith")) return "smith";
+  if (n.includes("cable") || n.includes("katana")) return "cable";
+  if (n.includes("iso-lateral") || n.includes("plate-loaded")) return "plate-loaded";
+  if (n.includes("leg press") || n.includes("hack squat") || n.includes("pendulum")) return "plate-loaded";
+  if (
+    n.includes("machine") || n.includes("mts") || n.includes("pec deck") || n.includes("atlantis") ||
+    n.includes("leg extension") || n.includes("leg curl") || n.includes("hamstring curl") ||
+    n.includes("calf raise") || n.includes("hip abduction") || n.includes("preacher") || n.includes("abs crunch")
+  ) return "selectorized";
+  if (n.includes("belt squat") || n.includes("trap bar")) return "specialty";
+  if (n.startsWith("db ") || n.includes(" db ") || n.includes("dumbbell")) return "dumbbell";
+  if (n.includes("pull up") || n.includes("hanging") || n.includes("captain") || n.includes("ab wheel") || n.includes("nordic") || n.includes("sissy") || n.includes("lunge") || n.includes("step up") || n.includes("kickback")) return "bodyweight";
+  return "barbell";
 }
 
 function getPrescription(exercise: Exercise) {
@@ -464,6 +510,18 @@ function getPrescription(exercise: Exercise) {
     "close-grip bench press": { sets: 3, reps: "6 to 10", warmup: true },
     "straight bar cable curl": { sets: 3, reps: "10 to 15", warmup: false },
     "machine triceps extension": { sets: 3, reps: "10 to 15", warmup: false },
+
+    "iso-lateral chest press": { sets: 3, reps: "6 to 10", warmup: true },
+    "iso-lateral incline press": { sets: 3, reps: "8 to 12", warmup: true },
+    "mts chest press": { sets: 3, reps: "6 to 10", warmup: true },
+    "mts incline press": { sets: 3, reps: "8 to 12", warmup: true },
+    "iso-lateral high row": { sets: 3, reps: "10 to 15", warmup: true },
+    "iso-lateral low row": { sets: 3, reps: "8 to 12", warmup: true },
+    "iso-lateral pulldown": { sets: 3, reps: "8 to 12", warmup: true },
+    "mts seated row": { sets: 3, reps: "8 to 12", warmup: true },
+    "mts lat pulldown": { sets: 3, reps: "8 to 12", warmup: true },
+    "iso-lateral shoulder press": { sets: 3, reps: "6 to 10", warmup: true },
+    "mts shoulder press": { sets: 3, reps: "6 to 10", warmup: true },
   };
 
   if (individual[name]) return individual[name];
@@ -496,6 +554,7 @@ function toPlanExercise(name: string): PlanExercise {
     warmup: prescription.warmup,
     muscles: exercise.muscles,
     movement: exercise.movement,
+    load: exercise.load,
   };
 }
 
@@ -916,7 +975,7 @@ function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movem
 }
 
 function calculateMuscleMatchScore(
-  target: Pick<PlanExercise, "group" | "movement" | "muscles" | "name">,
+  target: Pick<PlanExercise, "group" | "movement" | "muscles" | "name"> & { load?: LoadType },
   candidate: Exercise
 ): number {
   if (target.group !== candidate.group) return -1;
@@ -950,6 +1009,11 @@ function calculateMuscleMatchScore(
     score += 2;
   } else if (related.includes(candidate.movement)) {
     score += 1;
+  }
+
+  // Same weight system = similar feel & stability (small bonus)
+  if (getLoadType(candidate) === getLoadType({ name: target.name, load: target.load })) {
+    score += 0.5;
   }
 
   // Tier bonus as slight tie breaker
@@ -2172,7 +2236,9 @@ export default function Page() {
                           className="rounded-2xl bg-zinc-900 px-3 py-3 text-sm text-zinc-300"
                         >
                           <span className="font-bold">{item.name}</span>
-                          <span className="mt-1 block text-xs text-zinc-500">{item.movement} · {item.tier}</span>
+                          <span className="mt-1 block text-xs text-zinc-500">
+                            {item.movement} · {LOAD_LABELS[getLoadType(item)]} · {item.tier}
+                          </span>
                         </a>
                       ))}
                     </div>
@@ -2390,7 +2456,7 @@ export default function Page() {
                         <span>
                           <span className="block font-bold">{item.name}</span>
                           <span className="text-xs text-zinc-500">
-                            {item.group} · {item.movement} · {item.tier}
+                            {item.group} · {item.movement} · {LOAD_LABELS[getLoadType(item)]} · {item.tier}
                           </span>
                         </span>
                         <Plus size={18} className="text-emerald-300" />
@@ -2423,6 +2489,9 @@ export default function Page() {
                           <span className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-bold text-zinc-400">#{index + 1}</span>
                           <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">{exercise.group}</span>
                           <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">{exercise.movement}</span>
+                          <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">
+                            {LOAD_LABELS[getLoadType(exercise)]}
+                          </span>
                           {mode === "preset" && substituteMap[baseExercise.id] && <span className="rounded-full bg-blue-400/10 px-3 py-1 text-xs font-bold text-blue-300">Subbed</span>}
                           {exercise.warmup ? <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300"><Flame className="mr-1 inline" size={12} /> Warmup</span> : <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">No warmup</span>}
                         </div>
@@ -2902,7 +2971,7 @@ export default function Page() {
                           </span>
                         </div>
                         <p className="mt-1 text-xs text-zinc-400">
-                          {candidate.group} · {candidate.movement}
+                          {candidate.group} · {candidate.movement} · {LOAD_LABELS[getLoadType(candidate)]}
                           {isRelatedMovement && (
                             <span className="ml-1.5 inline-flex items-center rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">
                               Same Movement
