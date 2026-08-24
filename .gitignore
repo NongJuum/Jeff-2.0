@@ -1,19 +1,34 @@
-# macOS metadata files
+# macOS metadata & AppleDouble files
 ._*
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
 
-# Node modules
+# Windows thumbnail cache
+Thumbs.db
+ehthumbs.db
+
+# Node modules & package manager artifacts
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# Build output
+# TypeScript build info cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# Next.js and build output
 .next/
 dist/
 out/
+build/
 
 # Environment files
 .env
-.env.local
-# Updated git user.email configuration
-
-# OS‑specific files
-.DS_Store
-Thumbs.db
+.env*.local
+.env.development.local
+.env.test.local
+.env.production.local

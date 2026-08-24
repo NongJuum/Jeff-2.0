@@ -62,10 +62,13 @@ declare namespace JSX {
     rel?: string;
     src?: string;
     alt?: string;
+    lang?: string;
     [key: string]: any;
   }
 
   interface IntrinsicElements {
+    html: HTMLAttributes<HTMLHtmlElement>;
+    body: HTMLAttributes<HTMLBodyElement>;
     input: HTMLAttributes<HTMLInputElement>;
     select: HTMLAttributes<HTMLSelectElement>;
     textarea: HTMLAttributes<HTMLTextAreaElement>;
@@ -75,12 +78,20 @@ declare namespace JSX {
   interface Element extends React.ReactElement {}
 }
 
+declare module "*.css" {
+  const content: { [className: string]: string };
+  export default content;
+}
+
 declare module "next" {
   export interface Metadata {
     title?: string;
     description?: string;
     manifest?: string;
     icons?: any;
+    applicationName?: string;
+    formatDetection?: any;
+    appleWebApp?: any;
     [key: string]: any;
   }
 
@@ -90,8 +101,19 @@ declare module "next" {
     initialScale?: number;
     maximumScale?: number;
     userScalable?: boolean;
+    viewportFit?: string;
+    interactiveWidget?: string;
+    colorScheme?: string;
     [key: string]: any;
   }
+}
+
+declare module "tailwindcss" {
+  export interface Config {
+    [key: string]: any;
+  }
+  const config: Config;
+  export default config;
 }
 
 declare module "lucide-react" {

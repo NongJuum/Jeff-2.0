@@ -117,13 +117,6 @@ function writeLocalJson<T>(key: string, value: T) {
   } catch { /* quota exceeded or private mode */ }
 }
 
-function writeSessionJson<T>(key: string, value: T) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(key, JSON.stringify(value));
-  } catch { /* fallback to local storage */ }
-}
-
 function playRestDoneChime() {
   if (typeof window === "undefined") return;
   try {
@@ -592,33 +585,6 @@ function recommendForGroups(groups: MuscleGroup[]) {
   const maxExercises = groups.includes("Legs") ? 6 : groups.length >= 3 ? 7 : 6;
   return Array.from(new Set(names)).slice(0, maxExercises).map(toPlanExercise);
 }
-
-function inferGroupsFromText(text: string): MuscleGroup[] {
-  const lower = text.toLowerCase();
-  const groups: MuscleGroup[] = [];
-  const add = (group: MuscleGroup) => {
-    if (!groups.includes(group)) groups.push(group);
-  };
-
-  if (lower.includes("chest") || lower.includes("อก") || lower.includes("push")) add("Chest");
-  if (lower.includes("back") || lower.includes("pull") || lower.includes("หลัง") || lower.includes("lat")) add("Back");
-  if (lower.includes("leg") || lower.includes("ขา") || lower.includes("quad") || lower.includes("hamstring") || lower.includes("glute")) add("Legs");
-  if (lower.includes("shoulder") || lower.includes("ไหล่") || lower.includes("delt")) add("Shoulders");
-  if (lower.includes("arm") || lower.includes("แขน") || lower.includes("bicep") || lower.includes("tricep")) add("Arms");
-  if (lower.includes("abs") || lower.includes("core") || lower.includes("calf") || lower.includes("หน้าท้อง") || lower.includes("น่อง")) add("Abs & Calves");
-
-  if (groups.length === 0) return ["Chest", "Back"];
-  return groups;
-}
-
-function inferDayCountFromText(text: string) {
-  const lower = text.toLowerCase();
-  if (lower.includes("5") || lower.includes("five")) return 5;
-  if (lower.includes("3") || lower.includes("three")) return 3;
-  return 4;
-}
-
-
 
 function createStarterCustomPlan() {
   return {
