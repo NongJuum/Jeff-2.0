@@ -189,3 +189,11 @@ Keep postcss.config.mjs.
 - Exercise preview is now a small targeted thumbnail.
 - Records and rest timer are compact two-column cards.
 - Added extra bottom padding for the fixed mobile nav.
+
+## Permanent PR Records & History Retention
+- Added dedicated permanent storage (`haitPermanentRecordsV1`) for all-time Personal Records (PRs): Max Weight, Best Reps, and Best Volume.
+- Max Weight records are permanently preserved and never downgraded or deleted when lifting lighter weights or when time passes.
+- Backward compatibility: automatically recovers legacy `trainingStatsV2`, `trainingLatestV2`, and historical logs into all-time records on launch.
+- Workout history logs are preserved across days and weeks; sets only replace or update within the same day/session.
+- History Log UI now supports filtering by All-time, 30 days, or 14 days.
+- Clear History safely clears session logs while preserving all-time PRs.

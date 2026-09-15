@@ -95,6 +95,8 @@ const CUSTOM_PLANS_KEY = "haitCustomPlansV2";
 const SUBSTITUTE_KEY = "haitSubstitutionsV1";
 const LATEST_LOGS_KEY = "trainingLatestV2";
 const REST_TIMER_KEY = "haitRestTimerV1";
+const PERMANENT_RECORDS_KEY = "haitPermanentRecordsV1";
+const LEGACY_STATS_KEY = "trainingStatsV2";
 
 function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -115,6 +117,92 @@ function writeLocalJson<T>(key: string, value: T) {
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
   } catch { /* quota exceeded or private mode */ }
+}
+
+function getLocalDateKey(value: string | Date) {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function updateRecordsWithSet(records: Record<string, ExerciseRecords>, log: LogSet): Record<string, ExerciseRecords> {
+  if (!log || !log.exerciseName || !Number.isFinite(log.weightLbs) || !Number.isFinite(log.reps) || log.weightLbs <= 0 || log.reps <= 0) {
+    return records;
+  }
+  const current = records[log.exerciseName] ?? {};
+  const currentMax = current.maxWeight;
+  const currentReps = current.bestReps;
+  const currentVol = current.bestVolume;
+
+  const logVolScore = log.weightLbs * log.reps;
+  const bestVolScore = currentVol ? currentVol.weightLbs * currentVol.reps : -1;
+
+  // Max weight is PERMANENT: only updated if greater, never decreased
+  const newMax =
+    !currentMax ||
+    log.weightLbs > currentMax.weightLbs ||
+    (log.weightLbs === currentMax.weightLbs && log.reps > currentMax.reps)
+      ? log
+      : currentMax;
+
+  const newReps =
+    !currentReps ||
+    log.reps > currentReps.reps ||
+    (log.reps === currentReps.reps && log.weightLbs > currentReps.weightLbs)
+      ? log
+      : currentReps;
+
+  const newVol =
+    !currentVol ||
+    logVolScore > bestVolScore ||
+    (logVolScore === bestVolScore && log.weightLbs > currentVol.weightLbs)
+      ? log
+      : currentVol;
+
+  return {
+    ...records,
+    [log.exerciseName]: {
+      maxWeight: newMax,
+      bestReps: newReps,
+      bestVolume: newVol,
+    },
+  };
+}
+
+function loadPermanentRecords(): Record<string, ExerciseRecords> {
+  if (typeof window === "undefined") return {};
+
+  let result = readJson<Record<string, ExerciseRecords>>(PERMANENT_RECORDS_KEY, {});
+
+  // 1. Recover legacy stats if available
+  const legacyStats = readJson<Record<string, ExerciseRecords>>(LEGACY_STATS_KEY, {});
+  if (legacyStats && typeof legacyStats === "object") {
+    for (const rec of Object.values(legacyStats)) {
+      if (rec?.maxWeight) result = updateRecordsWithSet(result, rec.maxWeight);
+      if (rec?.bestReps) result = updateRecordsWithSet(result, rec.bestReps);
+      if (rec?.bestVolume) result = updateRecordsWithSet(result, rec.bestVolume);
+    }
+  }
+
+  // 2. Scan current logs
+  const latestLogs = readJson<LogSet[]>(LATEST_LOGS_KEY, []);
+  if (Array.isArray(latestLogs)) {
+    for (const log of latestLogs) {
+      result = updateRecordsWithSet(result, log);
+    }
+  }
+
+  // 3. Scan legacy training logs if any exist
+  const legacyLogs = readJson<LogSet[]>("trainingLogsV2", []);
+  if (Array.isArray(legacyLogs)) {
+    for (const log of legacyLogs) {
+      result = updateRecordsWithSet(result, log);
+    }
+  }
+
+  return result;
 }
 
 function playRestDoneChime() {
@@ -973,15 +1061,6 @@ function getMuscleRegionFill(region: MuscleRegion, primary: MuscleRegion[], seco
   return "#52525b";
 }
 
-
-function getLocalDateKey(value: string | Date) {
-  const date = new Date(value);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function summarizeRegionScores(scoreMap: Record<MuscleRegion, number>, sourceLabel: string): MuscleSummary {
   const ranked = Object.entries(scoreMap)
     .filter(([, score]) => score > 0)
@@ -1427,6 +1506,8 @@ export default function Page() {
   const [fiveDayMode, setFiveDayMode] = useState<"twoLegDays" | "oneLegDay">(initialUiState.fiveDayMode);
   const [selectedDay, setSelectedDay] = useState(initialUiState.selectedDay);
   const [logs, setLogs] = useState<LogSet[]>([]);
+  const [recordsMap, setRecordsMap] = useState<Record<string, ExerciseRecords>>(() => loadPermanentRecords());
+  const [historyRange, setHistoryRange] = useState<"all" | "30d" | "14d">("all");
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
   const [restTimer, setRestTimer] = useState<RestTimerState>(() => {
     const saved = readJson<RestTimerState | null>(REST_TIMER_KEY, null);
@@ -1478,7 +1559,16 @@ export default function Page() {
 
   useEffect(() => {
     const parsed = readJson<LogSet[]>(LATEST_LOGS_KEY, []);
-    if (Array.isArray(parsed)) setLogs(parsed);
+    if (Array.isArray(parsed)) {
+      setLogs(parsed);
+      setRecordsMap((current) => {
+        let updated = current;
+        for (const log of parsed) {
+          updated = updateRecordsWithSet(updated, log);
+        }
+        return updated;
+      });
+    }
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
@@ -1488,6 +1578,12 @@ export default function Page() {
   useEffect(() => {
     writeLocalJson(LATEST_LOGS_KEY, logs);
   }, [logs]);
+
+  // Persist permanent PR records to localStorage whenever they change
+  useEffect(() => {
+    writeLocalJson(PERMANENT_RECORDS_KEY, recordsMap);
+    writeLocalJson(LEGACY_STATS_KEY, recordsMap);
+  }, [recordsMap]);
 
   // Persist UI state to localStorage on every state change
   useEffect(() => {
@@ -1563,44 +1659,6 @@ export default function Page() {
     if (mode === "custom" && selectedCustomDay >= activePlan.length) setSelectedCustomDay(0);
     if (activeExerciseIndex >= (day?.exercises.length ?? 0)) setActiveExerciseIndex(0);
   }, [mode, selectedDay, selectedCustomDay, activePresetPlan.length, activePlan.length, isPresetLike, activeExerciseIndex, day?.exercises.length]);
-
-  const recordsMap = useMemo(() => {
-    const records: Record<string, ExerciseRecords> = {};
-
-    for (const log of logs) {
-      const current = records[log.exerciseName] ?? {};
-
-      const maxWeight = current.maxWeight;
-      const bestReps = current.bestReps;
-      const bestVolume = current.bestVolume;
-
-      const logVolume = log.weightLbs * log.reps;
-      const bestVolumeScore = bestVolume ? bestVolume.weightLbs * bestVolume.reps : -1;
-
-      records[log.exerciseName] = {
-        maxWeight:
-          !maxWeight ||
-          log.weightLbs > maxWeight.weightLbs ||
-          (log.weightLbs === maxWeight.weightLbs && log.reps > maxWeight.reps)
-            ? log
-            : maxWeight,
-        bestReps:
-          !bestReps ||
-          log.reps > bestReps.reps ||
-          (log.reps === bestReps.reps && log.weightLbs > bestReps.weightLbs)
-            ? log
-            : bestReps,
-        bestVolume:
-          !bestVolume ||
-          logVolume > bestVolumeScore ||
-          (logVolume === bestVolumeScore && log.weightLbs > bestVolume.weightLbs)
-            ? log
-            : bestVolume,
-      };
-    }
-
-    return records;
-  }, [logs]);
 
   // Robust timestamp-based interval + visibility sync (no drift on tab backgrounding/phone lock)
   useEffect(() => {
@@ -1750,12 +1808,14 @@ export default function Page() {
     return best;
   }, [recordsMap]);
 
-  // Persist computed stats whenever logs change (reuses recordsMap — no duplicate work)
-  useEffect(() => {
-    writeLocalJson("trainingStatsV2", recordsMap);
-  }, [recordsMap]);
+  const filteredHistoryLogs = useMemo(() => {
+    const sorted = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (historyRange === "14d") return sorted.filter((item) => isWithinLastDays(item.date, 14));
+    if (historyRange === "30d") return sorted.filter((item) => isWithinLastDays(item.date, 30));
+    return sorted;
+  }, [logs, historyRange]);
 
-  const recentLogs = useMemo(() => logs.filter((item) => isWithinLastDays(item.date, 14)).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [logs]);
+  const recentLogs = filteredHistoryLogs;
 
   const lastSetMap = useMemo(() => {
     const latest: Record<string, Record<number, LogSet>> = {};
@@ -1971,10 +2031,20 @@ export default function Page() {
         date: new Date().toISOString(),
       };
 
+      const todayKey = getLocalDateKey(logSet.date);
       setLogs((old) => {
-        const without = old.filter(l => l.exerciseName !== logSet.exerciseName || l.setNumber !== logSet.setNumber);
+        const without = old.filter(
+          (l) =>
+            !(
+              l.exerciseName === logSet.exerciseName &&
+              l.setNumber === logSet.setNumber &&
+              getLocalDateKey(l.date) === todayKey
+            )
+        );
         return [...without, logSet];
       });
+
+      setRecordsMap((old) => updateRecordsWithSet(old, logSet));
 
       // Auto start rest timer on completing working set
       startRestTimer(exercise);
@@ -2009,16 +2079,27 @@ export default function Page() {
       .map(({ alreadySaved, ...item }) => item);
 
     if (validSets.length > 0) {
+      const todayKey = getLocalDateKey(new Date());
       setLogs((old) => {
         const without = old.filter(
           (l) =>
             !(
               l.exerciseName === exercise.name &&
+              getLocalDateKey(l.date) === todayKey &&
               validSets.some((v) => v.setNumber === l.setNumber)
             )
         );
         return [...without, ...validSets];
       });
+
+      setRecordsMap((old) => {
+        let updated = old;
+        for (const s of validSets) {
+          updated = updateRecordsWithSet(updated, s);
+        }
+        return updated;
+      });
+
       startRestTimer(exercise);
     }
 
@@ -2056,6 +2137,14 @@ export default function Page() {
   }
 
   function clearHistory() {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "ต้องการล้างประวัติการฝึก (Workout Logs) หรือไม่?\n\n(หมายเหตุ: สถิติน้ำหนักสูงสุด PR และ Records จะยังคงถูกเก็บรักษาไว้ถาวร)"
+      )
+    ) {
+      return;
+    }
     setLogs([]);
     window.localStorage.removeItem(LATEST_LOGS_KEY);
   }
@@ -2199,9 +2288,9 @@ export default function Page() {
       description: "สร้างและแก้ตารางเอง",
     },
     history: {
-      eyebrow: "Temporary",
+      eyebrow: "Permanent",
       title: "History",
-      description: "ย้อนหลัง 14 วัน",
+      description: "ประวัติการฝึกและสถิติ",
     },
     library: {
       eyebrow: "Exercise",
@@ -2293,33 +2382,58 @@ export default function Page() {
 
         {mode === "history" && (
           <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="flex items-center gap-2 text-lg font-black"><ClipboardList size={18} /> History Log</h3>
-                <p className="mt-0.5 text-[11px] text-zinc-500">Temporary record from the last 14 days only.</p>
+                <p className="mt-0.5 text-[11px] text-zinc-500">บันทึกประวัติการฝึกและสถิติถาวร (Permanent Records)</p>
               </div>
-              {recentLogs.length > 0 && (
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex gap-1 rounded-xl bg-zinc-950 p-1">
                   <button
-                    onClick={exportLogsToCsv}
-                    className="flex items-center gap-1.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
-                    aria-label="Export history to CSV"
+                    onClick={() => setHistoryRange("all")}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "all" ? "bg-emerald-400 text-zinc-950" : "text-zinc-400 hover:text-zinc-200"}`}
                   >
-                    <Download size={15} /> Export CSV
+                    ทั้งหมด
                   </button>
                   <button
-                    onClick={clearHistory}
-                    className="rounded-2xl border border-red-500/40 bg-red-500/10 p-2.5 text-red-300 transition hover:bg-red-500/20"
-                    aria-label="Clear history"
+                    onClick={() => setHistoryRange("30d")}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "30d" ? "bg-emerald-400 text-zinc-950" : "text-zinc-400 hover:text-zinc-200"}`}
                   >
-                    <Trash2 size={16} />
+                    30 วัน
+                  </button>
+                  <button
+                    onClick={() => setHistoryRange("14d")}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "14d" ? "bg-emerald-400 text-zinc-950" : "text-zinc-400 hover:text-zinc-200"}`}
+                  >
+                    14 วัน
                   </button>
                 </div>
-              )}
+                {logs.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={exportLogsToCsv}
+                      className="flex items-center gap-1.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                      aria-label="Export history to CSV"
+                    >
+                      <Download size={15} /> Export CSV
+                    </button>
+                    <button
+                      onClick={clearHistory}
+                      className="rounded-2xl border border-red-500/40 bg-red-500/10 p-2 text-red-300 transition hover:bg-red-500/20"
+                      aria-label="Clear history"
+                      title="Clear history logs"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {recentLogs.length === 0 ? (
-              <div className="rounded-2xl bg-zinc-950 p-4 text-sm text-zinc-400">No workout log yet. Save working sets first.</div>
+            {filteredHistoryLogs.length === 0 ? (
+              <div className="rounded-2xl bg-zinc-950 p-4 text-sm text-zinc-400">
+                {logs.length === 0 ? "No workout log yet. Save working sets first." : "ไม่พบประวัติการฝึกในช่วงเวลาที่เลือก"}
+              </div>
             ) : (
               <div className="space-y-3 pr-1">
                 {Object.entries(recentLogsByDate).map(([date, items]) => (
