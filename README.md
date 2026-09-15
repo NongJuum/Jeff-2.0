@@ -197,3 +197,14 @@ Keep postcss.config.mjs.
 - Workout history logs are preserved across days and weeks; sets only replace or update within the same day/session.
 - History Log UI now supports filtering by All-time, 30 days, or 14 days.
 - Clear History safely clears session logs while preserving all-time PRs.
+
+## Machine Variants & Machine Tags (Multi-Machine Weight Tracking)
+- Added dedicated machine variants to Exercise Library:
+  - `Pin-Loaded Chest Press` (selectorized weight stack)
+  - `Plate-Loaded Chest Press` (independent plate sleeves / Hammer Strength style)
+  - `Converging Cable Chest Press` (dual cable / overhead pivot, e.g. North Fitness)
+  - `Incline Converging Chest Press`
+- Added per-exercise Machine Tag selector & custom text input (`haitMachineTagsV1`) on workout cards.
+- Quick chips for common gym machines: `Pin Stack`, `Plate-Loaded`, `North Fitness`, `Hammer`, `เครื่อง 1`, `เครื่อง 2`, or type custom name.
+- PR Records, Warmup calculations, and last-set placeholders automatically track and adapt independently per machine.
+- Machine tags are included in History logs and CSV export.

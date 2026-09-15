@@ -68,6 +68,7 @@ type LogSet = {
   reps: number;
   setNumber: number;
   date: string;
+  machine?: string;
 };
 
 type ExerciseRecords = {
@@ -97,6 +98,7 @@ const LATEST_LOGS_KEY = "trainingLatestV2";
 const REST_TIMER_KEY = "haitRestTimerV1";
 const PERMANENT_RECORDS_KEY = "haitPermanentRecordsV1";
 const LEGACY_STATS_KEY = "trainingStatsV2";
+const MACHINE_TAGS_KEY = "haitMachineTagsV1";
 
 function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -127,11 +129,17 @@ function getLocalDateKey(value: string | Date) {
   return `${year}-${month}-${day}`;
 }
 
+function getEffectiveExerciseKey(exerciseName: string, machineTag?: string) {
+  const trimmed = (machineTag ?? "").trim();
+  return trimmed ? `${exerciseName} [${trimmed}]` : exerciseName;
+}
+
 function updateRecordsWithSet(records: Record<string, ExerciseRecords>, log: LogSet): Record<string, ExerciseRecords> {
   if (!log || !log.exerciseName || !Number.isFinite(log.weightLbs) || !Number.isFinite(log.reps) || log.weightLbs <= 0 || log.reps <= 0) {
     return records;
   }
-  const current = records[log.exerciseName] ?? {};
+  const key = getEffectiveExerciseKey(log.exerciseName, log.machine);
+  const current = records[key] ?? {};
   const currentMax = current.maxWeight;
   const currentReps = current.bestReps;
   const currentVol = current.bestVolume;
@@ -161,14 +169,31 @@ function updateRecordsWithSet(records: Record<string, ExerciseRecords>, log: Log
       ? log
       : currentVol;
 
-  return {
+  const next: Record<string, ExerciseRecords> = {
     ...records,
-    [log.exerciseName]: {
+    [key]: {
       maxWeight: newMax,
       bestReps: newReps,
       bestVolume: newVol,
     },
   };
+
+  // If machine was specified, also update base exercise record if it sets a higher overall max
+  if (log.machine && key !== log.exerciseName) {
+    const baseCurrent = records[log.exerciseName] ?? {};
+    const baseMax = baseCurrent.maxWeight;
+    const baseReps = baseCurrent.bestReps;
+    const baseVol = baseCurrent.bestVolume;
+    const baseVolScore = baseVol ? baseVol.weightLbs * baseVol.reps : -1;
+
+    next[log.exerciseName] = {
+      maxWeight: !baseMax || log.weightLbs > baseMax.weightLbs || (log.weightLbs === baseMax.weightLbs && log.reps > baseMax.reps) ? log : baseMax,
+      bestReps: !baseReps || log.reps > baseReps.reps || (log.reps === baseReps.reps && log.weightLbs > baseReps.weightLbs) ? log : baseReps,
+      bestVolume: !baseVol || logVolScore > baseVolScore || (logVolScore === baseVolScore && log.weightLbs > baseVol.weightLbs) ? log : baseVol,
+    };
+  }
+
+  return next;
 }
 
 function loadPermanentRecords(): Record<string, ExerciseRecords> {
@@ -276,6 +301,10 @@ const exerciseLibrary: Exercise[] = [
   { name: "Incline DB Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+", load: "dumbbell" },
   { name: "DB Flye", group: "Chest", movement: "chest flye", muscles: ["Chest"], tier: "A", load: "dumbbell" },
   { name: "Machine Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+", load: "selectorized" },
+  { name: "Pin-Loaded Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+", load: "selectorized" },
+  { name: "Plate-Loaded Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+", load: "plate-loaded" },
+  { name: "Converging Cable Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+", load: "cable" },
+  { name: "Incline Converging Chest Press", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+", load: "cable" },
   { name: "Incline Machine Bench", group: "Chest", movement: "incline press", muscles: ["Upper chest", "Front delts", "Triceps"], tier: "S+", load: "selectorized" },
   { name: "Decline Machine Press", group: "Chest", movement: "decline press", muscles: ["Lower chest", "Front delts", "Triceps"], tier: "A+", load: "selectorized" },
   { name: "Iso-Lateral Chest Press", group: "Chest", movement: "horizontal press", muscles: ["Chest", "Front delts", "Triceps"], tier: "S+", load: "plate-loaded" },
@@ -433,6 +462,10 @@ function getPrescription(exercise: Exercise) {
 
   const individual: Record<string, { sets: number; reps: string; warmup: boolean }> = {
     "machine chest press": { sets: 3, reps: "6 to 10", warmup: true },
+    "pin-loaded chest press": { sets: 3, reps: "6 to 10", warmup: true },
+    "plate-loaded chest press": { sets: 3, reps: "6 to 10", warmup: true },
+    "converging cable chest press": { sets: 3, reps: "8 to 12", warmup: true },
+    "incline converging chest press": { sets: 3, reps: "8 to 12", warmup: true },
     "bench press": { sets: 3, reps: "5 to 8", warmup: true },
     "flat db press": { sets: 3, reps: "8 to 12", warmup: true },
     "incline db press": { sets: 3, reps: "8 to 12", warmup: true },
@@ -1508,6 +1541,7 @@ export default function Page() {
   const [logs, setLogs] = useState<LogSet[]>([]);
   const [recordsMap, setRecordsMap] = useState<Record<string, ExerciseRecords>>(() => loadPermanentRecords());
   const [historyRange, setHistoryRange] = useState<"all" | "30d" | "14d">("all");
+  const [machineTags, setMachineTags] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_TAGS_KEY, {}));
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
   const [restTimer, setRestTimer] = useState<RestTimerState>(() => {
     const saved = readJson<RestTimerState | null>(REST_TIMER_KEY, null);
@@ -1599,6 +1633,15 @@ export default function Page() {
   useEffect(() => writeLocalJson(SET_INPUTS_KEY, inputs), [inputs]);
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
   useEffect(() => writeLocalJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
+  useEffect(() => writeLocalJson(MACHINE_TAGS_KEY, machineTags), [machineTags]);
+
+  function updateMachineTag(exerciseId: string, tag: string) {
+    setMachineTags((old) => {
+      const next = { ...old, [exerciseId]: tag };
+      writeLocalJson(MACHINE_TAGS_KEY, next);
+      return next;
+    });
+  }
 
   // Persist rest timer state for resilience against refresh
   useEffect(() => {
@@ -1823,10 +1866,18 @@ export default function Page() {
     const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     for (const log of sortedLogs) {
-      latest[log.exerciseName] = latest[log.exerciseName] ?? {};
+      const key = getEffectiveExerciseKey(log.exerciseName, log.machine);
+      latest[key] = latest[key] ?? {};
 
-      if (!latest[log.exerciseName][log.setNumber]) {
-        latest[log.exerciseName][log.setNumber] = log;
+      if (!latest[key][log.setNumber]) {
+        latest[key][log.setNumber] = log;
+      }
+
+      if (log.machine) {
+        latest[log.exerciseName] = latest[log.exerciseName] ?? {};
+        if (!latest[log.exerciseName][log.setNumber]) {
+          latest[log.exerciseName][log.setNumber] = log;
+        }
       }
     }
 
@@ -2010,7 +2061,7 @@ export default function Page() {
     });
   }
 
-  function saveSingleSet(exercise: PlanExercise, setIndex: number) {
+  function saveSingleSet(exercise: PlanExercise, setIndex: number, machineTag?: string) {
     const exerciseInputs = normalizeSetInputs(inputs[exercise.id] ?? createDefaultSetInputs(exercise.sets), exercise.sets);
     const item = exerciseInputs[setIndex];
 
@@ -2022,6 +2073,7 @@ export default function Page() {
     if (!Number.isFinite(weightLbs) || !Number.isFinite(reps) || weightLbs <= 0 || reps <= 0) return;
 
     if (!item.done) {
+      const trimmedTag = (machineTag ?? "").trim();
       const logSet: LogSet = {
         exerciseId: exercise.id,
         exerciseName: exercise.name,
@@ -2029,6 +2081,7 @@ export default function Page() {
         reps,
         setNumber: setIndex + 1,
         date: new Date().toISOString(),
+        machine: trimmedTag || undefined,
       };
 
       const todayKey = getLocalDateKey(logSet.date);
@@ -2037,6 +2090,7 @@ export default function Page() {
           (l) =>
             !(
               l.exerciseName === logSet.exerciseName &&
+              (l.machine || "") === (logSet.machine || "") &&
               l.setNumber === logSet.setNumber &&
               getLocalDateKey(l.date) === todayKey
             )
@@ -2063,9 +2117,10 @@ export default function Page() {
     });
   }
 
-  function saveAllSets(exercise: PlanExercise) {
+  function saveAllSets(exercise: PlanExercise, machineTag?: string) {
+    const trimmedTag = (machineTag ?? "").trim();
     const exerciseInputs = normalizeSetInputs(inputs[exercise.id] ?? createDefaultSetInputs(exercise.sets), exercise.sets);
-    const validSets = exerciseInputs
+    const validSets: LogSet[] = exerciseInputs
       .map((item, index) => ({
         exerciseId: exercise.id,
         exerciseName: exercise.name,
@@ -2073,6 +2128,7 @@ export default function Page() {
         reps: Number(item.reps),
         setNumber: index + 1,
         date: new Date().toISOString(),
+        machine: trimmedTag || undefined,
         alreadySaved: item.done,
       }))
       .filter((item) => Number.isFinite(item.weightLbs) && Number.isFinite(item.reps) && item.weightLbs > 0 && item.reps > 0 && !item.alreadySaved)
@@ -2085,6 +2141,7 @@ export default function Page() {
           (l) =>
             !(
               l.exerciseName === exercise.name &&
+              (l.machine || "") === trimmedTag &&
               getLocalDateKey(l.date) === todayKey &&
               validSets.some((v) => v.setNumber === l.setNumber)
             )
@@ -2116,10 +2173,11 @@ export default function Page() {
 
   function exportLogsToCsv() {
     if (logs.length === 0) return;
-    const headers = ["Date", "Exercise", "Set", "Weight (lbs)", "Reps"];
+    const headers = ["Date", "Exercise", "Machine", "Set", "Weight (lbs)", "Reps"];
     const rows = logs.map((log) => [
       safeCsvCell(new Date(log.date).toISOString().replace("T", " ").slice(0, 19)),
       safeCsvCell(log.exerciseName),
+      safeCsvCell(log.machine || "-"),
       safeCsvCell(log.setNumber),
       safeCsvCell(log.weightLbs),
       safeCsvCell(log.reps),
@@ -2444,7 +2502,14 @@ export default function Page() {
                         <div key={`${item.date}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-bold leading-tight">{item.exerciseName}</p>
+                              <p className="font-bold leading-tight flex items-center flex-wrap gap-1.5">
+                                <span>{item.exerciseName}</span>
+                                {item.machine && (
+                                  <span className="rounded-md bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/20">
+                                    {item.machine}
+                                  </span>
+                                )}
+                              </p>
                               <p className="mt-1 text-[11px] text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
                             </div>
                             <p className="whitespace-nowrap text-sm font-black text-emerald-300">{item.weightLbs} lbs × {item.reps}</p>
@@ -2728,8 +2793,10 @@ export default function Page() {
                 const index = day.exercises.findIndex((item) => item.id === baseExercise.id);
                 const selectedSubstitute = substituteMap[baseExercise.id];
                 const exercise = mode === "custom" || !selectedSubstitute ? baseExercise : applyExerciseIdentity(baseExercise, selectedSubstitute);
-                const records = recordsMap[exercise.name] ?? {};
-                const pr = records.maxWeight ?? prMap[exercise.name];
+                const currentMachine = machineTags[baseExercise.id] || "";
+                const effectiveKey = getEffectiveExerciseKey(exercise.name, currentMachine);
+                const records = recordsMap[effectiveKey] ?? (currentMachine ? recordsMap[exercise.name] : {}) ?? {};
+                const pr = records.maxWeight ?? prMap[effectiveKey] ?? prMap[exercise.name];
                 const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
                 const restMode = restModeMap[baseExercise.id] ?? "normal";
                 const selectedRestSeconds = customRestMap[baseExercise.id] ?? getRestSecondsByMode({ ...exercise, id: baseExercise.id }, restMode);
@@ -2825,9 +2892,53 @@ export default function Page() {
                       </button>
                     </div>
 
+                    {/* Machine / Equipment Variant Selector */}
+                    <div className="mb-3 rounded-xl bg-zinc-950 p-2.5">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                          <Dumbbell size={12} className="text-emerald-400" />
+                          เครื่อง / Machine:
+                        </span>
+                        {currentMachine && (
+                          <button
+                            type="button"
+                            onClick={() => updateMachineTag(baseExercise.id, "")}
+                            className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                          >
+                            ล้างแท็ก
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {["Pin Stack", "Plate-Loaded", "North Fitness", "Hammer", "เครื่อง 1", "เครื่อง 2"].map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => updateMachineTag(baseExercise.id, currentMachine === tag ? "" : tag)}
+                            className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
+                              currentMachine === tag
+                                ? "bg-emerald-400 text-zinc-950 shadow-sm shadow-emerald-500/20"
+                                : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                        <input
+                          type="text"
+                          placeholder="+ พิมพ์ชื่อเครื่องเอง..."
+                          value={currentMachine}
+                          onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
+                          className="min-w-[120px] flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-zinc-200 placeholder-zinc-600 outline-none focus:border-emerald-400 transition"
+                        />
+                      </div>
+                    </div>
+
                     <div className="mb-3 grid gap-2 sm:grid-cols-2">
                       <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500"><Trophy size={14} /> Records</p>
+                        <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
+                          <Trophy size={14} /> Records {currentMachine && <span className="text-emerald-400 font-semibold normal-case">({currentMachine})</span>}
+                        </p>
                         <div className="grid grid-cols-2 gap-2">
                           <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Max</p><p className="mt-1 text-sm font-black text-emerald-300">{records.maxWeight ? `${records.maxWeight.weightLbs} × ${records.maxWeight.reps}` : "—"}</p></div>
                           <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p><p className="mt-1 text-sm font-black text-zinc-100">{records.bestReps ? `${records.bestReps.weightLbs} × ${records.bestReps.reps}` : "—"}</p></div>
@@ -2947,7 +3058,7 @@ export default function Page() {
                       </div>
                       <div className="space-y-2">
                         {setInputs.map((set, setIndex) => {
-                          const latestSet = lastSetMap[exercise.name]?.[setIndex + 1];
+                          const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1] ?? lastSetMap[exercise.name]?.[setIndex + 1];
 
                           return (
                             <div key={setIndex} className="grid grid-cols-[46px_1fr_1fr_42px] gap-2">
@@ -2973,7 +3084,7 @@ export default function Page() {
                                 placeholder={latestSet ? String(latestSet.reps) : "0"}
                               />
                               <button
-                                onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex)}
+                                onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex, currentMachine)}
                                 aria-label={`Save set ${setIndex + 1}`}
                                 className={`rounded-2xl border transition active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                                   set.done
@@ -2988,7 +3099,7 @@ export default function Page() {
                         })}
                       </div>
                       <button
-                        onClick={() => saveAllSets({ ...exercise, id: baseExercise.id })}
+                        onClick={() => saveAllSets({ ...exercise, id: baseExercise.id }, currentMachine)}
                         aria-label="Finish working sets and clear inputs"
                         className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99] transition hover:bg-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400"
                       >
