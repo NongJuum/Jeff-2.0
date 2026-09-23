@@ -99,6 +99,7 @@ const REST_TIMER_KEY = "haitRestTimerV1";
 const PERMANENT_RECORDS_KEY = "haitPermanentRecordsV1";
 const LEGACY_STATS_KEY = "trainingStatsV2";
 const MACHINE_TAGS_KEY = "haitMachineTagsV1";
+const PRESET_SETS_KEY = "haitPresetSetsV1";
 
 function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -900,10 +901,15 @@ function getWeeklyVolumeSummary(plan: DayPlan[]) {
   return Object.entries(summary).filter(([, sets]) => sets > 0);
 }
 
-function normalizeSetInputs(raw: SetInput[], sets: number) {
-  if (raw.length > sets) return raw.slice(0, sets);
-  if (raw.length < sets) return [...raw, ...createDefaultSetInputs(sets - raw.length)];
-  return raw;
+function normalizeSetInputs(raw: SetInput[] | undefined, defaultSets: number): SetInput[] {
+  if (!raw || !Array.isArray(raw) || raw.length === 0) {
+    return createDefaultSetInputs(defaultSets);
+  }
+  return raw.map((item) => ({
+    weightLbs: item?.weightLbs !== undefined ? String(item.weightLbs) : "",
+    reps: item?.reps !== undefined ? String(item.reps) : "",
+    done: Boolean(item?.done),
+  }));
 }
 
 
@@ -1608,6 +1614,7 @@ export default function Page() {
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
   const [compactList, setCompactList] = useState(true);
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
+  const [presetSetsMap, setPresetSetsMap] = useState<Record<string, number>>(() => readJson<Record<string, number>>(PRESET_SETS_KEY, {}));
 
   // Substitution Modal State
   const [substituteModalExercise, setSubstituteModalExercise] = useState<PlanExercise | null>(null);
@@ -1671,6 +1678,26 @@ export default function Page() {
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
   useEffect(() => writeLocalJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
   useEffect(() => writeLocalJson(MACHINE_TAGS_KEY, machineTags), [machineTags]);
+  useEffect(() => writeLocalJson(PRESET_SETS_KEY, presetSetsMap), [presetSetsMap]);
+
+  function updatePresetExerciseSets(exerciseId: string, newSets: number) {
+    const safeSets = Math.max(1, Math.min(10, newSets));
+    setPresetSetsMap((old) => ({ ...old, [exerciseId]: safeSets }));
+    setInputs((old) => {
+      const current = normalizeSetInputs(old[exerciseId], safeSets);
+      let updated: SetInput[];
+      if (current.length < safeSets) {
+        updated = [...current, ...createDefaultSetInputs(safeSets - current.length)];
+      } else if (current.length > safeSets) {
+        updated = current.slice(0, safeSets);
+      } else {
+        updated = current;
+      }
+      const nextInputs = { ...old, [exerciseId]: updated };
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
+      return nextInputs;
+    });
+  }
 
   function updateMachineTag(exerciseId: string, tag: string) {
     setMachineTags((old) => {
@@ -2041,7 +2068,7 @@ export default function Page() {
 
   function addManualSet(exerciseId: string, defaultSets: number) {
     setInputs((old) => {
-      const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
+      const current = normalizeSetInputs(old[exerciseId], defaultSets);
       const nextInputs = {
         ...old,
         [exerciseId]: [
@@ -2060,7 +2087,7 @@ export default function Page() {
 
   function removeManualSet(exerciseId: string, defaultSets: number) {
     setInputs((old) => {
-      const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
+      const current = normalizeSetInputs(old[exerciseId], defaultSets);
 
       if (current.length <= 1) return old;
 
@@ -2075,7 +2102,7 @@ export default function Page() {
 
   function updateSet(exerciseId: string, setIndex: number, field: keyof SetInput, value: string | boolean, defaultSets: number) {
     setInputs((old) => {
-      const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
+      const current = normalizeSetInputs(old[exerciseId], defaultSets);
       const updated = current.map((set, index) => {
         if (index !== setIndex) return set;
 
@@ -2100,7 +2127,7 @@ export default function Page() {
 
   function stepReps(exerciseId: string, setIndex: number, delta: number, defaultSets: number, fallbackReps = 10) {
     setInputs((old) => {
-      const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
+      const current = normalizeSetInputs(old[exerciseId], defaultSets);
       const updated = current.map((set, index) => {
         if (index !== setIndex) return set;
 
@@ -2127,7 +2154,7 @@ export default function Page() {
   }
 
   function saveSingleSet(exercise: PlanExercise, setIndex: number, machineTag?: string) {
-    const exerciseInputs = normalizeSetInputs(inputs[exercise.id] ?? createDefaultSetInputs(exercise.sets), exercise.sets);
+    const exerciseInputs = normalizeSetInputs(inputs[exercise.id], exercise.sets);
     const item = exerciseInputs[setIndex];
 
     if (!item) return;
@@ -2170,7 +2197,7 @@ export default function Page() {
     }
 
     setInputs((old) => {
-      const current = normalizeSetInputs(old[exercise.id] ?? createDefaultSetInputs(exercise.sets), exercise.sets);
+      const current = normalizeSetInputs(old[exercise.id], exercise.sets);
       const updated = current.map((set, index) => (index === setIndex ? { ...set, done: true } : set));
       const nextInputs = {
         ...old,
@@ -2184,7 +2211,7 @@ export default function Page() {
 
   function saveAllSets(exercise: PlanExercise, machineTag?: string) {
     const trimmedTag = (machineTag ?? "").trim();
-    const exerciseInputs = normalizeSetInputs(inputs[exercise.id] ?? createDefaultSetInputs(exercise.sets), exercise.sets);
+    const exerciseInputs = normalizeSetInputs(inputs[exercise.id], exercise.sets);
     const validSets: LogSet[] = exerciseInputs
       .map((item, index) => ({
         exerciseId: exercise.id,
@@ -2865,8 +2892,11 @@ export default function Page() {
                 const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
                 const restMode = restModeMap[baseExercise.id] ?? "normal";
                 const selectedRestSeconds = customRestMap[baseExercise.id] ?? getRestSecondsByMode({ ...exercise, id: baseExercise.id }, restMode);
-                const rawSetInputs = inputs[baseExercise.id] ?? createDefaultSetInputs(exercise.sets);
-                const setInputs = normalizeSetInputs(rawSetInputs, exercise.sets);
+                const effectiveSets = (mode === "preset" || mode === "today") && presetSetsMap[baseExercise.id]
+                  ? presetSetsMap[baseExercise.id]
+                  : exercise.sets;
+                const rawSetInputs = inputs[baseExercise.id];
+                const setInputs = normalizeSetInputs(rawSetInputs, effectiveSets);
                 const alternatives = getAlternatives(exercise);
 
                 return (
@@ -2885,7 +2915,7 @@ export default function Page() {
                         </div>
 
                         <h3 className="mt-2 text-lg font-black leading-snug sm:text-xl">{exercise.name}</h3>
-                        <p className="mt-1 text-sm text-zinc-400">{exercise.sets} hard working sets × {exercise.reps} reps</p>
+                        <p className="mt-1 text-sm text-zinc-400">{effectiveSets} hard working sets × {exercise.reps} reps</p>
                       </div>
 
                       <div className="flex flex-col gap-2">
@@ -2900,32 +2930,51 @@ export default function Page() {
 
                     <ExerciseMusclePreviewCard exercise={exercise} />
 
-                    {mode === "custom" && (
+                    {(mode === "custom" || mode === "preset" || mode === "today") && (
                       <details className="mb-3 rounded-xl bg-zinc-950 p-3">
-                        <summary className="cursor-pointer text-xs font-bold text-zinc-300">Edit</summary>
+                        <summary className="cursor-pointer text-xs font-bold text-zinc-300">Edit target sets & reps</summary>
 
-                        <div className="mt-3 grid grid-cols-3 gap-2">
+                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                           <div>
-                            <label className="mb-1 block text-xs font-bold text-zinc-500">Sets</label>
+                            <label className="mb-1 block text-xs font-bold text-zinc-500">Target Sets</label>
                             <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 transition">
                               <button
                                 type="button"
-                                onClick={() => updateCustomExercise(baseExercise.id, { sets: Math.max(1, exercise.sets - 1) })}
-                                className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                onClick={() => {
+                                  if (mode === "custom") {
+                                    updateCustomExercise(baseExercise.id, { sets: Math.max(1, exercise.sets - 1) });
+                                  } else {
+                                    updatePresetExerciseSets(baseExercise.id, effectiveSets - 1);
+                                  }
+                                }}
+                                className="flex w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                 aria-label="Decrease sets"
                               >
                                 −
                               </button>
                               <input
                                 inputMode="numeric"
-                                value={exercise.sets}
-                                onChange={(event) => updateCustomExercise(baseExercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })}
+                                value={effectiveSets}
+                                onChange={(event) => {
+                                  const val = Math.max(1, Number(event.target.value) || 1);
+                                  if (mode === "custom") {
+                                    updateCustomExercise(baseExercise.id, { sets: val });
+                                  } else {
+                                    updatePresetExerciseSets(baseExercise.id, val);
+                                  }
+                                }}
                                 className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-sm font-bold outline-none"
                               />
                               <button
                                 type="button"
-                                onClick={() => updateCustomExercise(baseExercise.id, { sets: Math.min(10, exercise.sets + 1) })}
-                                className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                onClick={() => {
+                                  if (mode === "custom") {
+                                    updateCustomExercise(baseExercise.id, { sets: Math.min(10, exercise.sets + 1) });
+                                  } else {
+                                    updatePresetExerciseSets(baseExercise.id, effectiveSets + 1);
+                                  }
+                                }}
+                                className="flex w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                 aria-label="Increase sets"
                               >
                                 +
@@ -2934,22 +2983,29 @@ export default function Page() {
                           </div>
 
                           <div>
-                            <label className="mb-1 block text-xs font-bold text-zinc-500">Reps</label>
+                            <label className="mb-1 block text-xs font-bold text-zinc-500">Target Reps</label>
                             <input
                               value={exercise.reps}
-                              onChange={(event) => updateCustomExercise(baseExercise.id, { reps: event.target.value })}
-                              className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none"
+                              onChange={(event) => {
+                                if (mode === "custom") {
+                                  updateCustomExercise(baseExercise.id, { reps: event.target.value });
+                                }
+                              }}
+                              readOnly={mode !== "custom"}
+                              className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none text-sm"
                             />
                           </div>
 
-                          <button
-                            onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })}
-                            className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${
-                              exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
-                            }`}
-                          >
-                            Warmup
-                          </button>
+                          {mode === "custom" && (
+                            <button
+                              onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })}
+                              className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${
+                                exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+                              }`}
+                            >
+                              Warmup
+                            </button>
+                          )}
                         </div>
                       </details>
                     )}
@@ -3111,27 +3167,27 @@ export default function Page() {
                         <div>
                           <p className="text-xs font-bold uppercase text-zinc-500">Working sets</p>
                           <p className="mt-0.5 text-[11px] text-zinc-600">
-                            Plan {exercise.sets} · Log {setInputs.length}
+                            Plan {effectiveSets} · Log {setInputs.length}
                           </p>
                         </div>
 
                         <div className="flex gap-2">
                           <button
-                            onClick={() => removeManualSet(baseExercise.id, exercise.sets)}
-                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            onClick={() => removeManualSet(baseExercise.id, effectiveSets)}
+                            className="flex items-center gap-1 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 select-none"
                             disabled={setInputs.length <= 1}
                             aria-label="Remove last set"
                             type="button"
                           >
-                            − Set
+                            <span className="text-base font-black leading-none">−</span> Set
                           </button>
                           <button
-                            onClick={() => addManualSet(baseExercise.id, exercise.sets)}
-                            className="rounded-xl bg-emerald-400 px-3 py-2 text-xs font-bold text-zinc-950 transition hover:bg-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            onClick={() => addManualSet(baseExercise.id, effectiveSets)}
+                            className="flex items-center gap-1 rounded-xl bg-emerald-400 px-3 py-2 text-xs font-bold text-zinc-950 transition hover:bg-emerald-300 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 select-none"
                             aria-label="Add additional set"
                             type="button"
                           >
-                            + Set
+                            <span className="text-base font-black leading-none">+</span> Set
                           </button>
                         </div>
                       </div>
@@ -3151,8 +3207,8 @@ export default function Page() {
                                 id={`weight-input-${baseExercise.id}-${setIndex}`}
                                 inputMode="decimal"
                                 value={set.weightLbs}
-                                onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, exercise.sets)}
-                                onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id }, baseExercise.id, setIndex, "weightLbs")}
+                                onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
+                                onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
                                 aria-label={`Weight in pounds for set ${setIndex + 1}`}
                                 className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
                                 placeholder={latestSet ? String(latestSet.weightLbs) : "0"}
@@ -3160,7 +3216,7 @@ export default function Page() {
                               <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400 transition">
                                 <button
                                   type="button"
-                                  onClick={() => stepReps(baseExercise.id, setIndex, -1, exercise.sets, fallbackRepVal)}
+                                  onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
                                   className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-lg select-none"
                                   aria-label={`Decrease reps for set ${setIndex + 1}`}
                                 >
@@ -3170,15 +3226,15 @@ export default function Page() {
                                   id={`rep-input-${baseExercise.id}-${setIndex}`}
                                   inputMode="numeric"
                                   value={set.reps}
-                                  onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)}
-                                  onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id }, baseExercise.id, setIndex, "reps")}
+                                  onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, effectiveSets)}
+                                  onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps")}
                                   aria-label={`Reps for set ${setIndex + 1}`}
                                   className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-base font-semibold outline-none"
                                   placeholder={latestSet ? String(latestSet.reps) : "0"}
                                 />
                                 <button
                                   type="button"
-                                  onClick={() => stepReps(baseExercise.id, setIndex, 1, exercise.sets, fallbackRepVal)}
+                                  onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
                                   className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-lg select-none"
                                   aria-label={`Increase reps for set ${setIndex + 1}`}
                                 >
@@ -3186,7 +3242,7 @@ export default function Page() {
                                 </button>
                               </div>
                               <button
-                                onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex, currentMachine)}
+                                onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
                                 aria-label={`Save set ${setIndex + 1}`}
                                 className={`rounded-2xl border transition active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                                   set.done
@@ -3201,7 +3257,7 @@ export default function Page() {
                         })}
                       </div>
                       <button
-                        onClick={() => saveAllSets({ ...exercise, id: baseExercise.id }, currentMachine)}
+                        onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
                         aria-label="Finish working sets and clear inputs"
                         className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99] transition hover:bg-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400"
                       >
