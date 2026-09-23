@@ -1206,15 +1206,12 @@ function RealisticAnatomyFigure({
             maskImage: `url('/anatomy/${side}/${id}.png')`,
             WebkitMaskImage: `url('/anatomy/${side}/${id}.png')`,
             maskSize: "contain",
-            WebkitMaskSize: "contain",
             maskPosition: "center",
-            WebkitMaskPosition: "center",
             maskRepeat: "no-repeat",
-            WebkitMaskRepeat: "no-repeat",
             backgroundColor: "#f59e0b",
             filter: "drop-shadow(0 0 8px rgba(245, 158, 11, 0.95)) brightness(1.2)",
             opacity: 0.85,
-          }}
+          } as React.CSSProperties}
         />
       ))}
 
@@ -1227,15 +1224,12 @@ function RealisticAnatomyFigure({
             maskImage: `url('/anatomy/${side}/${id}.png')`,
             WebkitMaskImage: `url('/anatomy/${side}/${id}.png')`,
             maskSize: "contain",
-            WebkitMaskSize: "contain",
             maskPosition: "center",
-            WebkitMaskPosition: "center",
             maskRepeat: "no-repeat",
-            WebkitMaskRepeat: "no-repeat",
             backgroundColor: "#10b981",
             filter: "drop-shadow(0 0 8px rgba(16, 185, 129, 1)) drop-shadow(0 0 16px rgba(16, 185, 129, 0.7)) brightness(1.35)",
             opacity: 0.95,
-          }}
+          } as React.CSSProperties}
         />
       ))}
     </div>
