@@ -424,8 +424,10 @@ const exerciseLibrary: Exercise[] = [
 
 const allGroups: MuscleGroup[] = ["Chest", "Back", "Legs", "Shoulders", "Arms", "Abs & Calves"];
 
+const exerciseByNameMap = new Map<string, Exercise>(exerciseLibrary.map((ex) => [ex.name, ex]));
+
 function findExercise(name: string) {
-  return exerciseLibrary.find((exercise) => exercise.name === name) ?? exerciseLibrary[0];
+  return exerciseByNameMap.get(name) ?? exerciseLibrary[0];
 }
 
 const LOAD_LABELS: Record<LoadType, string> = {
@@ -569,7 +571,6 @@ function getPrescription(exercise: Exercise) {
     "captain's chair knee raise": { sets: 3, reps: "10 to 15", warmup: false },
     "ab wheel rollout": { sets: 3, reps: "8 to 12", warmup: false },
 
-    "front calf muscle": { sets: 4, reps: "8 to 15", warmup: false },
     "seated calf raise": { sets: 4, reps: "10 to 15", warmup: false },
     "leg press calf raise": { sets: 4, reps: "8 to 15", warmup: false },
     "standing calf raise": { sets: 4, reps: "8 to 15", warmup: false },
@@ -651,7 +652,7 @@ function makeDay(title: string, subtitle: string, focus: MuscleGroup[], exercise
     subtitle,
     focus,
     exercises: exerciseNames
-      .map((n) => exerciseLibrary.find((e) => e.name === n))
+      .map((n) => exerciseByNameMap.get(n))
       .filter((e): e is Exercise => Boolean(e))
       .map((e) => toPlanExercise(e.name)),
   };
@@ -1079,27 +1080,6 @@ function calculateMuscleMatchScore(
   return score;
 }
 
-function getMuscleRegionFill(region: MuscleRegion, primary: MuscleRegion[], secondary: MuscleRegion[]) {
-  const check = (r: MuscleRegion) => {
-    if (primary.includes(r)) return 1;
-    if (secondary.includes(r)) return 2;
-    if (r === "chest" && (primary.includes("lowerChest") || primary.includes("chest"))) return 1;
-    if (r === "chest" && (secondary.includes("lowerChest") || secondary.includes("chest"))) return 2;
-    if (r === "upperBack" && (primary.includes("upperTraps") || primary.includes("upperBack"))) return 1;
-    if (r === "upperBack" && (secondary.includes("upperTraps") || secondary.includes("upperBack"))) return 2;
-    if (r === "midBack" && (primary.includes("lowerTraps") || primary.includes("midBack"))) return 1;
-    if (r === "midBack" && (secondary.includes("lowerTraps") || secondary.includes("midBack"))) return 2;
-    if (r === "triceps" && (primary.includes("tricepsLong") || primary.includes("triceps"))) return 1;
-    if (r === "triceps" && (secondary.includes("tricepsLong") || secondary.includes("triceps"))) return 2;
-    return 0;
-  };
-
-  const res = check(region);
-  if (res === 1) return "#dc2626";
-  if (res === 2) return "#fbbf24";
-  return "#52525b";
-}
-
 function summarizeRegionScores(scoreMap: Record<MuscleRegion, number>, sourceLabel: string): MuscleSummary {
   const ranked = Object.entries(scoreMap)
     .filter(([, score]) => score > 0)
@@ -1240,15 +1220,6 @@ function RealisticAnatomyFigure({
       ))}
     </div>
   );
-}
-
-function MusclePreviewFigure(props: {
-  side: "front" | "back";
-  primary: MuscleRegion[];
-  secondary: MuscleRegion[];
-  compact?: boolean;
-}) {
-  return <RealisticAnatomyFigure {...props} />;
 }
 
 function DayMuscleOverviewCard({ summary }: { summary: MuscleSummary }) {
@@ -1441,13 +1412,9 @@ function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePla
   const progress = progressSum / bestThis.size;
 
   // 2) VOLUME: เซต/กล้ามเนื้อ สัปดาห์นี้ (โซนทอง 10–20 เซต)
-  const lib = exerciseLibrary.reduce<Record<string, Exercise>>((a, e) => {
-    a[e.name] = e;
-    return a;
-  }, {});
   const muscleSets: Record<string, number> = {};
   for (const l of thisWeek) {
-    const ex = lib[l.exerciseName];
+    const ex = exerciseByNameMap.get(l.exerciseName);
     if (!ex) continue;
     for (const m of ex.muscles) {
       const key =
@@ -1922,8 +1889,6 @@ export default function Page() {
     return sorted;
   }, [logs, historyRange]);
 
-  const recentLogs = filteredHistoryLogs;
-
   const lastSetMap = useMemo(() => {
     const latest: Record<string, Record<number, LogSet>> = {};
 
@@ -1967,13 +1932,13 @@ export default function Page() {
   const activeMuscleSummary = loggedMuscleSummary.hasData ? loggedMuscleSummary : plannedMuscleSummary;
 
   const recentLogsByDate = useMemo(() => {
-    return recentLogs.reduce<Record<string, LogSet[]>>((acc, item) => {
+    return filteredHistoryLogs.reduce<Record<string, LogSet[]>>((acc, item) => {
       const key = new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric" }).format(new Date(item.date));
       acc[key] = acc[key] ?? [];
       acc[key].push(item);
       return acc;
     }, {});
-  }, [recentLogs]);
+  }, [filteredHistoryLogs]);
 
   const weeklyVolumeSummary = useMemo(() => getWeeklyVolumeSummary(activePlan), [activePlan]);
 

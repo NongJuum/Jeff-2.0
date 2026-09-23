@@ -1,4 +1,4 @@
-const CACHE_NAME = "hait-workout-v1";
+const CACHE_NAME = "hait-workout-v2";
 const ASSETS_TO_CACHE = [
   "/",
   "/manifest.webmanifest",
