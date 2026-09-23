@@ -1141,7 +1141,31 @@ function buildPlannedMuscleSummary(exercises: PlanExercise[]): MuscleSummary {
   return summarizeRegionScores(scoreMap, "Planned from this day");
 }
 
-function MusclePreviewFigure({
+const REGION_TO_ANATOMY_MAP: Record<MuscleRegion, { front?: string[]; back?: string[] }> = {
+  upperChest: { front: ["upper_chest"] },
+  chest: { front: ["chest"] },
+  lowerChest: { front: ["chest"] },
+  frontDelts: { front: ["front_deltoid"] },
+  sideDelts: { front: ["side_deltoid"], back: ["side_deltoid"] },
+  rearDelts: { back: ["rear_deltoid"] },
+  biceps: { front: ["biceps"] },
+  triceps: { back: ["triceps"] },
+  tricepsLong: { back: ["triceps"] },
+  lats: { back: ["lats"] },
+  midBack: { back: ["middle_traps", "infraspinatus"] },
+  upperBack: { back: ["upper_traps", "middle_traps"] },
+  erectors: { back: ["lower_back"] },
+  upperTraps: { back: ["upper_traps"] },
+  lowerTraps: { back: ["lower_traps"] },
+  abs: { front: ["abs"] },
+  obliques: { front: ["obliques", "serratus_anterior"] },
+  glutes: { back: ["glutes", "gluteus_medius"] },
+  quads: { front: ["quads"] },
+  hamstrings: { back: ["hamstrings"] },
+  calves: { front: ["tibialis_anterior"], back: ["calves", "soleus"] },
+};
+
+function RealisticAnatomyFigure({
   side,
   primary,
   secondary,
@@ -1152,89 +1176,100 @@ function MusclePreviewFigure({
   secondary: MuscleRegion[];
   compact?: boolean;
 }) {
-  const fill = (region: MuscleRegion) => getMuscleRegionFill(region, primary, secondary);
-  const stroke = "#09090b";
+  const primaryIds = Array.from(new Set(primary.flatMap((r) => REGION_TO_ANATOMY_MAP[r]?.[side] ?? [])));
+  const secondaryIds = Array.from(
+    new Set(secondary.flatMap((r) => REGION_TO_ANATOMY_MAP[r]?.[side] ?? []))
+  ).filter((id) => !primaryIds.includes(id));
 
   return (
-    <svg viewBox="0 0 220 320" className={compact ? "h-28 w-full" : "h-40 w-full"} aria-hidden="true">
-      {/* ===== Body silhouette (head, neck, torso, arms, legs) ===== */}
-      <g fill="#18181b" stroke="#71717a" strokeWidth="2.5" strokeLinejoin="round">
-        <circle cx="110" cy="25" r="14" />
-        <path d="M103 37 C105 42 115 42 117 37 L119 49 L101 49 Z" />
-        <path d="M80 51 C92 47 128 47 140 51 C149 55 153 64 153 76 C153 94 149 114 145 132 C142 147 139 158 137 168 L83 168 C81 158 78 147 75 132 C71 114 67 94 67 76 C67 64 71 55 80 51 Z" />
-        <path d="M67 55 C58 59 51 68 48 80 C45 94 44 110 46 126 C48 142 51 158 55 172 C56 177 60 180 64 179 C68 178 70 174 69 169 C66 156 63 142 62 128 C61 114 61 100 63 88 C65 77 68 67 73 60 Z" />
-        <path d="M153 55 C162 59 169 68 172 80 C175 94 176 110 174 126 C172 142 169 158 165 172 C164 177 160 180 156 179 C152 178 150 174 151 169 C154 156 157 142 158 128 C159 114 159 100 157 88 C155 77 152 67 147 60 Z" />
-        <path d="M83 170 C80 188 80 206 84 222 C86 231 88 240 89 249 C90 264 91 282 92 300 L104 300 C104 284 104 268 104 252 C104 242 106 232 108 223 C111 207 111 188 109 170 Z" />
-        <path d="M137 170 C140 188 140 206 136 222 C134 231 132 240 131 249 C130 264 129 282 128 300 L116 300 C116 284 116 268 116 252 C116 242 114 232 112 223 C109 207 109 188 111 170 Z" />
-      </g>
+    <div
+      className={`relative mx-auto flex items-center justify-center select-none overflow-hidden ${
+        compact ? "h-44 max-w-[140px]" : "h-60 max-w-[180px]"
+      }`}
+      aria-label={`Realistic Anatomy ${side} view`}
+    >
+      {/* Base 3D Realistic Body Render */}
+      <img
+        src={`/anatomy/${side}/body.webp`}
+        alt={`Human anatomy ${side}`}
+        className="h-full w-full object-contain pointer-events-none drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] opacity-95 transition-opacity"
+        loading="lazy"
+        draggable={false}
+      />
 
-      {side === "front" ? (
-        <g stroke={stroke} strokeWidth="2" strokeLinejoin="round">
-          <path d="M74 55 C68 58 63 65 61 73 C66 76 73 73 78 66 C77 61 76 57 74 55 Z" fill={fill("frontDelts")} />
-          <path d="M146 55 C152 58 157 65 159 73 C154 76 147 73 142 66 C143 61 144 57 146 55 Z" fill={fill("frontDelts")} />
-          <path d="M60 62 C54 69 50 78 49 88 C54 89 60 84 63 76 C62 71 61 66 60 62 Z" fill={fill("sideDelts")} />
-          <path d="M160 62 C166 69 170 78 171 88 C166 89 160 84 157 76 C158 71 159 66 160 62 Z" fill={fill("sideDelts")} />
-          <path d="M85 60 C93 56 103 57 109 63 L109 74 C100 72 91 68 85 64 Z" fill={fill("upperChest")} />
-          <path d="M135 60 C127 56 117 57 111 63 L111 74 C120 72 129 68 135 64 Z" fill={fill("upperChest")} />
-          <path d="M83 66 C91 64 102 68 109 76 L109 98 C99 102 89 99 83 91 C80 83 81 72 83 66 Z" fill={fill("chest")} />
-          <path d="M137 66 C129 64 118 68 111 76 L111 98 C121 102 131 99 137 91 C140 83 139 72 137 66 Z" fill={fill("chest")} />
-          <path d="M56 92 C51 100 49 112 51 122 C55 126 61 124 64 116 C65 106 62 97 56 92 Z" fill={fill("biceps")} />
-          <path d="M164 92 C169 100 171 112 169 122 C165 126 159 124 156 116 C155 106 158 97 164 92 Z" fill={fill("biceps")} />
-          <path d="M97 104 L123 104 C126 120 126 138 122 154 L98 154 C94 138 94 120 97 104 Z" fill={fill("abs")} />
-          <path d="M84 106 C88 118 89 134 87 148 C82 140 79 124 80 110 Z" fill={fill("obliques")} />
-          <path d="M136 106 C132 118 131 134 133 148 C138 140 141 124 140 110 Z" fill={fill("obliques")} />
-          <path d="M85 174 C94 172 103 176 105 186 C106 200 105 216 103 230 C96 232 89 228 86 218 C83 204 83 188 85 174 Z" fill={fill("quads")} />
-          <path d="M135 174 C126 172 117 176 115 186 C114 200 115 216 117 230 C124 232 131 228 134 218 C137 204 137 188 135 174 Z" fill={fill("quads")} />
-          <path d="M90 246 C95 246 99 252 99 260 C99 270 97 280 96 288 L91 288 C89 276 88 260 90 246 Z" fill={fill("calves")} />
-          <path d="M130 246 C125 246 121 252 121 260 C121 270 123 280 124 288 L129 288 C131 276 132 260 130 246 Z" fill={fill("calves")} />
-        </g>
-      ) : (
-        <g stroke={stroke} strokeWidth="2" strokeLinejoin="round">
-          <path d="M96 50 C102 46 118 46 124 50 C132 58 142 62 150 64 C144 70 134 70 126 66 C119 62 113 60 110 60 C107 60 101 62 94 66 C86 70 76 70 70 64 C78 62 88 58 96 50 Z" fill={fill("upperBack")} />
-          <path d="M92 74 L128 74 C126 86 124 96 121 104 L99 104 C96 96 94 86 92 74 Z" fill={fill("midBack")} />
-          <path d="M78 78 C84 84 90 94 93 108 C94 118 93 128 90 136 C82 128 76 114 74 100 C74 92 75 84 78 78 Z" fill={fill("lats")} />
-          <path d="M142 78 C136 84 130 94 127 108 C126 118 127 128 130 136 C138 128 144 114 146 100 C146 92 145 84 142 78 Z" fill={fill("lats")} />
-          <path d="M101 136 L108 136 C107 148 106 158 105 166 L99 166 C99 156 100 146 101 136 Z" fill={fill("erectors")} />
-          <path d="M119 136 L112 136 C113 148 114 158 115 166 L121 166 C121 156 120 146 119 136 Z" fill={fill("erectors")} />
-          <path d="M74 55 C68 58 63 65 61 73 C66 76 73 73 78 66 C77 61 76 57 74 55 Z" fill={fill("rearDelts")} />
-          <path d="M146 55 C152 58 157 65 159 73 C154 76 147 73 142 66 C143 61 144 57 146 55 Z" fill={fill("rearDelts")} />
-          <path d="M60 62 C54 69 50 78 49 88 C54 89 60 84 63 76 C62 71 61 66 60 62 Z" fill={fill("rearDelts")} />
-          <path d="M160 62 C166 69 170 78 171 88 C166 89 160 84 157 76 C158 71 159 66 160 62 Z" fill={fill("rearDelts")} />
-          <path d="M56 92 C51 100 49 112 51 122 C55 126 61 124 64 116 C65 106 62 97 56 92 Z" fill={fill("triceps")} />
-          <path d="M164 92 C169 100 171 112 169 122 C165 126 159 124 156 116 C155 106 158 97 164 92 Z" fill={fill("triceps")} />
-          <path d="M86 170 C96 168 106 172 108 180 C107 190 100 196 92 194 C85 190 83 180 86 170 Z" fill={fill("glutes")} />
-          <path d="M134 170 C124 168 114 172 112 180 C113 190 120 196 128 194 C135 190 137 180 134 170 Z" fill={fill("glutes")} />
-          <path d="M86 198 C94 196 102 200 104 208 C104 220 102 232 100 240 C93 240 87 234 85 224 C84 214 84 206 86 198 Z" fill={fill("hamstrings")} />
-          <path d="M134 198 C126 196 118 200 116 208 C116 220 118 232 120 240 C127 240 133 234 135 224 C136 214 136 206 134 198 Z" fill={fill("hamstrings")} />
-          <path d="M89 246 C94 244 100 246 102 252 C102 262 100 272 98 280 L92 280 C90 268 88 256 89 246 Z" fill={fill("calves")} />
-          <path d="M131 246 C126 244 120 246 118 252 C118 262 120 272 122 280 L128 280 C130 268 132 256 131 246 Z" fill={fill("calves")} />
-        </g>
-      )}
-    </svg>
+      {/* Secondary Muscles Glow Mask (Warm Amber Glow) */}
+      {secondaryIds.map((id) => (
+        <div
+          key={`sec-${id}`}
+          className="absolute inset-0 pointer-events-none transition-all duration-300"
+          style={{
+            maskImage: `url('/anatomy/${side}/${id}.png')`,
+            WebkitMaskImage: `url('/anatomy/${side}/${id}.png')`,
+            maskSize: "contain",
+            WebkitMaskSize: "contain",
+            maskPosition: "center",
+            WebkitMaskPosition: "center",
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            backgroundColor: "#f59e0b",
+            filter: "drop-shadow(0 0 8px rgba(245, 158, 11, 0.95)) brightness(1.2)",
+            opacity: 0.85,
+          }}
+        />
+      ))}
+
+      {/* Primary Muscles Glow Mask (Vibrant Emerald Neon Glow) */}
+      {primaryIds.map((id) => (
+        <div
+          key={`pri-${id}`}
+          className="absolute inset-0 pointer-events-none transition-all duration-300"
+          style={{
+            maskImage: `url('/anatomy/${side}/${id}.png')`,
+            WebkitMaskImage: `url('/anatomy/${side}/${id}.png')`,
+            maskSize: "contain",
+            WebkitMaskSize: "contain",
+            maskPosition: "center",
+            WebkitMaskPosition: "center",
+            maskRepeat: "no-repeat",
+            WebkitMaskRepeat: "no-repeat",
+            backgroundColor: "#10b981",
+            filter: "drop-shadow(0 0 8px rgba(16, 185, 129, 1)) drop-shadow(0 0 16px rgba(16, 185, 129, 0.7)) brightness(1.35)",
+            opacity: 0.95,
+          }}
+        />
+      ))}
+    </div>
   );
 }
 
-
+function MusclePreviewFigure(props: {
+  side: "front" | "back";
+  primary: MuscleRegion[];
+  secondary: MuscleRegion[];
+  compact?: boolean;
+}) {
+  return <RealisticAnatomyFigure {...props} />;
+}
 
 function DayMuscleOverviewCard({ summary }: { summary: MuscleSummary }) {
   return (
     <details className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Muscle Overview</p>
-          <p className="mt-1 text-sm font-semibold text-zinc-100">{summary.hasData ? summary.summaryText : "Show day muscle map"}</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Daily Muscle Map · 3D Anatomy</p>
+          <p className="mt-1 text-sm font-semibold text-zinc-100">{summary.hasData ? summary.summaryText : "Show day 3D anatomy"}</p>
         </div>
-        <span className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300">Show</span>
+        <span className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-800 transition">Show 3D</span>
       </summary>
       <p className="mt-2 text-[11px] text-zinc-500">{summary.sourceLabel}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-zinc-900 px-2 py-2">
-          <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Front</p>
-          <MusclePreviewFigure side="front" primary={summary.primary} secondary={summary.secondary} compact />
+        <div className="rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900 to-zinc-950 p-2 text-center">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Anterior (Front)</p>
+          <RealisticAnatomyFigure side="front" primary={summary.primary} secondary={summary.secondary} compact />
         </div>
-        <div className="rounded-xl bg-zinc-900 px-2 py-2">
-          <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Back</p>
-          <MusclePreviewFigure side="back" primary={summary.primary} secondary={summary.secondary} compact />
+        <div className="rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900 to-zinc-950 p-2 text-center">
+          <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Posterior (Back)</p>
+          <RealisticAnatomyFigure side="back" primary={summary.primary} secondary={summary.secondary} compact />
         </div>
       </div>
     </details>
@@ -1253,35 +1288,43 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
         <div className="min-w-0 flex-1">
           <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Target Muscles</p>
           <p className="mt-0.5 truncate text-xs">
-            <span className="font-semibold text-red-400">{primaryLabels.length > 0 ? primaryLabels.join(", ") : "—"}</span>
+            <span className="font-semibold text-emerald-400">{primaryLabels.length > 0 ? primaryLabels.join(", ") : "—"}</span>
             {secondaryLabels.length > 0 ? <span> · <span className="text-amber-300">{secondaryLabels.join(", ")}</span></span> : null}
           </p>
         </div>
         <button
           type="button"
           onClick={() => setShowDiagram((prev) => !prev)}
-          className="shrink-0 rounded-xl bg-zinc-900 px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
+          className="shrink-0 flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
           aria-expanded={showDiagram}
           aria-label={showDiagram ? "Hide muscle diagram" : "Show muscle diagram"}
         >
-          {showDiagram ? "Hide Map" : "View Map"}
+          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+          {showDiagram ? "Hide 3D Anatomy" : "View 3D Anatomy"}
         </button>
       </div>
 
       {showDiagram && (
-        <div className="mt-3 pt-2 border-t border-zinc-800/80">
-          <div className="mb-2 flex items-center justify-end gap-3 text-[10px] text-zinc-500">
-            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-red-600" /> Primary</span>
-            <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-400" /> Secondary</span>
+        <div className="mt-3 pt-3 border-t border-zinc-800/80">
+          <div className="mb-2.5 flex items-center justify-between text-[11px]">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Anatomy Explorer</span>
+            <div className="flex items-center gap-3 text-[10px] text-zinc-400">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" /> Primary
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" /> Secondary
+              </span>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-zinc-900 px-2 py-2">
-              <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Front</p>
-              <MusclePreviewFigure side="front" primary={primary} secondary={secondary} compact />
+            <div className="rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900 to-zinc-950 p-2 text-center">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Anterior (Front)</p>
+              <RealisticAnatomyFigure side="front" primary={primary} secondary={secondary} compact />
             </div>
-            <div className="rounded-xl bg-zinc-900 px-2 py-2">
-              <p className="mb-1 text-center text-[10px] font-bold uppercase tracking-wide text-zinc-500">Back</p>
-              <MusclePreviewFigure side="back" primary={primary} secondary={secondary} compact />
+            <div className="rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900 to-zinc-950 p-2 text-center">
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Posterior (Back)</p>
+              <RealisticAnatomyFigure side="back" primary={primary} secondary={secondary} compact />
             </div>
           </div>
         </div>
@@ -2049,6 +2092,34 @@ export default function Page() {
         }
 
         return nextSet;
+      });
+
+      const nextInputs = {
+        ...old,
+        [exerciseId]: updated,
+      };
+
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
+      return nextInputs;
+    });
+  }
+
+  function stepReps(exerciseId: string, setIndex: number, delta: number, defaultSets: number, fallbackReps = 10) {
+    setInputs((old) => {
+      const current = normalizeSetInputs(old[exerciseId] ?? createDefaultSetInputs(defaultSets), defaultSets);
+      const updated = current.map((set, index) => {
+        if (index !== setIndex) return set;
+
+        const currentNum = parseInt(String(set.reps).trim(), 10);
+        let nextVal: number;
+        if (Number.isFinite(currentNum) && currentNum > 0) {
+          nextVal = Math.max(1, Math.min(100, currentNum + delta));
+        } else {
+          const base = fallbackReps > 0 ? fallbackReps : 10;
+          nextVal = delta > 0 ? base : Math.max(1, base - 1);
+        }
+
+        return { ...set, reps: String(nextVal), done: false };
       });
 
       const nextInputs = {
@@ -2842,12 +2913,30 @@ export default function Page() {
                         <div className="mt-3 grid grid-cols-3 gap-2">
                           <div>
                             <label className="mb-1 block text-xs font-bold text-zinc-500">Sets</label>
-                            <input
-                              inputMode="numeric"
-                              value={exercise.sets}
-                              onChange={(event) => updateCustomExercise(baseExercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })}
-                              className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none"
-                            />
+                            <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 transition">
+                              <button
+                                type="button"
+                                onClick={() => updateCustomExercise(baseExercise.id, { sets: Math.max(1, exercise.sets - 1) })}
+                                className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                aria-label="Decrease sets"
+                              >
+                                −
+                              </button>
+                              <input
+                                inputMode="numeric"
+                                value={exercise.sets}
+                                onChange={(event) => updateCustomExercise(baseExercise.id, { sets: Math.max(1, Number(event.target.value) || 1) })}
+                                className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-sm font-bold outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => updateCustomExercise(baseExercise.id, { sets: Math.min(10, exercise.sets + 1) })}
+                                className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                aria-label="Increase sets"
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
 
                           <div>
@@ -3053,16 +3142,17 @@ export default function Page() {
                         </div>
                       </div>
 
-                      <div className="mb-2 grid grid-cols-[46px_1fr_1fr_42px] gap-2 text-[11px] font-bold uppercase text-zinc-500">
+                      <div className="mb-2 grid grid-cols-[38px_1fr_1.35fr_42px] gap-2 text-[11px] font-bold uppercase text-zinc-500">
                         <span>Set</span><span>lbs</span><span>Reps</span><span>Save</span>
                       </div>
                       <div className="space-y-2">
                         {setInputs.map((set, setIndex) => {
                           const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1] ?? lastSetMap[exercise.name]?.[setIndex + 1];
+                          const fallbackRepVal = latestSet ? Number(latestSet.reps) : 10;
 
                           return (
-                            <div key={setIndex} className="grid grid-cols-[46px_1fr_1fr_42px] gap-2">
-                              <div className="flex items-center font-black text-zinc-400">{setIndex + 1}</div>
+                            <div key={setIndex} className="grid grid-cols-[38px_1fr_1.35fr_42px] gap-2">
+                              <div className="flex items-center justify-center font-black text-zinc-400">{setIndex + 1}</div>
                               <input
                                 id={`weight-input-${baseExercise.id}-${setIndex}`}
                                 inputMode="decimal"
@@ -3073,16 +3163,34 @@ export default function Page() {
                                 className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
                                 placeholder={latestSet ? String(latestSet.weightLbs) : "0"}
                               />
-                              <input
-                                id={`rep-input-${baseExercise.id}-${setIndex}`}
-                                inputMode="numeric"
-                                value={set.reps}
-                                onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)}
-                                onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id }, baseExercise.id, setIndex, "reps")}
-                                aria-label={`Reps for set ${setIndex + 1}`}
-                                className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
-                                placeholder={latestSet ? String(latestSet.reps) : "0"}
-                              />
+                              <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400 transition">
+                                <button
+                                  type="button"
+                                  onClick={() => stepReps(baseExercise.id, setIndex, -1, exercise.sets, fallbackRepVal)}
+                                  className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-lg select-none"
+                                  aria-label={`Decrease reps for set ${setIndex + 1}`}
+                                >
+                                  −
+                                </button>
+                                <input
+                                  id={`rep-input-${baseExercise.id}-${setIndex}`}
+                                  inputMode="numeric"
+                                  value={set.reps}
+                                  onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, exercise.sets)}
+                                  onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id }, baseExercise.id, setIndex, "reps")}
+                                  aria-label={`Reps for set ${setIndex + 1}`}
+                                  className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-base font-semibold outline-none"
+                                  placeholder={latestSet ? String(latestSet.reps) : "0"}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => stepReps(baseExercise.id, setIndex, 1, exercise.sets, fallbackRepVal)}
+                                  className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-lg select-none"
+                                  aria-label={`Increase reps for set ${setIndex + 1}`}
+                                >
+                                  +
+                                </button>
+                              </div>
                               <button
                                 onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id }, setIndex, currentMachine)}
                                 aria-label={`Save set ${setIndex + 1}`}
