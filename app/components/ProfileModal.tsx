@@ -4,6 +4,7 @@ import { X, User, Trophy, Flame, Download, Settings, Info, Scale, ShieldCheck } 
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getMigrationResult } from "../lib/migration";
 import { getCurrentBodyweight } from "./BodyweightManager";
+import { getUserProfile } from "../lib/assessment";
 import type { WeightUnit } from "../lib/units";
 
 type Props = {
@@ -31,13 +32,14 @@ export function ProfileModal({
 }: Props) {
   if (!open) return null;
 
+  const profile = getUserProfile();
   const onboarding = getOnboardingResult();
   const migration = getMigrationResult();
   const bw = getCurrentBodyweight();
 
-  const level = onboarding?.level || migration?.level || "intermediate";
-  const goal = onboarding?.goal || migration?.goal || "hypertrophy";
-  const days = onboarding?.days || migration?.days || 4;
+  const level = profile ? (profile.expMonths < 6 ? "beginner" : profile.expMonths >= 24 ? "advanced" : "intermediate") : (onboarding?.level || migration?.level || "intermediate");
+  const goal = profile?.goal || onboarding?.goal || migration?.goal || "hypertrophy";
+  const days = profile?.daysPerWeek || onboarding?.days || migration?.days || 4;
 
   const levelLabels = {
     beginner: "🌱 มือใหม่ (Beginner)",

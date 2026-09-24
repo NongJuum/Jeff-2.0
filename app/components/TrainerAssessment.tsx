@@ -50,11 +50,11 @@ const SAMPLE_EXERCISES = [
 export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
 
-  // Form states
+  // Form states - use strings for effortless typing, backspacing, and decimal entry
   const [gender, setGender] = useState<Gender>("male");
-  const [age, setAge] = useState<number>(25);
-  const [heightCm, setHeightCm] = useState<number>(172);
-  const [weightKg, setWeightKg] = useState<number>(70);
+  const [ageStr, setAgeStr] = useState<string>("25");
+  const [heightStr, setHeightStr] = useState<string>("172");
+  const [weightStr, setWeightStr] = useState<string>("70");
   const [muscleMassKg, setMuscleMassKg] = useState<string>("");
   const [muscleMassMode, setMuscleMassMode] = useState<MuscleMassMode>("smm");
   const [expMonths, setExpMonths] = useState<number>(6);
@@ -68,27 +68,39 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
       const saved = getUserProfile();
       if (saved) {
         setGender(saved.gender);
-        setAge(saved.age);
-        setHeightCm(saved.heightCm);
-        setWeightKg(saved.weightKg);
+        setAgeStr(String(saved.age));
+        setHeightStr(String(saved.heightCm));
+        const unit = saved.preferredWeightUnit || "kg";
+        setPreferredWeightUnit(unit);
+        if (unit === "lbs") {
+          setWeightStr(String(Math.round((saved.weightKg / 0.453592) * 10) / 10));
+        } else {
+          setWeightStr(String(saved.weightKg));
+        }
         setMuscleMassKg(saved.muscleMassKg ? String(saved.muscleMassKg) : "");
         setMuscleMassMode(saved.muscleMassMode || "smm");
         setExpMonths(saved.expMonths);
         setDaysPerWeek(saved.daysPerWeek);
         setGoal(saved.goal);
         setInjuries(saved.injuries || []);
-        setPreferredWeightUnit(saved.preferredWeightUnit || "kg");
       }
     }
   }, [open]);
 
   if (!open) return null;
 
+  const parsedAge = Math.max(10, Math.min(100, Number(ageStr) || 25));
+  const parsedHeight = Math.max(80, Math.min(250, Number(heightStr) || 170));
+  const rawWeightVal = Number(weightStr) || 70;
+  const weightKg = preferredWeightUnit === "lbs"
+    ? Math.round(rawWeightVal * 0.453592 * 10) / 10
+    : rawWeightVal;
+
   const currentProfile: UserProfile = {
     gender,
-    age,
-    heightCm,
-    weightKg,
+    age: parsedAge,
+    heightCm: parsedHeight,
+    weightKg: Math.max(25, weightKg),
     muscleMassKg: muscleMassKg ? Number(muscleMassKg) : undefined,
     muscleMassMode,
     expMonths,
@@ -99,7 +111,7 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
     updatedAt: new Date().toISOString(),
   };
 
-  const bmiInfo = getAsiaPacificBmi(weightKg, heightCm);
+  const bmiInfo = getAsiaPacificBmi(currentProfile.weightKg, currentProfile.heightCm);
   const muscleInfo = evaluateMuscleMass(
     gender,
     weightKg,
@@ -115,6 +127,14 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
 
   const handleSaveAndCalculate = () => {
     saveUserProfile(currentProfile);
+    // Also save current bodyweight into haitBodyweight so BodyweightManager and relative strength are updated
+    try {
+      const bwEntry = {
+        lbs: Math.round((currentProfile.weightKg / 0.453592) * 10) / 10,
+        updatedAt: new Date().toISOString(),
+      };
+      window.localStorage.setItem("haitBodyweight", JSON.stringify(bwEntry));
+    } catch {}
     setStep(3);
   };
 
@@ -206,18 +226,22 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                 <div>
                   <label className="mb-1 block text-[11px] font-bold text-zinc-400">อายุ (ปี)</label>
                   <input
-                    type="number"
-                    value={age}
-                    onChange={(e) => setAge(Math.max(12, Number(e.target.value) || 20))}
+                    type="text"
+                    inputMode="numeric"
+                    value={ageStr}
+                    onChange={(e) => setAgeStr(e.target.value)}
+                    placeholder="เช่น 25"
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-bold text-zinc-100 outline-none focus:border-emerald-400"
                   />
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] font-bold text-zinc-400">ส่วนสูง (cm)</label>
                   <input
-                    type="number"
-                    value={heightCm}
-                    onChange={(e) => setHeightCm(Math.max(100, Number(e.target.value) || 160))}
+                    type="text"
+                    inputMode="numeric"
+                    value={heightStr}
+                    onChange={(e) => setHeightStr(e.target.value)}
+                    placeholder="เช่น 175"
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-bold text-zinc-100 outline-none focus:border-emerald-400"
                   />
                 </div>
@@ -228,31 +252,29 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                       type="button"
                       onClick={() => {
                         const nextUnit: WeightUnit = preferredWeightUnit === "kg" ? "lbs" : "kg";
+                        const num = Number(weightStr);
+                        if (num > 0) {
+                          if (nextUnit === "lbs") {
+                            setWeightStr(String(Math.round((num / 0.453592) * 10) / 10));
+                          } else {
+                            setWeightStr(String(Math.round((num * 0.453592) * 10) / 10));
+                          }
+                        }
                         setPreferredWeightUnit(nextUnit);
                       }}
-                      className="text-[10px] font-black text-emerald-400 underline"
+                      className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-black text-emerald-400 hover:bg-zinc-700 transition"
                       title="กดเพื่อสลับหน่วย"
                     >
-                      {preferredWeightUnit}
+                      ⇄ {preferredWeightUnit}
                     </button>
                   </div>
                   <div className="relative">
                     <input
-                      type="number"
-                      step="0.1"
-                      value={
-                        preferredWeightUnit === "lbs"
-                          ? Math.round((weightKg / 0.453592) * 10) / 10
-                          : weightKg
-                      }
-                      onChange={(e) => {
-                        const val = Math.max(20, Number(e.target.value) || 50);
-                        if (preferredWeightUnit === "lbs") {
-                          setWeightKg(Math.round(val * 0.453592 * 10) / 10);
-                        } else {
-                          setWeightKg(val);
-                        }
-                      }}
+                      type="text"
+                      inputMode="decimal"
+                      value={weightStr}
+                      onChange={(e) => setWeightStr(e.target.value)}
+                      placeholder={preferredWeightUnit === "lbs" ? "เช่น 155" : "เช่น 70"}
                       className="w-full rounded-xl border border-zinc-800 bg-zinc-900 pl-3 pr-8 py-2 text-sm font-bold text-zinc-100 outline-none focus:border-emerald-400"
                     />
                     <span className="pointer-events-none absolute right-2.5 top-2 text-xs font-bold text-zinc-500">
@@ -301,8 +323,8 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                 </div>
                 <div className="flex items-center gap-2">
                   <input
-                    type="number"
-                    step="0.1"
+                    type="text"
+                    inputMode="decimal"
                     placeholder="เช่น 28.5 (kg)"
                     value={muscleMassKg}
                     onChange={(e) => setMuscleMassKg(e.target.value)}
@@ -563,8 +585,19 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
             <button
               type="button"
               onClick={() => {
-                if (step === 1) setStep(2);
-                else handleSaveAndCalculate();
+                if (step === 1) {
+                  saveUserProfile(currentProfile);
+                  try {
+                    const bwEntry = {
+                      lbs: Math.round((currentProfile.weightKg / 0.453592) * 10) / 10,
+                      updatedAt: new Date().toISOString(),
+                    };
+                    window.localStorage.setItem("haitBodyweight", JSON.stringify(bwEntry));
+                  } catch {}
+                  setStep(2);
+                } else {
+                  handleSaveAndCalculate();
+                }
               }}
               className="flex items-center gap-1 rounded-xl bg-emerald-400 px-5 py-2.5 text-xs font-black text-zinc-950 shadow-md transition hover:bg-emerald-300"
             >
@@ -576,12 +609,19 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                 type="button"
                 onClick={() => {
                   saveUserProfile(currentProfile);
+                  try {
+                    const bwEntry = {
+                      lbs: Math.round((currentProfile.weightKg / 0.453592) * 10) / 10,
+                      updatedAt: new Date().toISOString(),
+                    };
+                    window.localStorage.setItem("haitBodyweight", JSON.stringify(bwEntry));
+                  } catch {}
                   onApplyPlan?.(daysPerWeek, currentProfile);
                   onClose();
                 }}
-                className="flex items-center gap-1.5 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-zinc-950 shadow-md transition hover:bg-emerald-300"
+                className="flex items-center gap-1.5 rounded-xl bg-emerald-400 px-4 py-2.5 text-xs font-black text-zinc-950 shadow-md transition hover:bg-emerald-300 active:scale-95"
               >
-                <Sparkles size={14} /> ใช้น้ำหนัก & จัดตาราง {daysPerWeek} วัน
+                <Sparkles size={14} /> บันทึก & จัดตาราง {daysPerWeek} วัน
               </button>
             </div>
           )}

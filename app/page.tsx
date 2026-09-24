@@ -2226,7 +2226,9 @@ export default function Page() {
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
 
   function handleApplyAssessmentPlan(targetDays: 3 | 4 | 5, profile: UserProfile) {
+    saveUserProfile(profile);
     setUserProfile(profile);
+    setBodyweightEntry(getCurrentBodyweight());
     setDays(targetDays);
     setMode("today");
 
