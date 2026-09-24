@@ -1325,7 +1325,7 @@ function RealisticAnatomyFigure({
         />
       ))}
 
-      {/* Primary Muscles Glow Mask (Vibrant Emerald Neon Glow) */}
+      {/* Primary Muscles Glow Mask (Universal CVD Safe Cyan Neon Glow) */}
       {primaryIds.map((id) => (
         <div
           key={`pri-${id}`}
@@ -1336,8 +1336,8 @@ function RealisticAnatomyFigure({
             maskSize: "contain",
             maskPosition: "center",
             maskRepeat: "no-repeat",
-            backgroundColor: "#10b981",
-            filter: "drop-shadow(0 0 8px rgba(16, 185, 129, 1)) drop-shadow(0 0 16px rgba(16, 185, 129, 0.7)) brightness(1.35)",
+            backgroundColor: "#06b6d4",
+            filter: "drop-shadow(0 0 8px rgba(6, 182, 212, 1)) drop-shadow(0 0 16px rgba(0, 242, 254, 0.8)) brightness(1.35)",
             opacity: 0.95,
           } as React.CSSProperties}
         />
@@ -1397,24 +1397,24 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
             </button>
           </div>
 
-          {/* Primary & Secondary Muscle Chips */}
+          {/* Primary & Secondary Muscle Chips (CVD Safe & High Contrast) */}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             {primaryLabels.map((label) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300 shadow-sm shadow-emerald-500/20"
+                className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-300 shadow-sm shadow-cyan-500/20"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                {label}
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#06b6d4] animate-pulse" />
+                ● หลัก {label}
               </span>
             ))}
             {secondaryLabels.map((label) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300"
+                className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-300"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                {label}
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" />
+                ○ รอง {label}
               </span>
             ))}
             {primaryLabels.length === 0 && secondaryLabels.length === 0 && (
@@ -1428,7 +1428,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
           role="button"
           tabIndex={0}
           onClick={() => setShowFullDiagram((prev) => !prev)}
-          className="shrink-0 cursor-pointer rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-1 transition hover:border-emerald-500/40 active:scale-95"
+          className="shrink-0 cursor-pointer rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-1 transition hover:border-cyan-500/40 active:scale-95"
           title="แตะเพื่อดูโมเดล 3D แบบเต็ม"
         >
           <div className="h-[96px] w-[56px] overflow-hidden flex items-center justify-center">
@@ -1452,10 +1452,10 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Full 3D Anatomy Explorer</span>
             <div className="flex items-center gap-3 text-[10px] text-zinc-400">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" /> Primary
+                <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#06b6d4]" /> ● Primary (หลัก)
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" /> Secondary
+                <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" /> ○ Secondary (รอง)
               </span>
             </div>
           </div>
@@ -1766,16 +1766,40 @@ function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePla
 }
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
+  const roundedVal = Math.round(value);
+  let statusBadge = "ต้องพักเพิ่ม";
+  let barColor = "bg-rose-400";
+  let badgeColor = "text-rose-300 border-rose-500/30 bg-rose-500/10";
+
+  if (value >= 80) {
+    statusBadge = "ดีเยี่ยม";
+    barColor = "bg-emerald-400";
+    badgeColor = "text-emerald-300 border-emerald-500/30 bg-emerald-500/10";
+  } else if (value >= 60) {
+    statusBadge = "ตามเกณฑ์";
+    barColor = "bg-cyan-400";
+    badgeColor = "text-cyan-300 border-cyan-500/30 bg-cyan-500/10";
+  } else if (value >= 40) {
+    statusBadge = "ต้องพัฒนา";
+    barColor = "bg-amber-400";
+    badgeColor = "text-amber-300 border-amber-500/30 bg-amber-500/10";
+  }
+
   return (
     <div>
-      <div className="flex justify-between text-[10px] font-bold text-zinc-400">
-        <span>{label}</span>
-        <span>{Math.round(value)}</span>
+      <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400">
+        <span className="truncate pr-1">{label}</span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`rounded px-1 py-0.2 text-[9px] font-black border ${badgeColor}`}>
+            {statusBadge}
+          </span>
+          <span className="text-zinc-200">{roundedVal}</span>
+        </div>
       </div>
-      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-zinc-900">
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-900 border border-zinc-800">
         <div
-          className={`h-full rounded-full ${value >= 80 ? "bg-emerald-400" : value >= 60 ? "bg-teal-400" : value >= 40 ? "bg-amber-400" : "bg-zinc-600"}`}
-          style={{ width: `${Math.min(100, value)}%` }}
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${Math.min(100, Math.max(0, value))}%` }}
         />
       </div>
     </div>
@@ -4180,21 +4204,23 @@ export default function Page() {
                         {["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"].map((tag) => {
                           const isTagFav = favoriteMachines[exercise.name] === tag;
                           const isLastUsed = lastUsedMachine === tag;
+                          const isSelected = currentMachine === tag;
                           return (
                             <button
                               key={tag}
                               type="button"
-                              onClick={() => updateMachineTag(baseExercise.id, currentMachine === tag ? "" : tag)}
-                              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition flex items-center gap-1 ${
-                                currentMachine === tag
-                                  ? "bg-emerald-400 text-zinc-950 shadow-sm shadow-emerald-500/20"
-                                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                              onClick={() => updateMachineTag(baseExercise.id, isSelected ? "" : tag)}
+                              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition flex items-center gap-1.5 ${
+                                isSelected
+                                  ? "bg-emerald-400 text-zinc-950 font-black shadow-md shadow-emerald-500/25 ring-1 ring-emerald-300"
+                                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 border border-zinc-800/80"
                               }`}
                             >
-                              {tag}
+                              <span>{isSelected ? "●" : "○"}</span>
+                              <span>{tag}</span>
                               {isLastUsed && (
                                 <span className={`text-[9px] px-1 py-0.2 rounded font-black tracking-tight ${
-                                  currentMachine === tag ? "bg-zinc-950/20 text-zinc-950" : "bg-emerald-500/20 text-emerald-400"
+                                  isSelected ? "bg-zinc-950/20 text-zinc-950" : "bg-emerald-500/20 text-emerald-400"
                                 }`}>
                                   ล่าสุด
                                 </span>
@@ -4359,14 +4385,14 @@ export default function Page() {
                                 <button
                                   onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
                                   aria-label={`Save set ${setIndex + 1}`}
-                                  title="บันทึกเซ็ตนี้"
+                                  title={set.done ? "เซ็ตนี้บันทึกแล้ว (แตะเพื่อบันทึกซ้ำ)" : "บันทึกเซ็ตนี้"}
                                   className={`rounded-2xl border py-3 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 ${
                                     set.done
-                                      ? "border-emerald-400 bg-emerald-400 text-zinc-950 shadow-sm shadow-emerald-500/20"
-                                      : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:border-emerald-400 hover:text-emerald-300"
+                                      ? "border-emerald-400 bg-emerald-400 text-zinc-950 shadow-md shadow-emerald-500/25 ring-1 ring-emerald-300"
+                                      : "border-dashed border-zinc-700 bg-zinc-900/60 text-zinc-500 hover:border-emerald-400 hover:text-emerald-300"
                                   }`}
                                 >
-                                  <Check size={18} className="mx-auto" />
+                                  <Check size={18} className={set.done ? "mx-auto stroke-[3]" : "mx-auto stroke-[2] opacity-60"} />
                                 </button>
                               </div>
                             </div>
