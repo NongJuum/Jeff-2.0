@@ -1372,37 +1372,84 @@ function DayMuscleOverviewCard({ summary }: { summary: MuscleSummary }) {
 }
 
 function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
-  const [showDiagram, setShowDiagram] = useState(true);
+  const [showFullDiagram, setShowFullDiagram] = useState(false);
   const { primary, secondary } = getExercisePreviewRegions(exercise);
   const primaryLabels = primary.map((item) => MUSCLE_REGION_LABELS[item]);
   const secondaryLabels = secondary.map((item) => MUSCLE_REGION_LABELS[item]);
 
+  const isBackDominant = secondary.some((m) => ["lats", "rhomboids", "upper_back", "lower_back", "glutes", "hamstrings", "rear_delts"].includes(m))
+    || primary.some((m) => ["lats", "rhomboids", "upper_back", "lower_back", "glutes", "hamstrings", "rear_delts"].includes(m));
+
   return (
-    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-      <div className="flex items-center justify-between gap-2">
+    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-2.5 sm:p-3">
+      {/* Integrated Inline Strip: Left Target Chips + Right Mini 3D Silhouette */}
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">Target Muscles</p>
-          <p className="mt-0.5 truncate text-xs">
-            <span className="font-semibold text-emerald-400">{primaryLabels.length > 0 ? primaryLabels.join(", ") : "—"}</span>
-            {secondaryLabels.length > 0 ? <span> · <span className="text-amber-300">{secondaryLabels.join(", ")}</span></span> : null}
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+            <span>Target Muscles</span>
+            <span>·</span>
+            <button
+              type="button"
+              onClick={() => setShowFullDiagram((prev) => !prev)}
+              className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2 capitalize font-semibold transition"
+            >
+              {showFullDiagram ? "ย่อรูปหุ่น 3D" : "ขยาย 3D คู่ (หน้า/หลัง)"}
+            </button>
+          </div>
+
+          {/* Primary & Secondary Muscle Chips */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {primaryLabels.map((label) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300 shadow-sm shadow-emerald-500/20"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                {label}
+              </span>
+            ))}
+            {secondaryLabels.map((label) => (
+              <span
+                key={label}
+                className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-300"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                {label}
+              </span>
+            ))}
+            {primaryLabels.length === 0 && secondaryLabels.length === 0 && (
+              <span className="text-xs text-zinc-500">—</span>
+            )}
+          </div>
+        </div>
+
+        {/* Mini 3D Anatomical Silhouette (~100px height) */}
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => setShowFullDiagram((prev) => !prev)}
+          className="shrink-0 cursor-pointer rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-1 transition hover:border-emerald-500/40 active:scale-95"
+          title="แตะเพื่อดูโมเดล 3D แบบเต็ม"
+        >
+          <div className="h-[96px] w-[56px] overflow-hidden flex items-center justify-center">
+            <RealisticAnatomyFigure
+              side={isBackDominant ? "back" : "front"}
+              primary={primary}
+              secondary={secondary}
+              compact
+            />
+          </div>
+          <p className="text-[9px] font-bold text-center text-zinc-500">
+            {isBackDominant ? "หลัง (3D)" : "หน้า (3D)"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowDiagram((prev) => !prev)}
-          className="shrink-0 flex items-center gap-1.5 rounded-xl bg-zinc-900 px-3 py-1.5 text-[11px] font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
-          aria-expanded={showDiagram}
-          aria-label={showDiagram ? "Hide muscle diagram" : "Show muscle diagram"}
-        >
-          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-          {showDiagram ? "Hide 3D Anatomy" : "View 3D Anatomy"}
-        </button>
       </div>
 
-      {showDiagram && (
-        <div className="mt-3 pt-3 border-t border-zinc-800/80">
-          <div className="mb-2.5 flex items-center justify-between text-[11px]">
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Anatomy Explorer</span>
+      {/* Expandable full dual-view 3D anatomy drawer inside card */}
+      {showFullDiagram && (
+        <div className="mt-3 pt-3 border-t border-zinc-800/80 animate-in fade-in duration-150">
+          <div className="mb-2 flex items-center justify-between text-[11px]">
+            <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Full 3D Anatomy Explorer</span>
             <div className="flex items-center gap-3 text-[10px] text-zinc-400">
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" /> Primary
@@ -3981,20 +4028,28 @@ export default function Page() {
                 return (
                   <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
                     <div className="mb-3 flex items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap gap-2">
-                          <span className="rounded-full bg-zinc-950 px-3 py-1 text-xs font-bold text-zinc-400">#{index + 1}</span>
-                          <span className="rounded-full bg-emerald-400/10 px-3 py-1 text-xs font-bold text-emerald-300">{exercise.group}</span>
-                          <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">{exercise.movement}</span>
-                          <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 text-xs font-bold text-zinc-400">#{index + 1}</span>
+                          <span className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs font-bold text-emerald-300">{exercise.group}</span>
+                          <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">{exercise.movement}</span>
+                          <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">
                             {LOAD_LABELS[getLoadType(exercise)]}
                           </span>
-                          {mode === "preset" && substituteMap[baseExercise.id] && <span className="rounded-full bg-blue-400/10 px-3 py-1 text-xs font-bold text-blue-300">Subbed</span>}
-                          {exercise.warmup ? <span className="rounded-full bg-orange-400/10 px-3 py-1 text-xs font-bold text-orange-300"><Flame className="mr-1 inline" size={12} /> Warmup</span> : <span className="rounded-full bg-zinc-800 px-3 py-1 text-xs font-bold text-zinc-400">No warmup</span>}
+                          {mode === "preset" && substituteMap[baseExercise.id] && (
+                            <span className="rounded-full bg-blue-400/10 px-2.5 py-0.5 text-xs font-bold text-blue-300">Subbed</span>
+                          )}
+                          {exercise.warmup ? (
+                            <span className="rounded-full bg-orange-400/10 px-2.5 py-0.5 text-xs font-bold text-orange-300">
+                              <Flame className="mr-1 inline" size={11} /> Warmup
+                            </span>
+                          ) : null}
                         </div>
 
-                        <h3 className="mt-2 text-lg font-black leading-snug sm:text-xl">{exercise.name}</h3>
-                        <p className="mt-1 text-sm text-zinc-400">{effectiveSets} hard working sets × {exercise.reps} reps</p>
+                        <h3 className="mt-2 text-lg sm:text-xl font-black leading-snug tracking-tight text-white">{exercise.name}</h3>
+                        <p className="mt-0.5 text-xs sm:text-sm font-medium text-zinc-400">
+                          {effectiveSets} hard working sets × {exercise.reps} reps
+                        </p>
 
                         {/* Trainer Assessment Biomechanical Recommended Note */}
                         {userProfile && (() => {
@@ -4046,123 +4101,34 @@ export default function Page() {
                         })()}
                       </div>
 
-                      <div className="flex flex-col gap-2">
-                        <a href={youtubeSearch(`${exercise.name} proper form`)} target="_blank" rel="noreferrer" className="rounded-2xl bg-zinc-50 p-3 text-zinc-950" aria-label="Watch demo"><PlayCircle size={22} /></a>
-                        {mode === "custom" && <button onClick={() => removeExerciseFromCurrentDay(baseExercise.id)} className="rounded-2xl border border-red-500/40 bg-red-500/10 p-3 text-red-300" aria-label="Remove exercise"><Trash2 size={18} /></button>}
+                      <div className="flex flex-col gap-2 shrink-0">
+                        <a
+                          href={youtubeSearch(`${exercise.name} proper form`)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-2xl bg-zinc-50 p-2.5 text-zinc-950 transition hover:bg-zinc-200"
+                          aria-label="Watch demo"
+                          title="ดูคลิปสอนท่าทางที่ถูกต้อง"
+                        >
+                          <PlayCircle size={20} />
+                        </a>
+                        {mode === "custom" && (
+                          <button
+                            onClick={() => removeExerciseFromCurrentDay(baseExercise.id)}
+                            className="rounded-2xl border border-red-500/40 bg-red-500/10 p-2.5 text-red-300 transition hover:bg-red-500/20"
+                            aria-label="Remove exercise"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        )}
                       </div>
                     </div>
 
-                    <div className="mb-2 flex flex-wrap gap-1.5">
-                      {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
-                    </div>
+                    {/* [Order 2] Integrated 3D Muscle & Target Strip (Inline Layout) */}
+                    <ExerciseMusclePreviewCard exercise={exercise} />
 
-                    <div>
-                      <ExerciseMusclePreviewCard exercise={exercise} />
-                    </div>
-
-                    {(mode === "custom" || mode === "preset" || mode === "today") && (
-                      <details className="mb-3 rounded-xl bg-zinc-950 p-3">
-                        <summary className="cursor-pointer text-xs font-bold text-zinc-300">Edit target sets & reps</summary>
-
-                        <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          <div>
-                            <label className="mb-1 block text-xs font-bold text-zinc-500">Target Sets</label>
-                            <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 transition">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (mode === "custom") {
-                                    updateCustomExercise(baseExercise.id, { sets: Math.max(1, exercise.sets - 1) });
-                                  } else {
-                                    updatePresetExerciseSets(baseExercise.id, effectiveSets - 1);
-                                  }
-                                }}
-                                className="flex w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
-                                aria-label="Decrease sets"
-                              >
-                                −
-                              </button>
-                              <input
-                                inputMode="numeric"
-                                value={effectiveSets}
-                                onChange={(event) => {
-                                  const val = Math.max(1, Number(event.target.value) || 1);
-                                  if (mode === "custom") {
-                                    updateCustomExercise(baseExercise.id, { sets: val });
-                                  } else {
-                                    updatePresetExerciseSets(baseExercise.id, val);
-                                  }
-                                }}
-                                className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-sm font-bold outline-none"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (mode === "custom") {
-                                    updateCustomExercise(baseExercise.id, { sets: Math.min(10, exercise.sets + 1) });
-                                  } else {
-                                    updatePresetExerciseSets(baseExercise.id, effectiveSets + 1);
-                                  }
-                                }}
-                                className="flex w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
-                                aria-label="Increase sets"
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="mb-1 block text-xs font-bold text-zinc-500">Target Reps</label>
-                            <input
-                              value={exercise.reps}
-                              onChange={(event) => {
-                                if (mode === "custom") {
-                                  updateCustomExercise(baseExercise.id, { reps: event.target.value });
-                                }
-                              }}
-                              readOnly={mode !== "custom"}
-                              className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none text-sm"
-                            />
-                          </div>
-
-                          {mode === "custom" && (
-                            <button
-                              onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })}
-                              className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${
-                                exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
-                              }`}
-                            >
-                              Warmup
-                            </button>
-                          )}
-                        </div>
-                      </details>
-                    )}
-
-                    <div className="mb-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSubstituteModalExercise(baseExercise);
-                          setSubstituteSearch("");
-                          setSubstituteFilter("movement");
-                        }}
-                        className="flex w-full items-center justify-between gap-2 rounded-xl bg-zinc-950 px-3.5 py-3 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
-                        aria-label={`Substitute ${exercise.name}`}
-                      >
-                        <span className="flex items-center gap-2">
-                          <RotateCcw size={14} className="text-emerald-400" />
-                          <span>Substitute Exercise</span>
-                        </span>
-                        <span className="rounded-lg bg-zinc-900 px-2 py-1 text-[11px] text-zinc-400">
-                          {selectedSubstitute ? "Modified" : "Choose"}
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* Machine / Equipment Variant Selector & Favorites */}
-                    <div className="mb-3 rounded-xl bg-zinc-950 p-2.5">
+                    {/* [Order 3] Machine Swapper & Quick Switch */}
+                    <div className="mb-3 rounded-xl bg-zinc-950 p-2.5 border border-zinc-800/80">
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                           <Dumbbell size={12} className="text-emerald-400" />
@@ -4247,178 +4213,12 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
-                          <Trophy size={14} /> Records {currentMachine && <span className="text-emerald-400 font-semibold normal-case">({currentMachine})</span>}
-                        </p>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
-                            <p className="text-[10px] font-bold uppercase text-zinc-500">Max</p>
-                            <div className="mt-1">
-                              {records.maxWeight ? (
-                                <>
-                                  <p className="text-sm font-black text-emerald-300">
-                                    {records.maxWeight.rawValue !== undefined && records.maxWeight.unit
-                                      ? `${records.maxWeight.rawValue} ${records.maxWeight.unit}`
-                                      : `${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs`}
-                                    {" × "}{records.maxWeight.reps}
-                                  </p>
-                                  <p className="text-[10px] text-zinc-500">
-                                    {records.maxWeight.unit === "kg" && records.maxWeight.rawValue !== undefined
-                                      ? `(${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs)`
-                                      : `(${Math.round(records.maxWeight.weightLbs * 0.453592 * 10) / 10} kg)`}
-                                  </p>
-                                </>
-                              ) : (
-                                <p className="text-sm font-black text-zinc-500">—</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
-                            <p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p>
-                            <div className="mt-1">
-                              {records.bestReps ? (
-                                <>
-                                  <p className="text-sm font-black text-zinc-100">
-                                    {records.bestReps.rawValue !== undefined && records.bestReps.unit
-                                      ? `${records.bestReps.rawValue} ${records.bestReps.unit}`
-                                      : `${Math.round(records.bestReps.weightLbs * 10) / 10} lbs`}
-                                    {" × "}{records.bestReps.reps}
-                                  </p>
-                                  <p className="text-[10px] text-zinc-500">
-                                    {records.bestReps.unit === "kg" && records.bestReps.rawValue !== undefined
-                                      ? `(${Math.round(records.bestReps.weightLbs * 10) / 10} lbs)`
-                                      : `(${Math.round(records.bestReps.weightLbs * 0.453592 * 10) / 10} kg)`}
-                                  </p>
-                                </>
-                              ) : (
-                                <p className="text-sm font-black text-zinc-500">—</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
-                            <p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p>
-                            <p className="mt-1 text-sm font-black text-zinc-100">{records.bestVolume ? `${records.bestVolume.weightLbs} × ${records.bestVolume.reps}` : "—"}</p>
-                          </div>
-                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
-                            <p className="text-[10px] font-bold uppercase text-zinc-500">Warmup</p>
-                            <p className="mt-1 text-sm font-black text-zinc-100">{exercise.warmup && warmups.length > 0 ? `${warmups[0].weight}/${warmups[1].weight}/${warmups[2].weight}` : "Skip"}</p>
-                          </div>
-                          {bodyweightEntry && records.maxWeight && (() => {
-                            const ratio = records.maxWeight.weightLbs / bodyweightEntry.lbs;
-                            const isBench = exercise.name.toLowerCase().includes("bench press");
-                            const isSquat = exercise.name.toLowerCase().includes("squat");
-                            const isDL = exercise.name.toLowerCase().includes("deadlift");
-                            const target = isBench ? 1.5 : isSquat ? 2.0 : isDL ? 2.5 : null;
-
-                            return (
-                              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 col-span-2">
-                                <div className="flex items-center justify-between">
-                                  <p className="text-[10px] font-bold uppercase text-emerald-300">Relative Strength</p>
-                                  {target && (
-                                    <span className="text-[10px] text-zinc-400 font-medium">
-                                      เป้าหมาย: {target}× BW
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="mt-1 flex items-baseline justify-between">
-                                  <p className="text-sm font-black text-emerald-300">
-                                    {ratio.toFixed(2)}× BW
-                                  </p>
-                                  {target && (
-                                    <span className={`text-[10px] font-bold ${ratio >= target ? "text-emerald-300" : "text-amber-400"}`}>
-                                      {ratio >= target ? "✓ บรรลุเป้าหมาย" : `ขาดอีก ${(target - ratio).toFixed(2)}×`}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="text-xs font-bold uppercase text-zinc-500">Rest</p>
-                            <p className="mt-1 text-2xl font-black text-emerald-300">
-                              {restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0
-                                ? formatRestTime(restTimer.secondsLeft)
-                                : formatRestTime(selectedRestSeconds)}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setRestTimerEnabled((value) => !value)}
-                              className={`rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-emerald-400 ${
-                                restTimerEnabled ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-400"
-                              }`}
-                              aria-label={restTimerEnabled ? "Disable rest timer" : "Enable rest timer"}
-                              type="button"
-                            >
-                              {restTimerEnabled ? "On" : "Off"}
-                            </button>
-                            <button
-                              onClick={() =>
-                                restTimer.exerciseId === baseExercise.id && restTimer.running
-                                  ? stopRestTimer()
-                                  : startRestTimer({ ...exercise, id: baseExercise.id })
-                              }
-                              className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
-                              aria-label={restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop rest timer" : "Start rest timer"}
-                              type="button"
-                            >
-                              {restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop" : "Start"}
-                            </button>
-                          </div>
-                        </div>
-                        <div className="mt-3 grid grid-cols-3 gap-2">
-                          {[["short", "Short"], ["normal", "Normal"], ["heavy", "Heavy"]].map(([mode, label]) => (
-                            <button
-                              key={mode}
-                              onClick={() => setRestMode({ ...exercise, id: baseExercise.id }, mode as RestMode)}
-                              className={`rounded-xl px-2 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-emerald-400 ${
-                                restMode === mode ? "bg-zinc-50 text-zinc-950" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
-                              }`}
-                              aria-label={`Set rest preset ${label}`}
-                              type="button"
-                            >
-                              {label}
-                            </button>
-                          ))}
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2">
-                          <button
-                            onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, -30)}
-                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
-                            aria-label="Decrease rest by 30 seconds"
-                            type="button"
-                          >
-                            −30s
-                          </button>
-                          <button
-                            onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, 30)}
-                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
-                            aria-label="Increase rest by 30 seconds"
-                            type="button"
-                          >
-                            +30s
-                          </button>
-                        </div>
-                        {restTimer.exerciseId === baseExercise.id && restTimer.totalSeconds > 0 && (
-                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
-                            <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${restProgress}%` }} />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="rounded-2xl bg-zinc-950 p-3">
+                    {/* [Order 4] PRIMARY ZONE: Working Sets Table */}
+                    <div className="mb-3 rounded-2xl bg-zinc-950 p-3 border border-zinc-800/80">
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <div>
-                          <p className="text-xs font-bold uppercase text-zinc-500">Working sets</p>
-                          <p className="mt-0.5 text-[11px] text-zinc-600">
+                          <p className="text-xs font-bold uppercase text-zinc-400">Working sets</p>
+                          <p className="mt-0.5 text-[11px] text-zinc-500">
                             Plan {effectiveSets} · Log {setInputs.length}
                           </p>
                         </div>
@@ -4462,7 +4262,6 @@ export default function Page() {
                       </div>
                       <div className="space-y-3">
                         {setInputs.map((set, setIndex) => {
-                          // Prefer session history for this exact machine variant, fallback to base exercise only if no machine selected
                           const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1] ?? (!currentMachine ? lastSetMap[exercise.name]?.[setIndex + 1] : undefined);
                           const fallbackRepVal = latestSet ? Number(latestSet.reps) : 10;
                           const fallbackWeightVal = latestSet
@@ -4471,7 +4270,6 @@ export default function Page() {
                               : convertAndSnapWeight(latestSet.weightLbs, "lbs", effectiveUnit, isIso)
                             : 0;
 
-                          // Assessment suggestion fallback if no previous performance on this machine
                           const aiWeightSuggestion = userProfile ? (() => {
                             const muscleInfo = evaluateMuscleMass(userProfile.gender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
                             const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier);
@@ -4583,6 +4381,285 @@ export default function Page() {
                         <Save size={18} /> Finish & clear
                       </button>
                     </div>
+
+                    {/* [Order 5] Rest Timer Controls */}
+                    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-bold uppercase text-zinc-500">Rest Timer</p>
+                          <p className="mt-1 text-2xl font-black text-emerald-300">
+                            {restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0
+                              ? formatRestTime(restTimer.secondsLeft)
+                              : formatRestTime(selectedRestSeconds)}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setRestTimerEnabled((value) => !value)}
+                            className={`rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                              restTimerEnabled ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-400"
+                            }`}
+                            aria-label={restTimerEnabled ? "Disable rest timer" : "Enable rest timer"}
+                            type="button"
+                          >
+                            {restTimerEnabled ? "On" : "Off"}
+                          </button>
+                          <button
+                            onClick={() =>
+                              restTimer.exerciseId === baseExercise.id && restTimer.running
+                                ? stopRestTimer()
+                                : startRestTimer({ ...exercise, id: baseExercise.id })
+                            }
+                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            aria-label={restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop rest timer" : "Start rest timer"}
+                            type="button"
+                          >
+                            {restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop" : "Start"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        {[["short", "Short"], ["normal", "Normal"], ["heavy", "Heavy"]].map(([mode, label]) => (
+                          <button
+                            key={mode}
+                            onClick={() => setRestMode({ ...exercise, id: baseExercise.id }, mode as RestMode)}
+                            className={`rounded-xl px-2 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                              restMode === mode ? "bg-zinc-50 text-zinc-950" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+                            }`}
+                            aria-label={`Set rest preset ${label}`}
+                            type="button"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, -30)}
+                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                          aria-label="Decrease rest by 30 seconds"
+                          type="button"
+                        >
+                          −30s
+                        </button>
+                        <button
+                          onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, 30)}
+                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                          aria-label="Increase rest by 30 seconds"
+                          type="button"
+                        >
+                          +30s
+                        </button>
+                      </div>
+                      {restTimer.exerciseId === baseExercise.id && restTimer.totalSeconds > 0 && (
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
+                          <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${restProgress}%` }} />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* [Order 6] Secondary Tools Accordion (Progressive Disclosure) */}
+                    <details className="rounded-xl bg-zinc-950 border border-zinc-800/80 p-3">
+                      <summary className="cursor-pointer py-1 text-xs font-bold text-zinc-400 hover:text-emerald-400 transition flex items-center justify-between">
+                        <span>🏆 สถิติเดิม PR, Warmup & การตั้งค่าเพิ่มเติม</span>
+                        <ChevronDown size={14} className="text-zinc-500" />
+                      </summary>
+
+                      <div className="mt-3 pt-3 border-t border-zinc-800/80 space-y-3">
+                        {/* Records & Relative Strength Grid */}
+                        <div>
+                          <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
+                            <Trophy size={14} /> Records {currentMachine && <span className="text-emerald-400 font-semibold normal-case">({currentMachine})</span>}
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                              <p className="text-[10px] font-bold uppercase text-zinc-500">Max</p>
+                              <div className="mt-1">
+                                {records.maxWeight ? (
+                                  <>
+                                    <p className="text-sm font-black text-emerald-300">
+                                      {records.maxWeight.rawValue !== undefined && records.maxWeight.unit
+                                        ? `${records.maxWeight.rawValue} ${records.maxWeight.unit}`
+                                        : `${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs`}
+                                      {" × "}{records.maxWeight.reps}
+                                    </p>
+                                    <p className="text-[10px] text-zinc-500">
+                                      {records.maxWeight.unit === "kg" && records.maxWeight.rawValue !== undefined
+                                        ? `(${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs)`
+                                        : `(${Math.round(records.maxWeight.weightLbs * 0.453592 * 10) / 10} kg)`}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="text-sm font-black text-zinc-500">—</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                              <p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p>
+                              <div className="mt-1">
+                                {records.bestReps ? (
+                                  <>
+                                    <p className="text-sm font-black text-zinc-100">
+                                      {records.bestReps.rawValue !== undefined && records.bestReps.unit
+                                        ? `${records.bestReps.rawValue} ${records.bestReps.unit}`
+                                        : `${Math.round(records.bestReps.weightLbs * 10) / 10} lbs`}
+                                      {" × "}{records.bestReps.reps}
+                                    </p>
+                                    <p className="text-[10px] text-zinc-500">
+                                      {records.bestReps.unit === "kg" && records.bestReps.rawValue !== undefined
+                                        ? `(${Math.round(records.bestReps.weightLbs * 10) / 10} lbs)`
+                                        : `(${Math.round(records.bestReps.weightLbs * 0.453592 * 10) / 10} kg)`}
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className="text-sm font-black text-zinc-500">—</p>
+                                )}
+                              </div>
+                            </div>
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                              <p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p>
+                              <p className="mt-1 text-sm font-black text-zinc-100">{records.bestVolume ? `${records.bestVolume.weightLbs} × ${records.bestVolume.reps}` : "—"}</p>
+                            </div>
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                              <p className="text-[10px] font-bold uppercase text-zinc-500">Warmup</p>
+                              <p className="mt-1 text-sm font-black text-zinc-100">{exercise.warmup && warmups.length > 0 ? `${warmups[0].weight}/${warmups[1].weight}/${warmups[2].weight}` : "Skip"}</p>
+                            </div>
+                            {bodyweightEntry && records.maxWeight && (() => {
+                              const ratio = records.maxWeight.weightLbs / bodyweightEntry.lbs;
+                              const isBench = exercise.name.toLowerCase().includes("bench press");
+                              const isSquat = exercise.name.toLowerCase().includes("squat");
+                              const isDL = exercise.name.toLowerCase().includes("deadlift");
+                              const target = isBench ? 1.5 : isSquat ? 2.0 : isDL ? 2.5 : null;
+
+                              return (
+                                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 col-span-2">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-[10px] font-bold uppercase text-emerald-300">Relative Strength</p>
+                                    {target && (
+                                      <span className="text-[10px] text-zinc-400 font-medium">
+                                        เป้าหมาย: {target}× BW
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 flex items-baseline justify-between">
+                                    <p className="text-sm font-black text-emerald-300">
+                                      {ratio.toFixed(2)}× BW
+                                    </p>
+                                    {target && (
+                                      <span className={`text-[10px] font-bold ${ratio >= target ? "text-emerald-300" : "text-amber-400"}`}>
+                                        {ratio >= target ? "✓ บรรลุเป้าหมาย" : `ขาดอีก ${(target - ratio).toFixed(2)}×`}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+
+                        {/* Edit target sets & reps */}
+                        {(mode === "custom" || mode === "preset" || mode === "today") && (
+                          <div className="rounded-xl bg-zinc-900/60 border border-zinc-800/80 p-3">
+                            <p className="text-xs font-bold text-zinc-400 mb-2">Edit target sets & reps</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-zinc-500">Target Sets</label>
+                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 transition">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (mode === "custom") {
+                                        updateCustomExercise(baseExercise.id, { sets: Math.max(1, exercise.sets - 1) });
+                                      } else {
+                                        updatePresetExerciseSets(baseExercise.id, effectiveSets - 1);
+                                      }
+                                    }}
+                                    className="flex w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    aria-label="Decrease sets"
+                                  >
+                                    −
+                                  </button>
+                                  <input
+                                    inputMode="numeric"
+                                    value={effectiveSets}
+                                    onChange={(event) => {
+                                      const val = Math.max(1, Number(event.target.value) || 1);
+                                      if (mode === "custom") {
+                                        updateCustomExercise(baseExercise.id, { sets: val });
+                                      } else {
+                                        updatePresetExerciseSets(baseExercise.id, val);
+                                      }
+                                    }}
+                                    className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-sm font-bold outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (mode === "custom") {
+                                        updateCustomExercise(baseExercise.id, { sets: Math.min(10, exercise.sets + 1) });
+                                      } else {
+                                        updatePresetExerciseSets(baseExercise.id, effectiveSets + 1);
+                                      }
+                                    }}
+                                    className="flex w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    aria-label="Increase sets"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-bold text-zinc-500">Target Reps</label>
+                                <input
+                                  value={exercise.reps}
+                                  onChange={(event) => {
+                                    if (mode === "custom") {
+                                      updateCustomExercise(baseExercise.id, { reps: event.target.value });
+                                    }
+                                  }}
+                                  readOnly={mode !== "custom"}
+                                  className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none text-sm font-bold"
+                                />
+                              </div>
+
+                              {mode === "custom" && (
+                                <button
+                                  onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })}
+                                  className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${
+                                    exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+                                  }`}
+                                >
+                                  Warmup
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Substitute Exercise Action */}
+                        <div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSubstituteModalExercise(baseExercise);
+                              setSubstituteSearch("");
+                              setSubstituteFilter("movement");
+                            }}
+                            className="flex w-full items-center justify-between gap-2 rounded-xl bg-zinc-900 border border-zinc-800 px-3.5 py-3 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            aria-label={`Substitute ${exercise.name}`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <RotateCcw size={14} className="text-emerald-400" />
+                              <span>Substitute Exercise</span>
+                            </span>
+                            <span className="rounded-lg bg-zinc-800 px-2 py-1 text-[11px] text-zinc-400">
+                              {selectedSubstitute ? "Modified" : "Choose"}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+                    </details>
 
                     {compactList && (
                       <div className="mt-3 grid grid-cols-2 gap-2">
