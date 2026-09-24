@@ -45,3 +45,15 @@ textarea {
     font-size: 15px;
   }
 }
+
+.compact-card .hide-when-compact {
+  display: none;
+}
+
+.compact-card h3 {
+  font-size: 1rem;
+}
+
+.compact-card .compact-only {
+  display: block !important;
+}

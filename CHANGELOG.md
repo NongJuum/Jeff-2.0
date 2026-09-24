@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.1.0] - 2026-09-24 - Jeff 2.0 Pro UX Redesign
+
+### 🎨 UX & UI Improvements (U1-U5)
+- **U1 (Clean 4-Tab Navigation):** รวมแท็บ Today, Preset, Custom ให้อยู่ใต้แท็บ `Workout` หลัก พร้อม Sub-tab Pill Switcher ด้านบน เหลือ Navigation ด้านล่างเพียง 4 ปุ่ม (`Workout`, `Stats`, `Library`, `Profile`) ประหยัดพื้นที่หน้าจอและลดความสับสน
+- **U2 (Utility Header):** เพิ่ม Header Utility Bar ด้านบนสุด พร้อมปุ่มลัดดูน้ำหนักตัว (`⚖️`), จัดการแจ้งเตือน (`🔔`), และเปิดโปรไฟล์ & การตั้งค่า (`⚙️`)
+- **U3 (MuscleTapBuilder Component):** สร้างคอมโพเนนต์เลือกท่าฝึกแบบอินเทอร์แอคทีฟ แตะจุดกล้ามเนื้อ (Front/Back) พร้อมแสดง Emoji ประจำมัดกล้ามเนื้อ, Badge จำนวนท่าที่ฝึกได้ และ Exercise Picker Modal เรียงลำดับ Tier S+ และ A ขึ้นก่อน
+- **U4 (Custom Mode Integration):** เชื่อมต่อ `MuscleTapBuilder` ในหน้า Custom Workout Builder โดยตรง พร้อมเก็บระบบค้นหาท่าฝึกเดิมไว้ในเมนูแบบพับเก็บได้
+- **U5 (Compact Exercise Cards):** เพิ่มโหมด Compact Card ใน `app/globals.css` ซ่อนเมนูแก้ไขเซตเป้าหมายและตารางสถิติที่ไม่จำเป็นขณะฝึกจริง (`.hide-when-compact`) พร้อมแสดง Badge PR และเวลาพัก (`.compact-only`) เพื่อให้ Scroll น้อยลงขณะฝึกซ้อม
+- **Profile Modal (`ProfileModal.tsx`):** หน้าต่างโปรไฟล์สรุปสถิติผู้ใช้ (Level, Goal, Streak, Total Sets, PRs, น้ำหนักตัว) และฟังก์ชันส่งออกข้อมูลการฝึก (CSV Export) ในที่เดียว
+
 ## [3.0.0] - 2026-09-24
 
 ### 🎁 Added

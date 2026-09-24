@@ -1,0 +1,141 @@
+"use client";
+import React from "react";
+import { X, User, Trophy, Flame, Download, Settings, Info, Scale, ShieldCheck } from "lucide-react";
+import { getOnboardingResult } from "./OnboardingWizard";
+import { getMigrationResult } from "../lib/migration";
+import { getCurrentBodyweight } from "./BodyweightManager";
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  logsCount: number;
+  recordsCount: number;
+  streak: number;
+  onExportLogs: () => void;
+};
+
+export function ProfileModal({
+  open,
+  onClose,
+  logsCount,
+  recordsCount,
+  streak,
+  onExportLogs,
+}: Props) {
+  if (!open) return null;
+
+  const onboarding = getOnboardingResult();
+  const migration = getMigrationResult();
+  const bw = getCurrentBodyweight();
+
+  const level = onboarding?.level || migration?.level || "intermediate";
+  const goal = onboarding?.goal || migration?.goal || "hypertrophy";
+  const days = onboarding?.days || migration?.days || 4;
+
+  const levelLabels = {
+    beginner: "🌱 มือใหม่ (Beginner)",
+    intermediate: "💪 ปานกลาง (Intermediate)",
+    advanced: "🔥 ขั้นสูง (Advanced)",
+  };
+
+  const goalLabels = {
+    strength: "🏋️ Strength (เน้นแรง)",
+    hypertrophy: "📈 Hypertrophy (เน้นกล้าม)",
+    fitness: "❤️ General Fitness (สุขภาพดี)",
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/80 backdrop-blur-sm sm:items-center sm:p-4">
+      <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-t-3xl border border-zinc-800 bg-zinc-950 shadow-2xl sm:rounded-3xl">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
+          <div className="flex items-center gap-2">
+            <User size={20} className="text-emerald-400" />
+            <h3 className="text-lg font-black">Profile & Settings</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-zinc-900 p-2 text-zinc-400 hover:text-zinc-200"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          {/* User Card */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-400/20 text-2xl font-black text-emerald-400">
+                👤
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-black text-zinc-100">HA IT Athlete</p>
+                <p className="text-xs text-zinc-400">{levelLabels[level]}</p>
+              </div>
+              {streak > 0 && (
+                <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-black text-amber-300">
+                  <Flame size={14} />
+                  <span>{streak}w</span>
+                </span>
+              )}
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-2 border-t border-zinc-800/80 pt-3 text-center">
+              <div>
+                <p className="text-[10px] font-bold uppercase text-zinc-500">เป้าหมาย</p>
+                <p className="text-xs font-black text-emerald-300 mt-0.5">{goalLabels[goal].split(" ")[1]}</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-zinc-500">วันฝึก/สัปดาห์</p>
+                <p className="text-xs font-black text-zinc-100 mt-0.5">{days} วัน</p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-zinc-500">น้ำหนักตัว</p>
+                <p className="text-xs font-black text-zinc-100 mt-0.5">{bw ? `${Math.round(bw.lbs)} lbs` : "—"}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Training Stats summary */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">📊 สถิติการฝึกรวม</p>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="rounded-xl bg-zinc-900 p-3">
+                <p className="text-xs text-zinc-500">จำนวนเซตที่บันทึก</p>
+                <p className="mt-1 text-lg font-black text-emerald-300">{logsCount} เซต</p>
+              </div>
+              <div className="rounded-xl bg-zinc-900 p-3">
+                <p className="text-xs text-zinc-500">สถิติ PR สูงสุด</p>
+                <p className="mt-1 text-lg font-black text-emerald-300">{recordsCount} ท่า</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Backup & Export */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-zinc-400">💾 สำรองข้อมูล (Backup)</p>
+            <button
+              type="button"
+              onClick={onExportLogs}
+              className="flex w-full items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 p-3 text-sm font-bold text-zinc-200 transition hover:bg-zinc-800"
+            >
+              <span className="flex items-center gap-2">
+                <Download size={16} className="text-emerald-400" /> ส่งออกประวัติการฝึก (CSV)
+              </span>
+              <span className="text-xs text-zinc-500">Export</span>
+            </button>
+          </div>
+
+          {/* App Info */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 text-center space-y-1">
+            <p className="text-xs font-black text-zinc-300">HA IT Workout Tracker Pro</p>
+            <p className="text-[11px] text-zinc-500">เวอร์ชัน 3.0.0 · Jeff Nippard Hypertrophy Principles</p>
+            <p className="text-[10px] text-emerald-400/80">Client-side & Offline First · 100% Private</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -21,11 +21,14 @@ import {
   Sparkles,
   Trash2,
   Trophy,
+  User,
   X,
 } from "lucide-react";
 import { OnboardingWizard, hasCompletedOnboarding } from "./components/OnboardingWizard";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
+import { MuscleTapBuilder } from "./components/MuscleTapBuilder";
+import { ProfileModal } from "./components/ProfileModal";
 import { ProgressPhotos } from "./components/ProgressPhotos";
 import { runMigration, hasMigrated, getMigrationResult, type MigrationResult } from "./lib/migration";
 import { WeeklyTrendChart, type WeeklyScore } from "./components/WeeklyTrendChart";
@@ -2179,6 +2182,9 @@ export default function Page() {
   // Notification Settings (N3)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
+  // Profile & Settings Modal (U1)
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
   useEffect(() => {
     if (!hasCompletedOnboarding()) setShowOnboarding(true);
   }, []);
@@ -3132,26 +3138,34 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={() => setShowBodyweightModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+              className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
               aria-label="Manage bodyweight"
             >
-              <Scale size={14} className="text-emerald-400" />
-              <span>{bodyweightEntry ? `${Math.round(bodyweightEntry.lbs)} lbs` : "น้ำหนักตัว"}</span>
+              <span>⚖️</span>
+              <span>{bodyweightEntry ? `${Math.round(bodyweightEntry.lbs)} lbs` : "—"}</span>
             </button>
             <button
               type="button"
               onClick={() => setShowNotificationSettings(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+              className="rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
               aria-label="Notification settings"
             >
               <Bell size={14} className="text-emerald-400" />
             </button>
+            <button
+              type="button"
+              onClick={() => setShowProfileModal(true)}
+              className="rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+              aria-label="Profile and Settings"
+            >
+              <User size={14} className="text-emerald-400" />
+            </button>
             {performanceReport.currentStreak > 0 && (
-              <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-xs font-black text-amber-300">
+              <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-black text-amber-300">
                 <span>🔥</span>
                 <span>{performanceReport.currentStreak}w</span>
               </span>
@@ -3164,7 +3178,28 @@ export default function Page() {
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
           <p className="text-[10px] font-black uppercase tracking-wide text-emerald-300">{pageMeta.eyebrow}</p>
           <h2 className="mt-1 text-lg font-black">{pageMeta.title}</h2>
-          
+
+          {["today", "preset", "custom"].includes(mode) && (
+            <div className="mt-2.5 flex gap-1 rounded-xl bg-zinc-950 p-1">
+              {[
+                { id: "today", label: "Today" },
+                { id: "preset", label: "Preset Plan" },
+                { id: "custom", label: "Custom Builder" },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setMode(tab.id as AppMode)}
+                  className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                    mode === tab.id
+                      ? "bg-emerald-400 text-zinc-950 shadow-sm"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {(mode === "today" || mode === "preset") && (
             <div className="mt-3 rounded-xl bg-zinc-950 p-3">
@@ -3551,18 +3586,19 @@ export default function Page() {
               </div>
             </details>
 
-            {mode === "custom" && (
+            {mode === "custom" && selectedCustomPlan && (
               <>
                 <div className="mt-4">
-                  <MuscleTapPicker
+                  <MuscleTapBuilder
                     exercises={exerciseLibrary}
                     onPick={(name) => addExerciseToCurrentDay(name)}
+                    currentExercises={day?.exercises.map((e) => ({ name: e.name, sets: e.sets })) ?? []}
                   />
                 </div>
 
                 <details className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-                  <summary className="cursor-pointer text-xs font-bold text-zinc-300">
-                    <Plus size={16} className="mr-2 inline" /> วิธีอื่น: ค้นหาจากชื่อ / กลุ่มกล้ามเนื้อ
+                  <summary className="cursor-pointer text-xs text-zinc-400 font-bold">
+                    <Plus size={16} className="mr-2 inline" /> วิธีเก่า: ค้นหาจากชื่อ / กลุ่มกล้ามเนื้อ
                   </summary>
 
                 <div className="mt-4">
@@ -3633,7 +3669,7 @@ export default function Page() {
                 const alternatives = getAlternatives(exercise);
 
                 return (
-                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
+                  <article key={baseExercise.id} className={`rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 ${compactList ? "compact-card" : ""}`}>
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap gap-2">
@@ -3657,6 +3693,13 @@ export default function Page() {
                       </div>
                     </div>
 
+                    <div className="compact-only hidden mb-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5">
+                      <p className="text-xs text-emerald-300 font-bold flex items-center justify-between">
+                        <span>PR: {pr ? `${pr.weightLbs} lbs × ${pr.reps}` : "—"}</span>
+                        <span className="text-zinc-400 font-medium">พัก {formatRestTime(selectedRestSeconds)}</span>
+                      </p>
+                    </div>
+
                     <div className="mb-2 flex flex-wrap gap-1.5">
                       {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
                     </div>
@@ -3664,7 +3707,7 @@ export default function Page() {
                     <ExerciseMusclePreviewCard exercise={exercise} />
 
                     {(mode === "custom" || mode === "preset" || mode === "today") && (
-                      <details className="mb-3 rounded-xl bg-zinc-950 p-3">
+                      <details className="hide-when-compact mb-3 rounded-xl bg-zinc-950 p-3">
                         <summary className="cursor-pointer text-xs font-bold text-zinc-300">Edit target sets & reps</summary>
 
                         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -3765,7 +3808,7 @@ export default function Page() {
                     </div>
 
                     {/* Machine / Equipment Variant Selector */}
-                    <div className="mb-3 rounded-xl bg-zinc-950 p-2.5">
+                    <div className="hide-when-compact mb-3 rounded-xl bg-zinc-950 p-2.5">
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
                           <Dumbbell size={12} className="text-emerald-400" />
@@ -3807,7 +3850,7 @@ export default function Page() {
                     </div>
 
                     <div className="mb-3 grid gap-2 sm:grid-cols-2">
-                      <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                      <div className="hide-when-compact rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
                         <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
                           <Trophy size={14} /> Records {currentMachine && <span className="text-emerald-400 font-semibold normal-case">({currentMachine})</span>}
                         </p>
@@ -4370,25 +4413,50 @@ export default function Page() {
         />
       )}
 
+      {/* Profile & Settings Modal */}
+      <ProfileModal
+        open={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        logsCount={logs.length}
+        recordsCount={Object.keys(recordsMap).length}
+        streak={performanceReport.currentStreak}
+        onExportLogs={exportLogsToCsv}
+      />
+
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
-        <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1.5">
+        <div className="mx-auto grid max-w-5xl grid-cols-4 gap-1.5">
           {[
-            ["today", "Today"],
-            ["preset", "Preset"],
-            ["custom", "Custom"],
-            ["history", "Log"],
-            ["library", "Library"],
-          ].map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setMode(key as AppMode)}
-              className={`rounded-xl py-2.5 text-[11px] font-medium ${
-                mode === key ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+            ["workout", "Workout", Dumbbell],
+            ["stats", "Stats", Trophy],
+            ["library", "Library", Library],
+            ["profile", "Profile", User],
+          ].map(([key, label, Icon]) => {
+            const isTabActive =
+              (key === "workout" && ["today", "preset", "custom"].includes(mode)) ||
+              (key === "stats" && mode === "history") ||
+              (key === "library" && mode === "library");
+
+            return (
+              <button
+                key={key as string}
+                type="button"
+                onClick={() => {
+                  if (key === "workout") setMode("today");
+                  else if (key === "stats") setMode("history");
+                  else if (key === "library") setMode("library");
+                  else setShowProfileModal(true);
+                }}
+                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium transition active:scale-95 ${
+                  isTabActive
+                    ? "bg-emerald-400 text-zinc-950 font-bold shadow-sm"
+                    : "bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+                }`}
+              >
+                <Icon size={18} />
+                <span>{label as string}</span>
+              </button>
+            );
+          })}
         </div>
       </nav>
     </main>
