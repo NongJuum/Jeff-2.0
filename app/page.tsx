@@ -1372,7 +1372,7 @@ function DayMuscleOverviewCard({ summary }: { summary: MuscleSummary }) {
 }
 
 function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
-  const [showDiagram, setShowDiagram] = useState(false);
+  const [showDiagram, setShowDiagram] = useState(true);
   const { primary, secondary } = getExercisePreviewRegions(exercise);
   const primaryLabels = primary.map((item) => MUSCLE_REGION_LABELS[item]);
   const secondaryLabels = secondary.map((item) => MUSCLE_REGION_LABELS[item]);
@@ -2241,6 +2241,7 @@ export default function Page() {
 
   // Stage 2 Trainer Assessment Modal state
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+  const [showScoreModal, setShowScoreModal] = useState(false);
 
   function handleApplyAssessmentPlan(targetDays: 3 | 4 | 5, profile: UserProfile) {
     saveUserProfile(profile);
@@ -3512,12 +3513,24 @@ export default function Page() {
 
         {(mode === "today" || mode === "preset" || mode === "custom") && (
           <>
-            <div className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300">
-              <span>
+            <div 
+              role="button" 
+              tabIndex={0}
+              onClick={() => setShowScoreModal(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setShowScoreModal(true);
+                }
+              }}
+              className="flex cursor-pointer items-center justify-between rounded-xl bg-zinc-900 px-3 py-2.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800/90 active:scale-[0.99] border border-zinc-800 hover:border-emerald-500/30"
+            >
+              <span className="flex items-center gap-1.5">
+                <Trophy className="text-emerald-400" size={14} />
                 Weekly Score: {performanceReport.hasData ? `${performanceReport.score}/100 (${performanceReport.rank})` : "—/100"}
                 {performanceReport.currentStreak > 0 && ` · 🔥 ${performanceReport.currentStreak}w streak`}
               </span>
-              <span className="text-[11px] text-emerald-400 font-medium">แตะเพื่อดูรายละเอียด</span>
+              <span className="text-[11px] text-emerald-400 font-medium underline underline-offset-2">แตะเพื่อดูรายละเอียด</span>
             </div>
             {weeklyScores.length >= 2 && (
               <div className="mt-3">
@@ -4961,6 +4974,112 @@ export default function Page() {
         onClose={() => setShowAssessmentModal(false)}
         onApplyPlan={handleApplyAssessmentPlan}
       />
+
+      {/* Weekly Score & Methodology Modal */}
+      {showScoreModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-950 shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-800/80 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="text-emerald-400" size={20} />
+                <h2 className="text-base sm:text-lg font-black text-white">Weekly Performance Breakdown</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowScoreModal(false)}
+                className="rounded-full bg-zinc-900 p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-white"
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+              {/* Section A: Performance Card */}
+              <div>
+                <WeeklyPerformanceCard report={performanceReport} />
+              </div>
+
+              {/* Section B: Scoring Methodology */}
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-base">📖</span>
+                  <h3 className="text-sm font-black text-zinc-200">เกณฑ์และวิธีการคิดคะแนน (Scoring Methodology)</h3>
+                </div>
+
+                <div className="space-y-2.5 text-xs">
+                  <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
+                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span>🏋️ Strength (25%)</span>
+                    </p>
+                    <p className="mt-1 text-zinc-300 leading-relaxed">
+                      คำนวณจาก e1RM (สูตร Epley) สัปดาห์นี้เทียบกับสถิติเดิมทั้งหมด หากทำลาย PR ได้ 100 คะแนนเต็ม, ยกได้ 95%+ ได้ 80 คะแนน
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
+                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span>📦 Volume (25%)</span>
+                    </p>
+                    <p className="mt-1 text-zinc-300 leading-relaxed">
+                      วัดจากจำนวนเซตจริงต่อกลุ่มกล้ามเนื้อ เทียบกับเป้าหมาย Hypertrophy (เป้าหมาย 10–12 เซต/กล้ามเนื้อ/สัปดาห์)
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
+                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span>📅 Consistency (20%)</span>
+                    </p>
+                    <p className="mt-1 text-zinc-300 leading-relaxed">
+                      วัดจากอัตราส่วนวันที่เข้ายิมจริง เทียบกับจำนวนวันฝึกที่เลือกไว้ในตาราง (3, 4, หรือ 5 วัน)
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
+                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span>🎯 Completion (15%)</span>
+                    </p>
+                    <p className="mt-1 text-zinc-300 leading-relaxed">
+                      เปอร์เซ็นต์เซตที่เล่นสำเร็จจริง เทียบกับจำนวนเซตทั้งหมดตามแผนในสัปดาห์
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
+                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span>😴 Recovery (10%)</span>
+                    </p>
+                    <p className="mt-1 text-zinc-300 leading-relaxed">
+                      การพักฟื้น ร่างกายต้องการวันพักอย่างน้อย 2 วัน/สัปดาห์ (พัก ≥2 วัน = 100, พัก 1 วัน = 75, ไม่พักเลย = 50)
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
+                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                      <span>🔥 Streak Bonus (5%)</span>
+                    </p>
+                    <p className="mt-1 text-zinc-300 leading-relaxed">
+                      โบนัสวินัยต่อเนื่อง เพิ่มสัปดาห์ละ 10 คะแนน (สะสมสูงสุด 10 สัปดาห์ = 100 คะแนน)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="border-t border-zinc-800/80 p-3 bg-zinc-950">
+              <button
+                type="button"
+                onClick={() => setShowScoreModal(false)}
+                className="w-full rounded-2xl bg-zinc-900 py-3 text-sm font-bold text-zinc-200 transition hover:bg-zinc-800 active:scale-[0.99]"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
         <div className="mx-auto grid max-w-5xl grid-cols-4 gap-1.5">
