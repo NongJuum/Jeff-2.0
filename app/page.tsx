@@ -2,11 +2,13 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
   Bell,
   CalendarDays,
   Check,
   ChevronDown,
   ClipboardList,
+  Cog,
   Download,
   Dumbbell,
   Flame,
@@ -35,6 +37,29 @@ import { WeeklyTrendChart, type WeeklyScore } from "./components/WeeklyTrendChar
 import { BodyweightManager, getCurrentBodyweight, type BodyweightEntry } from "./components/BodyweightManager";
 import { NotificationSettings } from "./components/NotificationSettings";
 import { startNotificationScheduler } from "./lib/notifications";
+import {
+  type WeightUnit,
+  resolveEffectiveUnit,
+  getSnapStep,
+  snapWeight,
+  convertWeight,
+  convertAndSnapWeight,
+  MACHINE_UNITS_KEY,
+  EXERCISE_UNITS_KEY,
+  getMachineUnitsMap,
+  saveMachineUnit,
+  getExerciseUnitsMap,
+  saveExerciseUnit,
+} from "./lib/units";
+import { TrainerAssessment } from "./components/TrainerAssessment";
+import {
+  type UserProfile,
+  getUserProfile,
+  saveUserProfile,
+  USER_PROFILE_KEY,
+  calculatePrescriptionWeight,
+  INJURY_RULES,
+} from "./lib/assessment";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
 type AppMode = "today" | "preset" | "custom" | "history" | "library";
@@ -83,6 +108,8 @@ export type LogSet = {
   setNumber: number;
   date: string;
   machine?: string;
+  unit?: WeightUnit;
+  rawValue?: number;
 };
 
 export type ExerciseRecords = {
@@ -2133,6 +2160,118 @@ export default function Page() {
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
   const [presetSetsMap, setPresetSetsMap] = useState<Record<string, number>>(() => readJson<Record<string, number>>(PRESET_SETS_KEY, {}));
 
+  // Stage 1 Unit Hierarchy State (haitMachineUnitsV1, haitExerciseUnitsV1, haitUserProfileV1)
+  const [exerciseUnits, setExerciseUnits] = useState<Record<string, WeightUnit>>(() => getExerciseUnitsMap());
+  const [machineUnits, setMachineUnits] = useState<Record<string, WeightUnit>>(() => getMachineUnitsMap());
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getUserProfile());
+
+  const globalWeightUnit: WeightUnit = userProfile?.preferredWeightUnit || "kg";
+
+  function getEffectiveUnitForExercise(exerciseName: string, machineTag?: string): WeightUnit {
+    return resolveEffectiveUnit(exerciseName, machineTag, globalWeightUnit, exerciseUnits, machineUnits);
+  }
+
+  function handleToggleExerciseUnit(exercise: PlanExercise, machineTag?: string, defaultSets?: number) {
+    const currentUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
+    const targetUnit: WeightUnit = currentUnit === "kg" ? "lbs" : "kg";
+    const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
+
+    // Save exercise unit override
+    saveExerciseUnit(exercise.name, targetUnit);
+    setExerciseUnits((prev) => ({ ...prev, [exercise.name]: targetUnit }));
+
+    // Re-calculate and snap existing input value on unit toggle
+    const setsCount = defaultSets || exercise.sets;
+    setInputs((old) => {
+      const currentInputs = normalizeSetInputs(old[exercise.id], setsCount);
+      const convertedInputs = currentInputs.map((s) => {
+        const numVal = parseFloat(s.weightLbs);
+        if (!Number.isFinite(numVal) || numVal <= 0) return s;
+        const converted = convertAndSnapWeight(numVal, currentUnit, targetUnit, isIso);
+        return {
+          ...s,
+          weightLbs: String(converted),
+        };
+      });
+      const nextInputs = { ...old, [exercise.id]: convertedInputs };
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
+      return nextInputs;
+    });
+  }
+
+  function handleSetGlobalUnit(newUnit: WeightUnit) {
+    if (userProfile) {
+      const updated: UserProfile = { ...userProfile, preferredWeightUnit: newUnit, updatedAt: new Date().toISOString() };
+      saveUserProfile(updated);
+      setUserProfile(updated);
+    } else {
+      const fresh: UserProfile = {
+        gender: "male",
+        age: 25,
+        heightCm: 175,
+        weightKg: 70,
+        expMonths: 12,
+        daysPerWeek: days,
+        goal: "hypertrophy",
+        injuries: [],
+        preferredWeightUnit: newUnit,
+        updatedAt: new Date().toISOString(),
+      };
+      saveUserProfile(fresh);
+      setUserProfile(fresh);
+    }
+  }
+
+  // Stage 2 Trainer Assessment Modal state
+  const [showAssessmentModal, setShowAssessmentModal] = useState(false);
+
+  function handleApplyAssessmentPlan(targetDays: 3 | 4 | 5, profile: UserProfile) {
+    setUserProfile(profile);
+    setDays(targetDays);
+    setMode("today");
+
+    // Auto-plan generator based on days & experience:
+    // Novice (<6m): 2 sets/ex, Beginner (6-12m): 3 sets/ex, Inter/Adv (>12m): template default sets
+    let targetSetsPerEx = 3;
+    if (profile.expMonths < 6) {
+      targetSetsPerEx = 2;
+    } else if (profile.expMonths <= 12) {
+      targetSetsPerEx = 3;
+    } else {
+      targetSetsPerEx = 4;
+    }
+
+    const planToUse = targetDays === 5 && fiveDayMode === "oneLegDay" ? fiveDayLegOncePlan : presetPlans[targetDays];
+    const newPresetSets: Record<string, number> = {};
+    const newInputs: Record<string, SetInput[]> = { ...inputs };
+
+    planToUse.forEach((d) => {
+      d.exercises.forEach((ex) => {
+        const assignedSets = profile.expMonths > 12 ? ex.sets : targetSetsPerEx;
+        newPresetSets[ex.id] = assignedSets;
+
+        // Pre-fill weights based on biomechanical calculation
+        const result = calculatePrescriptionWeight(ex.name, ex.load, ex.reps, profile);
+        const effectiveU = resolveEffectiveUnit(ex.name, undefined, profile.preferredWeightUnit, exerciseUnits, machineUnits);
+        const isIso = ex.movement.toLowerCase().includes("isolation") || ex.movement.toLowerCase().includes("curl") || ex.movement.toLowerCase().includes("raise") || ex.movement.toLowerCase().includes("ext");
+        const prefillVal = effectiveU === "kg"
+          ? result.hardwareWeightKg
+          : convertAndSnapWeight(result.hardwareWeightKg, "kg", "lbs", isIso);
+
+        newInputs[ex.id] = Array.from({ length: assignedSets }, () => ({
+          weightLbs: String(prefillVal),
+          reps: ex.reps.split(" ")[0] || "10",
+          done: false,
+        }));
+      });
+    });
+
+    setPresetSetsMap(newPresetSets);
+    writeLocalJson(PRESET_SETS_KEY, newPresetSets);
+    setInputs(newInputs);
+    writeLocalJson(SET_INPUTS_KEY, newInputs);
+  }
+
   // Substitution Modal State
   const [substituteModalExercise, setSubstituteModalExercise] = useState<PlanExercise | null>(null);
   const [substituteSearch, setSubstituteSearch] = useState("");
@@ -2793,16 +2932,59 @@ export default function Page() {
     });
   }
 
+  function stepWeight(
+    exercise: PlanExercise,
+    setIndex: number,
+    deltaStepCount: number,
+    machineTag?: string,
+    defaultSets?: number,
+    fallbackWeight = 0
+  ) {
+    const effectiveUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
+    const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
+    const stepSize = getSnapStep(effectiveUnit, isIso);
+    const setsCount = defaultSets || exercise.sets;
+
+    setInputs((old) => {
+      const current = normalizeSetInputs(old[exercise.id], setsCount);
+      const updated = current.map((set, index) => {
+        if (index !== setIndex) return set;
+
+        const currentVal = parseFloat(String(set.weightLbs).trim());
+        let nextVal: number;
+        if (Number.isFinite(currentVal) && currentVal > 0) {
+          nextVal = Math.max(0, snapWeight(currentVal + deltaStepCount * stepSize, stepSize));
+        } else {
+          const base = fallbackWeight > 0 ? fallbackWeight : stepSize;
+          nextVal = deltaStepCount > 0 ? base : Math.max(0, base - stepSize);
+        }
+
+        return { ...set, weightLbs: nextVal > 0 ? String(nextVal) : "", done: false };
+      });
+
+      const nextInputs = {
+        ...old,
+        [exercise.id]: updated,
+      };
+
+      writeLocalJson(SET_INPUTS_KEY, nextInputs);
+      return nextInputs;
+    });
+  }
+
   function saveSingleSet(exercise: PlanExercise, setIndex: number, machineTag?: string) {
     const exerciseInputs = normalizeSetInputs(inputs[exercise.id], exercise.sets);
     const item = exerciseInputs[setIndex];
 
     if (!item) return;
 
-    const weightLbs = Number(item.weightLbs);
+    const enteredVal = Number(item.weightLbs);
     const reps = Number(item.reps);
 
-    if (!Number.isFinite(weightLbs) || !Number.isFinite(reps) || weightLbs <= 0 || reps <= 0) return;
+    if (!Number.isFinite(enteredVal) || !Number.isFinite(reps) || enteredVal <= 0 || reps <= 0) return;
+
+    const effectiveUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
+    const weightLbs = effectiveUnit === "kg" ? convertWeight(enteredVal, "kg", "lbs") : enteredVal;
 
     if (!item.done) {
       const trimmedTag = (machineTag ?? "").trim();
@@ -2814,6 +2996,8 @@ export default function Page() {
         setNumber: setIndex + 1,
         date: new Date().toISOString(),
         machine: trimmedTag || undefined,
+        unit: effectiveUnit,
+        rawValue: enteredVal,
       };
 
       const prCheck = checkIsPr(recordsMap, logSet);
@@ -2862,18 +3046,24 @@ export default function Page() {
 
   function saveAllSets(exercise: PlanExercise, machineTag?: string) {
     const trimmedTag = (machineTag ?? "").trim();
+    const effectiveUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
     const exerciseInputs = normalizeSetInputs(inputs[exercise.id], exercise.sets);
     const validSets: LogSet[] = exerciseInputs
-      .map((item, index) => ({
-        exerciseId: exercise.id,
-        exerciseName: exercise.name,
-        weightLbs: Number(item.weightLbs),
-        reps: Number(item.reps),
-        setNumber: index + 1,
-        date: new Date().toISOString(),
-        machine: trimmedTag || undefined,
-        alreadySaved: item.done,
-      }))
+      .map((item, index) => {
+        const entered = Number(item.weightLbs);
+        return {
+          exerciseId: exercise.id,
+          exerciseName: exercise.name,
+          weightLbs: effectiveUnit === "kg" ? convertWeight(entered, "kg", "lbs") : entered,
+          reps: Number(item.reps),
+          setNumber: index + 1,
+          date: new Date().toISOString(),
+          machine: trimmedTag || undefined,
+          unit: effectiveUnit,
+          rawValue: entered,
+          alreadySaved: item.done,
+        };
+      })
       .filter((item) => Number.isFinite(item.weightLbs) && Number.isFinite(item.reps) && item.weightLbs > 0 && item.reps > 0 && !item.alreadySaved)
       .map(({ alreadySaved, ...item }) => item);
 
@@ -2930,15 +3120,22 @@ export default function Page() {
 
   function exportLogsToCsv() {
     if (logs.length === 0) return;
-    const headers = ["Date", "Exercise", "Machine", "Set", "Weight (lbs)", "Reps"];
-    const rows = logs.map((log) => [
-      safeCsvCell(new Date(log.date).toISOString().replace("T", " ").slice(0, 19)),
-      safeCsvCell(log.exerciseName),
-      safeCsvCell(log.machine || "-"),
-      safeCsvCell(log.setNumber),
-      safeCsvCell(log.weightLbs),
-      safeCsvCell(log.reps),
-    ]);
+    const headers = ["Date", "Exercise", "Machine", "Set", "Weight", "Unit", "Normalized_Weight_Lbs", "Reps"];
+    const rows = logs.map((log) => {
+      const displayVal = log.rawValue ?? (log.unit === "kg" ? Math.round(log.weightLbs * 0.453592 * 100) / 100 : Math.round(log.weightLbs * 100) / 100);
+      const displayUnit = log.unit || "lbs";
+      const normalizedLbs = Math.round(log.weightLbs * 100) / 100;
+      return [
+        safeCsvCell(new Date(log.date).toISOString().replace("T", " ").slice(0, 19)),
+        safeCsvCell(log.exerciseName),
+        safeCsvCell(log.machine || "-"),
+        safeCsvCell(log.setNumber),
+        safeCsvCell(displayVal),
+        safeCsvCell(displayUnit),
+        safeCsvCell(normalizedLbs),
+        safeCsvCell(log.reps),
+      ];
+    });
     const csvContent = [headers.map(safeCsvCell).join(","), ...rows.map((row) => row.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -3141,28 +3338,41 @@ export default function Page() {
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setShowBodyweightModal(true)}
-              className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
-              aria-label="Manage bodyweight"
+              onClick={() => setShowAssessmentModal(true)}
+              className="flex items-center gap-1 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-black text-emerald-300 transition hover:bg-emerald-500/20 active:scale-95"
+              aria-label="Trainer Assessment"
+              title="แบบประเมินตนเองและเป้าหมาย"
             >
-              <span>⚖️</span>
+              <Activity size={14} className="text-emerald-400" />
+              <span>{userProfile ? "ผลประเมิน" : "ประเมินตัวเอง"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowBodyweightModal(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+              aria-label="Manage bodyweight"
+              title="จัดการน้ำหนักตัว"
+            >
+              <Scale size={14} className="text-emerald-400" />
               <span>{bodyweightEntry ? `${Math.round(bodyweightEntry.lbs)} lbs` : "—"}</span>
             </button>
             <button
               type="button"
               onClick={() => setShowNotificationSettings(true)}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+              className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
               aria-label="Notification settings"
+              title="ตั้งค่าการแจ้งเตือน"
             >
-              <Bell size={14} className="text-emerald-400" />
+              <Bell size={15} className="text-emerald-400" />
             </button>
             <button
               type="button"
               onClick={() => setShowProfileModal(true)}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+              className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
               aria-label="Profile and Settings"
+              title="โปรไฟล์และการตั้งค่า"
             >
-              <User size={14} className="text-emerald-400" />
+              <Cog size={15} className="text-emerald-400" />
             </button>
             {performanceReport.currentStreak > 0 && (
               <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-black text-amber-300">
@@ -3251,7 +3461,7 @@ export default function Page() {
             <WeeklyPerformanceCard report={performanceReport} />
             {weeklyScores.length >= 2 && (
               <div className="mt-3">
-                <WeeklyTrendChart scores={weeklyScores.slice(-4)} />
+                <WeeklyTrendChart scores={weeklyScores.slice(-8)} />
               </div>
             )}
           </>
@@ -3341,7 +3551,24 @@ export default function Page() {
                               </p>
                               <p className="mt-1 text-[11px] text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
                             </div>
-                            <p className="whitespace-nowrap text-sm font-black text-emerald-300">{item.weightLbs} lbs × {item.reps}</p>
+                            <div className="text-right">
+                              <p className="whitespace-nowrap text-sm font-black text-emerald-300">
+                                {item.rawValue !== undefined && item.unit
+                                  ? `${item.rawValue} ${item.unit}`
+                                  : `${Math.round(item.weightLbs * 10) / 10} lbs`}
+                                {" × "}{item.reps}
+                              </p>
+                              {item.unit === "kg" && item.rawValue !== undefined && (
+                                <p className="text-[10px] text-zinc-500">
+                                  ≈ {Math.round(item.weightLbs * 10) / 10} lbs
+                                </p>
+                              )}
+                              {item.unit === "lbs" && item.rawValue !== undefined && (
+                                <p className="text-[10px] text-zinc-500">
+                                  ≈ {Math.round(item.weightLbs * 0.453592 * 10) / 10} kg
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -3667,6 +3894,8 @@ export default function Page() {
                 const rawSetInputs = inputs[baseExercise.id];
                 const setInputs = normalizeSetInputs(rawSetInputs, effectiveSets);
                 const alternatives = getAlternatives(exercise);
+                const effectiveUnit = getEffectiveUnitForExercise(exercise.name, currentMachine);
+                const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
 
                 return (
                   <article key={baseExercise.id} className={`rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 ${compactList ? "compact-card" : ""}`}>
@@ -3685,6 +3914,46 @@ export default function Page() {
 
                         <h3 className="mt-2 text-lg font-black leading-snug sm:text-xl">{exercise.name}</h3>
                         <p className="mt-1 text-sm text-zinc-400">{effectiveSets} hard working sets × {exercise.reps} reps</p>
+
+                        {/* Trainer Assessment Biomechanical Recommended Note */}
+                        {userProfile && (() => {
+                          const bioRes = calculatePrescriptionWeight(exercise.name, exercise.load, exercise.reps, userProfile);
+                          return (
+                            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+                              <Sparkles size={11} className="text-emerald-400" />
+                              <span>แนะนำ: {bioRes.displayNote}</span>
+                            </p>
+                          );
+                        })()}
+
+                        {/* Injury Alert Badge */}
+                        {userProfile && userProfile.injuries?.length > 0 && (() => {
+                          const matchedInjuries = userProfile.injuries.filter((injId) => {
+                            const rule = INJURY_RULES[injId];
+                            return rule && rule.warns.some((w) => exercise.name.toLowerCase().includes(w.toLowerCase()));
+                          });
+
+                          if (matchedInjuries.length === 0) return null;
+
+                          return (
+                            <div className="mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-300">
+                              <p className="font-bold flex items-center gap-1">
+                                <span>⚠️ มีข้อควรระวังสำหรับผู้บาดเจ็บ:</span>
+                                <span>{matchedInjuries.map((i) => INJURY_RULES[i]?.label).join(", ")}</span>
+                              </p>
+                              {matchedInjuries.map((injId) => {
+                                const subs = INJURY_RULES[injId]?.substitutes;
+                                const subExercise = subs ? subs[exercise.name] : null;
+                                if (!subExercise) return null;
+                                return (
+                                  <p key={injId} className="mt-1 text-[11px] text-amber-200">
+                                    แนะนำเปลี่ยนเป็น: <strong className="underline cursor-pointer" onClick={() => substituteExercise({ ...exercise, id: baseExercise.id }, subExercise)}>{subExercise}</strong>
+                                  </p>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       <div className="flex flex-col gap-2">
@@ -3700,11 +3969,13 @@ export default function Page() {
                       </p>
                     </div>
 
-                    <div className="mb-2 flex flex-wrap gap-1.5">
+                    <div className="hide-when-compact mb-2 flex flex-wrap gap-1.5">
                       {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
                     </div>
 
-                    <ExerciseMusclePreviewCard exercise={exercise} />
+                    <div className="hide-when-compact">
+                      <ExerciseMusclePreviewCard exercise={exercise} />
+                    </div>
 
                     {(mode === "custom" || mode === "preset" || mode === "today") && (
                       <details className="hide-when-compact mb-3 rounded-xl bg-zinc-950 p-3">
@@ -3786,7 +4057,7 @@ export default function Page() {
                       </details>
                     )}
 
-                    <div className="mb-3">
+                    <div className="hide-when-compact mb-3">
                       <button
                         type="button"
                         onClick={() => {
@@ -3814,15 +4085,32 @@ export default function Page() {
                           <Dumbbell size={12} className="text-emerald-400" />
                           เครื่อง / Machine:
                         </span>
-                        {currentMachine && (
-                          <button
-                            type="button"
-                            onClick={() => updateMachineTag(baseExercise.id, "")}
-                            className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                          >
-                            ล้างแท็ก
-                          </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {currentMachine && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const currentU = machineUnits[currentMachine] || globalWeightUnit;
+                                const nextU: WeightUnit = currentU === "kg" ? "lbs" : "kg";
+                                saveMachineUnit(currentMachine, nextU);
+                                setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
+                              }}
+                              className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-black text-emerald-300 hover:border-emerald-400 transition"
+                              title="สลับหน่วยเฉพาะเครื่องนี้"
+                            >
+                              ⚙️ เครื่อง: {machineUnits[currentMachine] || globalWeightUnit}
+                            </button>
+                          )}
+                          {currentMachine && (
+                            <button
+                              type="button"
+                              onClick={() => updateMachineTag(baseExercise.id, "")}
+                              className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                            >
+                              ล้างแท็ก
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center gap-1.5">
                         {["Pin Stack", "Plate-Loaded", "North Fitness", "Hammer", "เครื่อง 1", "เครื่อง 2"].map((tag) => (
@@ -3855,18 +4143,88 @@ export default function Page() {
                           <Trophy size={14} /> Records {currentMachine && <span className="text-emerald-400 font-semibold normal-case">({currentMachine})</span>}
                         </p>
                         <div className="grid grid-cols-2 gap-2">
-                          <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Max</p><p className="mt-1 text-sm font-black text-emerald-300">{records.maxWeight ? `${records.maxWeight.weightLbs} × ${records.maxWeight.reps}` : "—"}</p></div>
-                          <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p><p className="mt-1 text-sm font-black text-zinc-100">{records.bestReps ? `${records.bestReps.weightLbs} × ${records.bestReps.reps}` : "—"}</p></div>
-                          <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p><p className="mt-1 text-sm font-black text-zinc-100">{records.bestVolume ? `${records.bestVolume.weightLbs} × ${records.bestVolume.reps}` : "—"}</p></div>
-                          <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Warmup</p><p className="mt-1 text-sm font-black text-zinc-100">{exercise.warmup && warmups.length > 0 ? `${warmups[0].weight}/${warmups[1].weight}/${warmups[2].weight}` : "Skip"}</p></div>
-                          {bodyweightEntry && records.maxWeight && (
-                            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 col-span-2">
-                              <p className="text-[10px] font-bold uppercase text-emerald-300">Relative Strength</p>
-                              <p className="mt-1 text-sm font-black text-emerald-300">
-                                {(records.maxWeight.weightLbs / bodyweightEntry.lbs).toFixed(2)}× BW
-                              </p>
+                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                            <p className="text-[10px] font-bold uppercase text-zinc-500">Max</p>
+                            <div className="mt-1">
+                              {records.maxWeight ? (
+                                <>
+                                  <p className="text-sm font-black text-emerald-300">
+                                    {records.maxWeight.rawValue !== undefined && records.maxWeight.unit
+                                      ? `${records.maxWeight.rawValue} ${records.maxWeight.unit}`
+                                      : `${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs`}
+                                    {" × "}{records.maxWeight.reps}
+                                  </p>
+                                  <p className="text-[10px] text-zinc-500">
+                                    {records.maxWeight.unit === "kg" && records.maxWeight.rawValue !== undefined
+                                      ? `(${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs)`
+                                      : `(${Math.round(records.maxWeight.weightLbs * 0.453592 * 10) / 10} kg)`}
+                                  </p>
+                                </>
+                              ) : (
+                                <p className="text-sm font-black text-zinc-500">—</p>
+                              )}
                             </div>
-                          )}
+                          </div>
+                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                            <p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p>
+                            <div className="mt-1">
+                              {records.bestReps ? (
+                                <>
+                                  <p className="text-sm font-black text-zinc-100">
+                                    {records.bestReps.rawValue !== undefined && records.bestReps.unit
+                                      ? `${records.bestReps.rawValue} ${records.bestReps.unit}`
+                                      : `${Math.round(records.bestReps.weightLbs * 10) / 10} lbs`}
+                                    {" × "}{records.bestReps.reps}
+                                  </p>
+                                  <p className="text-[10px] text-zinc-500">
+                                    {records.bestReps.unit === "kg" && records.bestReps.rawValue !== undefined
+                                      ? `(${Math.round(records.bestReps.weightLbs * 10) / 10} lbs)`
+                                      : `(${Math.round(records.bestReps.weightLbs * 0.453592 * 10) / 10} kg)`}
+                                  </p>
+                                </>
+                              ) : (
+                                <p className="text-sm font-black text-zinc-500">—</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                            <p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p>
+                            <p className="mt-1 text-sm font-black text-zinc-100">{records.bestVolume ? `${records.bestVolume.weightLbs} × ${records.bestVolume.reps}` : "—"}</p>
+                          </div>
+                          <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                            <p className="text-[10px] font-bold uppercase text-zinc-500">Warmup</p>
+                            <p className="mt-1 text-sm font-black text-zinc-100">{exercise.warmup && warmups.length > 0 ? `${warmups[0].weight}/${warmups[1].weight}/${warmups[2].weight}` : "Skip"}</p>
+                          </div>
+                          {bodyweightEntry && records.maxWeight && (() => {
+                            const ratio = records.maxWeight.weightLbs / bodyweightEntry.lbs;
+                            const isBench = exercise.name.toLowerCase().includes("bench press");
+                            const isSquat = exercise.name.toLowerCase().includes("squat");
+                            const isDL = exercise.name.toLowerCase().includes("deadlift");
+                            const target = isBench ? 1.5 : isSquat ? 2.0 : isDL ? 2.5 : null;
+
+                            return (
+                              <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 col-span-2">
+                                <div className="flex items-center justify-between">
+                                  <p className="text-[10px] font-bold uppercase text-emerald-300">Relative Strength</p>
+                                  {target && (
+                                    <span className="text-[10px] text-zinc-400 font-medium">
+                                      เป้าหมาย: {target}× BW
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="mt-1 flex items-baseline justify-between">
+                                  <p className="text-sm font-black text-emerald-300">
+                                    {ratio.toFixed(2)}× BW
+                                  </p>
+                                  {target && (
+                                    <span className={`text-[10px] font-bold ${ratio >= target ? "text-emerald-300" : "text-amber-400"}`}>
+                                      {ratio >= target ? "✓ บรรลุเป้าหมาย" : `ขาดอีก ${(target - ratio).toFixed(2)}×`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -3946,7 +4304,7 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl bg-zinc-950 p-3">
+                    <div className="hide-when-compact rounded-2xl bg-zinc-950 p-3">
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <div>
                           <p className="text-xs font-bold uppercase text-zinc-500">Working sets</p>
@@ -3976,32 +4334,68 @@ export default function Page() {
                         </div>
                       </div>
 
-                      <div className="mb-2 grid grid-cols-[38px_1fr_1.35fr_42px] gap-2 text-[11px] font-bold uppercase text-zinc-500">
-                        <span>Set</span><span>lbs</span><span>Reps</span><span>Save</span>
+                      <div className="mb-2 grid grid-cols-[38px_1.25fr_1.25fr_42px] gap-2 items-center text-[11px] font-bold uppercase text-zinc-500">
+                        <span>Set</span>
+                        <div className="flex items-center gap-1">
+                          <span>{effectiveUnit}</span>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
+                            className="rounded bg-zinc-800 px-1 py-0.2 text-[9px] font-bold text-emerald-400 hover:bg-zinc-700 transition"
+                            title="สลับหน่วย kg / lbs สำหรับท่านี้"
+                          >
+                            ⇄ {effectiveUnit === "kg" ? "lbs" : "kg"}
+                          </button>
+                        </div>
+                        <span>Reps</span>
+                        <span>Save</span>
                       </div>
                       <div className="space-y-2">
                         {setInputs.map((set, setIndex) => {
                           const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1] ?? lastSetMap[exercise.name]?.[setIndex + 1];
                           const fallbackRepVal = latestSet ? Number(latestSet.reps) : 10;
+                          const fallbackWeightVal = latestSet
+                            ? latestSet.unit === effectiveUnit
+                              ? (latestSet.rawValue ?? latestSet.weightLbs)
+                              : convertAndSnapWeight(latestSet.weightLbs, "lbs", effectiveUnit, isIso)
+                            : 0;
 
                           return (
-                            <div key={setIndex} className="grid grid-cols-[38px_1fr_1.35fr_42px] gap-2">
+                            <div key={setIndex} className="grid grid-cols-[38px_1.25fr_1.25fr_42px] gap-2">
                               <div className="flex items-center justify-center font-black text-zinc-400">{setIndex + 1}</div>
-                              <input
-                                id={`weight-input-${baseExercise.id}-${setIndex}`}
-                                inputMode="decimal"
-                                value={set.weightLbs}
-                                onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
-                                onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
-                                aria-label={`Weight in pounds for set ${setIndex + 1}`}
-                                className="min-w-0 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base outline-none focus:border-emerald-400 focus-visible:ring-2 focus-visible:ring-emerald-400 transition"
-                                placeholder={latestSet ? String(latestSet.weightLbs) : "0"}
-                              />
+                              <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400 transition">
+                                <button
+                                  type="button"
+                                  onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, fallbackWeightVal)}
+                                  className="flex w-6 sm:w-7 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                  aria-label={`Decrease weight by step for set ${setIndex + 1}`}
+                                >
+                                  −
+                                </button>
+                                <input
+                                  id={`weight-input-${baseExercise.id}-${setIndex}`}
+                                  inputMode="decimal"
+                                  value={set.weightLbs}
+                                  onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
+                                  onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
+                                  aria-label={`Weight in ${effectiveUnit} for set ${setIndex + 1}`}
+                                  className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-base font-semibold outline-none"
+                                  placeholder={fallbackWeightVal > 0 ? String(fallbackWeightVal) : "0"}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, fallbackWeightVal)}
+                                  className="flex w-6 sm:w-7 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                  aria-label={`Increase weight by step for set ${setIndex + 1}`}
+                                >
+                                  +
+                                </button>
+                              </div>
                               <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400 transition">
                                 <button
                                   type="button"
                                   onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
-                                  className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-lg select-none"
+                                  className="flex w-6 sm:w-7 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                   aria-label={`Decrease reps for set ${setIndex + 1}`}
                                 >
                                   −
@@ -4019,7 +4413,7 @@ export default function Page() {
                                 <button
                                   type="button"
                                   onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
-                                  className="flex w-7 sm:w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-lg select-none"
+                                  className="flex w-6 sm:w-7 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                   aria-label={`Increase reps for set ${setIndex + 1}`}
                                 >
                                   +
@@ -4369,10 +4763,10 @@ export default function Page() {
           <div className="flex items-start gap-3">
             <span className="text-2xl">🎉</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-black text-emerald-300">อัปเกรดเรียบร้อย!</p>
+              <p className="text-sm font-black text-emerald-300">นำเข้าข้อมูลเดิมสำเร็จ — Streak {migrationResult.weekStreak} สัปดาห์</p>
               <p className="mt-0.5 text-xs text-zinc-300">
-                เรานำเข้าข้อมูลเดิมของคุณแล้ว — Streak {migrationResult.weekStreak} สัปดาห์
-                {migrationResult.estimatedBodyweightLbs && `, น้ำหนักเริ่มต้น ${migrationResult.estimatedBodyweightLbs} lbs`}
+                ประเมินระดับ: {migrationResult.level === "advanced" ? "ขั้นสูง (Advanced)" : migrationResult.level === "intermediate" ? "ปานกลาง (Intermediate)" : "มือใหม่ (Beginner)"}
+                {migrationResult.estimatedBodyweightLbs ? ` · น้ำหนักตัว ~${migrationResult.estimatedBodyweightLbs} lbs` : ""}
               </p>
             </div>
             <button
@@ -4420,7 +4814,16 @@ export default function Page() {
         logsCount={logs.length}
         recordsCount={Object.keys(recordsMap).length}
         streak={performanceReport.currentStreak}
+        preferredUnit={globalWeightUnit}
+        onUnitChange={handleSetGlobalUnit}
         onExportLogs={exportLogsToCsv}
+      />
+
+      {/* Trainer Assessment Modal (Stage 2) */}
+      <TrainerAssessment
+        open={showAssessmentModal}
+        onClose={() => setShowAssessmentModal(false)}
+        onApplyPlan={handleApplyAssessmentPlan}
       />
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">

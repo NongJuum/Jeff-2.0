@@ -4,6 +4,7 @@ import { X, User, Trophy, Flame, Download, Settings, Info, Scale, ShieldCheck } 
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getMigrationResult } from "../lib/migration";
 import { getCurrentBodyweight } from "./BodyweightManager";
+import type { WeightUnit } from "../lib/units";
 
 type Props = {
   open: boolean;
@@ -11,6 +12,8 @@ type Props = {
   logsCount: number;
   recordsCount: number;
   streak: number;
+  preferredUnit?: WeightUnit;
+  onUnitChange?: (unit: WeightUnit) => void;
   onExportLogs: () => void;
 };
 
@@ -20,6 +23,8 @@ export function ProfileModal({
   logsCount,
   recordsCount,
   streak,
+  preferredUnit = "kg",
+  onUnitChange,
   onExportLogs,
 }: Props) {
   if (!open) return null;
@@ -95,6 +100,42 @@ export function ProfileModal({
                 <p className="text-[10px] font-bold uppercase text-zinc-500">น้ำหนักตัว</p>
                 <p className="text-xs font-black text-zinc-100 mt-0.5">{bw ? `${Math.round(bw.lbs)} lbs` : "—"}</p>
               </div>
+            </div>
+          </div>
+
+          {/* Unit Settings */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-zinc-300">⚖️ หน่วยน้ำหนักหลัก (Global Unit)</p>
+                <p className="text-[11px] text-zinc-500 mt-0.5">ใช้เป็นค่าเริ่มต้นสำหรับสร้างและบันทึกเซต</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onUnitChange?.("kg")}
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition ${
+                  preferredUnit === "kg"
+                    ? "bg-emerald-400 text-zinc-950 shadow-md shadow-emerald-500/20"
+                    : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 border border-zinc-800"
+                }`}
+              >
+                <span>กิโลกรัม (kg)</span>
+                {preferredUnit === "kg" && <span className="rounded-full bg-zinc-950/20 px-1.5 py-0.2 text-[10px]">Active</span>}
+              </button>
+              <button
+                type="button"
+                onClick={() => onUnitChange?.("lbs")}
+                className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition ${
+                  preferredUnit === "lbs"
+                    ? "bg-emerald-400 text-zinc-950 shadow-md shadow-emerald-500/20"
+                    : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 border border-zinc-800"
+                }`}
+              >
+                <span>ปอนด์ (lbs)</span>
+                {preferredUnit === "lbs" && <span className="rounded-full bg-zinc-950/20 px-1.5 py-0.2 text-[10px]">Active</span>}
+              </button>
             </div>
           </div>
 

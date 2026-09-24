@@ -57,7 +57,7 @@ export function WeeklyTrendChart({ scores }: Props) {
       <div className="flex items-center justify-between mb-2">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
-            4-Week Trend
+            {scores.length}-Week Trend (Score History)
           </p>
           <p className="mt-0.5 flex items-center gap-1.5 text-sm font-black" style={{ color: trendColor }}>
             <TrendIcon size={14} />

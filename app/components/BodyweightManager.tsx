@@ -52,9 +52,9 @@ export function BodyweightManager({ open, onClose, currentPrs }: Props) {
   // คำนวณ Relative Strength สำหรับท่าหลัก
   const bw = entry?.lbs ?? 0;
   const ratios = currentPrs && bw > 0 ? [
-    { name: "Bench Press", pr: currentPrs["Bench Press"], target: 1.5, unit: "× BW" },
-    { name: "Squat", pr: currentPrs["Barbell Back Squat"], target: 2.0, unit: "× BW" },
-    { name: "Deadlift", pr: currentPrs["Deadlift"], target: 2.5, unit: "× BW" },
+    { name: "Bench Press", pr: currentPrs["Bench Press"] || Object.entries(currentPrs).find(([k]) => k.toLowerCase().includes("bench press"))?.[1], target: 1.5, unit: "× BW" },
+    { name: "Squat", pr: currentPrs["Barbell Back Squat"] || currentPrs["Hack Squat"] || Object.entries(currentPrs).find(([k]) => k.toLowerCase().includes("squat"))?.[1], target: 2.0, unit: "× BW" },
+    { name: "Deadlift", pr: currentPrs["Deadlift"] || currentPrs["Romanian Deadlift RDL"] || Object.entries(currentPrs).find(([k]) => k.toLowerCase().includes("deadlift"))?.[1], target: 2.5, unit: "× BW" },
   ].filter((r) => r.pr) : [];
 
   return (
