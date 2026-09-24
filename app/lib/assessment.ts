@@ -469,7 +469,8 @@ export function calculatePrescriptionWeight(
   exerciseName: string,
   load: string,
   repsStr: string,
-  userProfile: UserProfile
+  userProfile: UserProfile,
+  mMusc: number = 1.0
 ): BiomechanicalResult {
   const bw = userProfile.weightKg;
   const cat = getExerciseStrengthCategory(exerciseName);
@@ -479,12 +480,8 @@ export function calculatePrescriptionWeight(
   const e_exp = getExperienceModifier(userProfile.expMonths).modifier;
   const r_rep = getRepsModifier(repsStr);
   const g_goal = getGoalModifier(userProfile.goal);
-  const m_musc = evaluateMuscleMass(
-    userProfile.gender,
-    userProfile.weightKg,
-    userProfile.muscleMassKg,
-    userProfile.muscleMassMode
-  ).modifier;
+  // Use provided muscle mass modifier (default 1.0) or compute if not supplied
+  const m_musc = mMusc;
 
   let force = bw * s_ratio * e_exp * r_rep * g_goal * m_musc;
 

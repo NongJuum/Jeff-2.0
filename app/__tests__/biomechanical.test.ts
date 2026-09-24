@@ -110,4 +110,32 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(res.hardwareWeightKg).toBeLessThanOrEqual(2.5);
     expect(res.displayNote).toMatch(/2(\.0|\.5)? kg/);
   });
+
+  it("Case 6: Dynamic recalculation when switching machine variants (Barbell -> Smith -> Cable)", () => {
+    const profile: UserProfile = {
+      gender: "male",
+      age: 28,
+      heightCm: 180,
+      weightKg: 80,
+      expMonths: 24, // Advanced modifier 1.0
+      daysPerWeek: 4,
+      goal: "hypertrophy",
+      injuries: [],
+      preferredWeightUnit: "kg",
+      updatedAt: new Date().toISOString(),
+    };
+
+    const barbellRes = calculatePrescriptionWeight("Bench Press", "barbell", "6 to 10", profile);
+    const smithRes = calculatePrescriptionWeight("Bench Press", "smith", "6 to 10", profile);
+    const cableRes = calculatePrescriptionWeight("Bench Press", "cable", "6 to 10", profile);
+
+    // Barbell tare is 20kg, Smith tare is 11kg, Cable tare is 0kg
+    expect(barbellRes.tareWeightKg).toBe(20);
+    expect(smithRes.tareWeightKg).toBe(11);
+    expect(cableRes.tareWeightKg).toBe(0);
+
+    // Ensure weights differ and do not blindly carry over incompatible values
+    expect(barbellRes.hardwareWeightKg).not.toBe(cableRes.hardwareWeightKg);
+  });
 });
+

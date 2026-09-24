@@ -332,9 +332,9 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                   />
                   <span className="text-xs text-zinc-500 font-bold">kg</span>
                 </div>
-                {muscleMassKg && (
+                {weightKg > 0 && (
                   <p className="text-[11px] text-emerald-300 font-medium">
-                    {muscleInfo.percentage}% นน. ตัว · {muscleInfo.label}
+                    {muscleMassKg ? `${muscleInfo.percentage}% นน. ตัว · ${muscleInfo.label}` : 'ประเมินด้วยเกณฑ์มาตรฐาน (ไม่มีข้อมูลมวลกล้ามเนื้อ)'}
                   </p>
                 )}
               </div>
@@ -520,7 +520,8 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                       ex.name,
                       ex.load,
                       ex.reps,
-                      currentProfile
+                      currentProfile,
+                      muscleInfo.modifier
                     );
 
                     return (
