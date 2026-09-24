@@ -40,7 +40,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="th">
+    <html lang="en">
       <body className="bg-zinc-950 antialiased">{children}</body>
     </html>
   );

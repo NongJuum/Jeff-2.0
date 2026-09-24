@@ -116,36 +116,3 @@ declare module "tailwindcss" {
   export default config;
 }
 
-declare module "lucide-react" {
-  export interface LucideProps {
-    size?: number | string;
-    color?: string;
-    strokeWidth?: number | string;
-    className?: string;
-    [key: string]: any;
-  }
-  export type LucideIcon = (props: LucideProps) => any;
-
-  export const Bell: LucideIcon;
-  export const CalendarDays: LucideIcon;
-  export const Check: LucideIcon;
-  export const ChevronDown: LucideIcon;
-  export const ChevronUp: LucideIcon;
-  export const ClipboardList: LucideIcon;
-  export const Dumbbell: LucideIcon;
-  export const Download: LucideIcon;
-  export const Flame: LucideIcon;
-  export const Library: LucideIcon;
-  export const MinusCircle: LucideIcon;
-  export const PlayCircle: LucideIcon;
-  export const Plus: LucideIcon;
-  export const RotateCcw: LucideIcon;
-  export const Save: LucideIcon;
-  export const Search: LucideIcon;
-  export const Sparkles: LucideIcon;
-  export const Timer: LucideIcon;
-  export const Trash2: LucideIcon;
-  export const Trophy: LucideIcon;
-  export const Volume2: LucideIcon;
-  export const X: LucideIcon;
-}

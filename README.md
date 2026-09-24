@@ -1,210 +1,80 @@
-# HA IT AI Coach Update
+# 🏋️ HA IT — Workout Tracker
 
-## New
-- Full project files
-- Preset mode
-- Custom builder
-- Coach mode with local rule-based AI chat
-- Users can chat to generate a workout plan
-- Generated chat plan can be saved directly into Custom
-- No API key needed
-- PR tracking
-- Warmup calculator
-- 14-day history
-- Weekly hard set checker
-- HA IT branding and favicon
+แอปบันทึกการฝึกเวทเทรนนิ่งแบบ mobile-first พร้อมระบบคะแนนอัจฉริยะ 
+แผนฝึกสำเร็จรูป และ 3D anatomy preview
 
-## Important
-This is a local rule-based coach, not a real OpenAI API integration. It works on Vercel without server keys.
+![HA IT](https://ha-it.vercel.app/hait-logo.png)
 
-## Upload
-Replace your repo with everything in this ZIP.
-Delete old postcss.config.js if it exists.
-Keep postcss.config.mjs.
+## ✨ Features
 
-## Substitution and volume fix
-- Fixed substitution select in Preset mode
-- Substitutions now persist in session state
-- Alternatives now fall back to related movement and same muscle group so the list no longer disappears
-- Increased sparse 4-exercise days to more complete 5-7 exercise days
-- Preset and coach plans now have more realistic hypertrophy day density
+- 📋 **แผนฝึกสำเร็จรูป** — 3/4/5 วัน (Jeff Nippard-inspired)
+- 🛠️ **Custom Plan Builder** — สร้างตารางเองแบบ drag & drop
+- 🏆 **ระบบคะแนน Weekly Performance** — Progress, Volume, Consistency, Recovery, Streak
+- 🎉 **PR Celebration** — ฉลองเมื่อทำลายสถิติ พร้อม confetti
+- 🦴 **3D Anatomy Preview** — ดูกล้ามเนื้อที่ใช้แต่ละท่า
+- ⏱️ **Rest Timer** — จับเวลาพักอัตโนมัติ
+- 📸 **Progress Photos** — ติดตามความก้าวหน้าพร้อม client-side image compression
+- ⚖️ **Bodyweight Tracking** — คำนวณ relative strength
+- 📊 **History & Trends** — กราฟความก้าวหน้าย้อนหลัง
+- 🧭 **Onboarding Wizard** — ตั้งค่าเริ่มต้น 3 ขั้นตอน (ระดับ, เป้าหมาย, วันฝึก)
+- ⚡ **FAB Start Today** — เข้าโหมดฝึกของวันนี้ได้ทันทีจากทุกหน้า
 
-## Jeff-principled correction
-- Rebuilt preset day structures around public Jeff-style hypertrophy principles:
-  - Most muscles land near the 10-20 hard sets/week range
-  - Avoids excessive per-session junk volume
-  - Compounds mostly 3 sets
-  - Isolation mostly 2-3 sets
-  - Direct arms 3 sets per isolation, with indirect arm volume from pressing/pulling
-  - Very fatiguing hinge/deadlift patterns stay at 2 sets
-- 3 day, 4 day, and 5 day presets now use balanced movement order:
-  - Heavy compound first
-  - Secondary compound next
-  - Isolation/accessory later
-  - Arms/abs/calves toward the end
-- Substitutions remain same-muscle/similar-pattern and work in both Preset and Custom.
+## 🚀 Quick Start
 
-## Individual set and substitution fix
-- Fixed preset substitution so selecting an option immediately changes the displayed exercise.
-- Added individual per-exercise set prescriptions instead of one generic rule per movement pattern.
-- Pec Deck and Seated Cable Pec Flye are now 4 hard sets, not 2.
-- Face Away Bayesian Curl and Overhead Cable Extension are 4 sets; most other direct arms are 3 sets.
-- Cable lateral raise and major lateral raise variations are 4 sets.
-- Heavy hinges/deadlifts stay lower due to fatigue.
+```bash
+# ติดตั้ง dependencies
+bun install
 
-## Mobile UX cleanup
-- History and Library are now real bottom tabs, not dropdown panels.
-- Added Today tab for a cleaner workout view.
-- Added exercise navigation carousel so users can jump to a movement without scrolling through the whole day.
-- Default workout view shows one exercise at a time with Previous/Next controls.
-- Weekly volume checker is collapsed by default to reduce vertical clutter.
-- Bottom navigation is now the main mobile navigation.
+# รัน development server
+bun dev
 
-## Custom responsive cleanup
-- Custom plan settings are collapsed by default.
-- Day targets/recommendation are collapsed into a small panel.
-- Add Exercise is collapsed by default.
-- Exercise set/reps editing is collapsed.
-- Substitution selector is collapsed.
-- Exercise card text and spacing are tightened for mobile.
+# Build production
+bun run build
 
-## All pages mobile cleanup
-- Every main page now has a compact page header instead of a large repeated hero block.
-- Today/Preset/Custom controls are contextual, not duplicated everywhere.
-- Library is now accordion grouped by muscle and opens groups only when searching.
-- History is standalone and cleaner for mobile.
-- Coach chat is more compact.
-- Day carousel and exercise carousel are smaller and more responsive.
+# รัน tests
+bun test
+```
 
-## Coach answer fix
-- Coach now separates direct questions from plan generation.
-- It can answer set/volume/warmup/substitution questions without forcing a new plan.
-- It only generates a plan when the message looks like a plan request.
-- Added direct exercise prescription answers for mentioned exercise names.
+เปิด [http://localhost:3000](http://localhost:3000)
 
-## Free Smart Coach upgrade
-- Still no paid API.
-- Better intent routing:
-  - Direct set questions
-  - Warmup questions
-  - Substitution questions
-  - Volume analysis
-  - Plan generation
-  - Simple plan adjustment requests
-- Can analyze current selected plan using weekly hard set summary.
-- Can create an adjusted plan and save it to Custom.
+## 🛠️ Tech Stack
 
-## Layout/CSS placement fix
-- Removed incorrect root-level layout.tsx if it contained CSS.
-- Ensured Tailwind import lives only in app/globals.css.
-- Ensured app/layout.tsx is valid TypeScript/React.
+| เครื่องมือ | เวอร์ชัน |
+|-----|---------|
+| Next.js | 15 (App Router) |
+| React | 18 / 19 |
+| Tailwind CSS | 4 |
+| TypeScript | 5 |
+| Lucide React | Icons |
+| Vitest | Unit Tests |
 
-## No Coach clean version
-- Removed Coach mode from the UI.
-- Removed Smart Coach copy.
-- Bottom navigation is now Today, Preset, Custom, Log and Library.
-- The app is focused on workout tracking and custom plan building.
+## 📁 โครงสร้างโปรเจกต์
 
+```
+Jeff-2.0/
+├── app/
+│   ├── components/
+│   │   ├── OnboardingWizard.tsx
+│   │   ├── PlanBuilder.tsx
+│   │   └── ProgressPhotos.tsx
+│   ├── __tests__/
+│   │   └── scoring.test.ts
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── public/
+│   ├── anatomy/
+│   ├── manifest.webmanifest
+│   └── sw.js
+├── package.json
+├── tailwind.config.ts
+└── tsconfig.json
+```
 
-## Minimal responsive UI cleanup
-- Reduced oversized typography and spacing across all main screens.
-- Shortened non-essential descriptive text.
-- Made day cards, exercise navigation, and bottom navigation smaller and cleaner.
-- Simplified selected-day summary and workout card UI.
-- Improved small-screen scaling for a cleaner mobile-first feel.
+## 🚢 Deploy
 
-## Typecheck fix
-- Removed leftover Coach function savePlanFromChat.
-- Removed remaining references to setChatMessages/chatMessages after Coach mode removal.
+Push ขึ้น GitHub → Vercel จะ auto-deploy ที่ [ha-it.vercel.app](https://ha-it.vercel.app)
 
-## Manual set controls
-- Added + Set button in the logging area.
-- Added − Set button in the logging area.
-- Manual added sets are preserved while filling the workout.
-- Save resets the exercise back to the planned set count.
+## 📝 License
 
-## Records on workout page
-- Workout page now shows Records for each exercise:
-  - Max Weight
-  - Best Reps
-  - Best Volume
-- Warmup still uses Max Weight record.
-- This gives better context while training instead of relying on one PR number.
-
-## Stable tick save fix
-- Rebuilt from stable records version.
-- Check button saves one set immediately and clears that row.
-- Save sets saves all valid rows and clears all rows.
-- Avoids broken JSX patch from previous build.
-
-## Duplicate helper fix
-- Removed duplicate persistSetInputsNow helper created by repeated patches.
-- Kept tick-save and clear behavior intact.
-
-## Keep values after tick
-- Check button now saves a single set and keeps the lbs/reps visible.
-- Saved rows stay checked.
-- Editing lbs/reps marks the row as unsaved again.
-- Finish & clear saves unsaved rows and clears all inputs.
-
-## Last workout placeholders
-- Empty lbs/reps fields now show the last saved value for that exercise and set number.
-- If there is no history, placeholders show 0.
-- After saving a set, the latest log updates future placeholders.
-
-## Rest timer
-- Added optional rest countdown in the workout page.
-- Rest starts automatically after saving a set when enabled.
-- Defaults:
-  - Hinge/deadlift/RDL: 4:00
-  - Compound press/row/pull/squat: 3:00
-  - Isolation arms/delts/flye: 1:30
-  - Abs/calves: 1:00
-- Users can turn the timer on/off or manually start/stop it.
-
-## Rest timer controls
-- Added Short / Normal / Heavy rest modes per exercise.
-- Added −30s / +30s adjustment.
-- Machine compounds default closer to 2:30, free-weight compounds around 3:00, hinges around 3:30, isolation around 1:30.
-
-## Exercise Preview Muscle Graphic
-- Added an SVG muscle preview card for each exercise.
-- Shows front and back muscle maps.
-- Uses red for primary emphasis and yellow for secondary emphasis.
-- Based on the selected exercise identity, so substitutions update the preview too.
-
-## Clean muscle preview graphic
-- Replaced the first stick-figure SVG with a cleaner silhouette-style SVG.
-- Larger shapes, less clutter, easier to read on mobile.
-
-## Build fix
-- Removed leftover MusclePreviewFigure type-signature tail that caused a JSX/TS parse error.
-
-## Final muscle preview syntax fix
-- Replaced the full MuscleRegion helper/component section to remove all partial leftover syntax.
-
-## Compact step-by-step UI final
-- Removed duplicate top Today/Preset/Custom tabs.
-- Muscle overview is collapsed by default.
-- Exercise preview is now a small targeted thumbnail.
-- Records and rest timer are compact two-column cards.
-- Added extra bottom padding for the fixed mobile nav.
-
-## Permanent PR Records & History Retention
-- Added dedicated permanent storage (`haitPermanentRecordsV1`) for all-time Personal Records (PRs): Max Weight, Best Reps, and Best Volume.
-- Max Weight records are permanently preserved and never downgraded or deleted when lifting lighter weights or when time passes.
-- Backward compatibility: automatically recovers legacy `trainingStatsV2`, `trainingLatestV2`, and historical logs into all-time records on launch.
-- Workout history logs are preserved across days and weeks; sets only replace or update within the same day/session.
-- History Log UI now supports filtering by All-time, 30 days, or 14 days.
-- Clear History safely clears session logs while preserving all-time PRs.
-
-## Machine Variants & Machine Tags (Multi-Machine Weight Tracking)
-- Added dedicated machine variants to Exercise Library:
-  - `Pin-Loaded Chest Press` (selectorized weight stack)
-  - `Plate-Loaded Chest Press` (independent plate sleeves / Hammer Strength style)
-  - `Converging Cable Chest Press` (dual cable / overhead pivot, e.g. North Fitness)
-  - `Incline Converging Chest Press`
-- Added per-exercise Machine Tag selector & custom text input (`haitMachineTagsV1`) on workout cards.
-- Quick chips for common gym machines: `Pin Stack`, `Plate-Loaded`, `North Fitness`, `Hammer`, `เครื่อง 1`, `เครื่อง 2`, or type custom name.
-- PR Records, Warmup calculations, and last-set placeholders automatically track and adapt independently per machine.
-- Machine tags are included in History logs and CSV export.
+Private project — © 2026 NongJuum

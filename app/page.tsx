@@ -21,6 +21,9 @@ import {
   Trophy,
   X,
 } from "lucide-react";
+import { OnboardingWizard, hasCompletedOnboarding } from "./components/OnboardingWizard";
+import { PlanBuilder } from "./components/PlanBuilder";
+import { ProgressPhotos } from "./components/ProgressPhotos";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
 type AppMode = "today" | "preset" | "custom" | "history" | "library";
@@ -100,6 +103,20 @@ const PERMANENT_RECORDS_KEY = "haitPermanentRecordsV1";
 const LEGACY_STATS_KEY = "trainingStatsV2";
 const MACHINE_TAGS_KEY = "haitMachineTagsV1";
 const PRESET_SETS_KEY = "haitPresetSetsV1";
+const WEEK_STREAK_KEY = "haitWeekStreak";
+const BODYWEIGHT_LOGS_KEY = "haitBodyweightLogsV1";
+const CURRENT_BODYWEIGHT_KEY = "haitCurrentBodyweightKg";
+
+type BodyweightLog = {
+  date: string;
+  weightKg: number;
+};
+
+type WeeklyTrendPoint = {
+  label: string;
+  score: number;
+  dateRange: string;
+};
 
 function makeId(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -195,6 +212,58 @@ function updateRecordsWithSet(records: Record<string, ExerciseRecords>, log: Log
   }
 
   return next;
+}
+
+function checkIsPr(
+  records: Record<string, ExerciseRecords>,
+  log: LogSet
+): { isPr: boolean; type: "weight" | "reps" | "volume"; oldVal: string; newVal: string } | null {
+  if (!log || !log.exerciseName || !Number.isFinite(log.weightLbs) || !Number.isFinite(log.reps) || log.weightLbs <= 0 || log.reps <= 0) {
+    return null;
+  }
+  const key = getEffectiveExerciseKey(log.exerciseName, log.machine);
+  const current = records[key];
+  if (!current || !current.maxWeight) {
+    return null;
+  }
+
+  // 1. Max Weight PR
+  if (log.weightLbs > current.maxWeight.weightLbs) {
+    const oldKg = Math.round(current.maxWeight.weightLbs * 0.453592 * 10) / 10;
+    const newKg = Math.round(log.weightLbs * 0.453592 * 10) / 10;
+    return {
+      isPr: true,
+      type: "weight",
+      oldVal: `${oldKg} kg (${current.maxWeight.weightLbs} lbs) × ${current.maxWeight.reps} reps`,
+      newVal: `${newKg} kg (${log.weightLbs} lbs) × ${log.reps} reps`,
+    };
+  }
+
+  // 2. Best Reps PR
+  if (current.bestReps && log.weightLbs >= current.bestReps.weightLbs && log.reps > current.bestReps.reps) {
+    const oldKg = Math.round(current.bestReps.weightLbs * 0.453592 * 10) / 10;
+    const newKg = Math.round(log.weightLbs * 0.453592 * 10) / 10;
+    return {
+      isPr: true,
+      type: "reps",
+      oldVal: `${oldKg} kg × ${current.bestReps.reps} reps`,
+      newVal: `${newKg} kg × ${log.reps} reps`,
+    };
+  }
+
+  // 3. Best Volume PR
+  const logVol = log.weightLbs * log.reps;
+  const bestVol = current.bestVolume ? current.bestVolume.weightLbs * current.bestVolume.reps : 0;
+  if (bestVol > 0 && logVol > bestVol * 1.05) {
+    return {
+      isPr: true,
+      type: "volume",
+      oldVal: `${Math.round(bestVol * 0.453592)} kg total volume`,
+      newVal: `${Math.round(logVol * 0.453592)} kg total volume`,
+    };
+  }
+
+  return null;
 }
 
 function loadPermanentRecords(): Record<string, ExerciseRecords> {
@@ -1355,16 +1424,78 @@ type PerformanceReport = {
   volume: number;
   consistency: number;
   completion: number;
+  recovery: number;
+  streakBonus: number;
+  restDays: number;
+  uniqueDays: number;
+  totalSets: number;
+  currentStreak: number;
+  fatigueWarning: boolean;
+  deloadSuggestion: boolean;
+  weeklyTrends: WeeklyTrendPoint[];
   challenges: Challenge[];
   hasData: boolean;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+function getComputedStreak(logs: LogSet[]): number {
+  if (logs.length === 0) return readJson<number>(WEEK_STREAK_KEY, 0);
+  const now = Date.now();
+  let streak = 0;
+  for (let w = 0; w < 52; w++) {
+    const start = now - (w + 1) * 7 * DAY_MS;
+    const end = now - w * 7 * DAY_MS;
+    const hasLog = logs.some((l) => {
+      const t = new Date(l.date).getTime();
+      return t >= start && t <= end;
+    });
+    if (hasLog) {
+      streak++;
+    } else {
+      if (w === 0) continue;
+      break;
+    }
+  }
+  const saved = readJson<number>(WEEK_STREAK_KEY, 0);
+  return Math.max(streak, saved);
+}
+
 function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePlan: DayPlan[]): PerformanceReport {
   const now = Date.now();
   const weekAgo = now - 7 * DAY_MS;
   const thisWeek = logs.filter((l) => new Date(l.date).getTime() >= weekAgo);
+
+  // 4-Week historical trends
+  const weeklyTrends: WeeklyTrendPoint[] = [];
+  for (let w = 3; w >= 0; w--) {
+    const wStart = now - (w + 1) * 7 * DAY_MS;
+    const wEnd = now - w * 7 * DAY_MS;
+    const wLogs = logs.filter((l) => {
+      const t = new Date(l.date).getTime();
+      return t >= wStart && t < wEnd;
+    });
+    const label = w === 0 ? "สัปดาห์นี้" : w === 1 ? "สัปดาห์ก่อน" : `-${w} สัปดาห์`;
+    const dStart = new Date(wStart).toLocaleDateString("th-TH", { month: "numeric", day: "numeric" });
+    const dEnd = new Date(wEnd).toLocaleDateString("th-TH", { month: "numeric", day: "numeric" });
+    if (wLogs.length === 0) {
+      weeklyTrends.push({ label, score: 0, dateRange: `${dStart} - ${dEnd}` });
+    } else {
+      const uDays = new Set(wLogs.map((l) => getLocalDateKey(l.date))).size;
+      const wPlannedSets = activePlan.reduce((s, d) => s + d.exercises.reduce((x, e) => x + e.sets, 0), 0);
+      const wCompletion = wPlannedSets > 0 ? Math.min(100, (wLogs.length / wPlannedSets) * 100) : 0;
+      const wConsistency = Math.min(100, (uDays / Math.max(1, plannedDays)) * 100);
+      const wRest = 7 - uDays;
+      const wRecovery = wRest >= 2 ? 100 : wRest === 1 ? 75 : 50;
+      const wVol = Math.min(100, (wLogs.length / (plannedDays * 12)) * 100);
+      const wScore = Math.round(wVol * 0.35 + wConsistency * 0.25 + wCompletion * 0.25 + wRecovery * 0.15);
+      weeklyTrends.push({ label, score: Math.min(100, Math.max(10, wScore)), dateRange: `${dStart} - ${dEnd}` });
+    }
+  }
+
+  // 🆕 Streak bonus (ต้องเก็บใน localStorage เพิ่ม)
+  const currentStreak = readJson<number>("haitWeekStreak", 0);
+  const streakBonus = Math.min(100, currentStreak * 10); // สูงสุด 10 สัปดาห์
 
   if (thisWeek.length === 0) {
     return {
@@ -1376,6 +1507,15 @@ function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePla
       volume: 0,
       consistency: 0,
       completion: 0,
+      recovery: 100,
+      streakBonus,
+      restDays: 7,
+      uniqueDays: 0,
+      totalSets: 0,
+      currentStreak,
+      fatigueWarning: false,
+      deloadSuggestion: currentStreak >= 4,
+      weeklyTrends,
       challenges: [],
       hasData: false,
     };
@@ -1411,7 +1551,7 @@ function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePla
   }
   const progress = progressSum / bestThis.size;
 
-  // 2) VOLUME: เซต/กล้ามเนื้อ สัปดาห์นี้ (โซนทอง 10–20 เซต)
+  // 2) VOLUME: เซต/กล้ามเนื้อ สัปดาห์นี้
   const muscleSets: Record<string, number> = {};
   for (const l of thisWeek) {
     const ex = exerciseByNameMap.get(l.exerciseName);
@@ -1445,8 +1585,9 @@ function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePla
     }
   }
   const volEntries = Object.values(muscleSets);
+  // Volume ใหม่: ไม่ลงโทษคนเล่นเยอะ
   const volume = volEntries.length
-    ? volEntries.reduce((s, n) => s + (n >= 10 && n <= 20 ? 100 : n < 10 ? (n / 10) * 100 : 85), 0) / volEntries.length
+    ? volEntries.reduce((s, n) => s + Math.min(100, (n / 12) * 100), 0) / volEntries.length
     : 0;
   const musclesOver10 = volEntries.filter((n) => n >= 10).length;
 
@@ -1458,7 +1599,27 @@ function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePla
   const plannedSets = activePlan.reduce((s, d) => s + d.exercises.reduce((x, e) => x + e.sets, 0), 0);
   const completion = plannedSets > 0 ? Math.min(100, (thisWeek.length / plannedSets) * 100) : 0;
 
-  const score = Math.round(progress * 0.3 + volume * 0.3 + consistency * 0.25 + completion * 0.15);
+  // 🆕 Recovery score (ประเมินจาก rest days)
+  const restDays = 7 - uniqueDays;
+  const recovery = restDays >= 2 ? 100 : restDays === 1 ? 75 : 50; // ต้องพักอย่างน้อย 2 วัน
+
+  // สูตรใหม่: สมดุล + มี safety net
+  const score = Math.round(
+    progress * 0.25 +        // ลดจาก 0.3 (ไม่ให้ progress ครอบงำ)
+    volume * 0.25 +          // คงเดิม แต่แก้ cap
+    consistency * 0.20 +     // ลดจาก 0.25
+    completion * 0.15 +      // คงเดิม
+    recovery * 0.10 +        // 🆕 ใหม่! พักผ่อนเพียงพอ = +คะแนน
+    streakBonus * 0.05       // 🆕 ใหม่! สัปดาห์ต่อเนื่อง
+  );
+
+  // Update latest weekly trend point
+  if (weeklyTrends.length > 0) {
+    weeklyTrends[weeklyTrends.length - 1].score = score;
+  }
+
+  const fatigueWarning = restDays < 2 || (thisWeek.length >= 60 && restDays <= 2);
+  const deloadSuggestion = currentStreak >= 4;
 
   // 🏅 Rank + 💙 คำให้กำลังใจ (คะแนนน้อย = กอดก่อน ไม่ด่า)
   const info =
@@ -1481,7 +1642,25 @@ function computeWeeklyPerformance(logs: LogSet[], plannedDays: number, activePla
     { name: "Show Up 📅", desc: "เข้ายิมครบตามที่เลือกไว้", done: uniqueDays >= plannedDays, progress: `${uniqueDays}/${plannedDays}` },
   ];
 
-  return { score, ...info, progress, volume, consistency, completion, challenges, hasData: true };
+  return {
+    score,
+    ...info,
+    progress,
+    volume,
+    consistency,
+    completion,
+    recovery,
+    streakBonus,
+    restDays,
+    uniqueDays,
+    totalSets: thisWeek.length,
+    currentStreak,
+    fatigueWarning,
+    deloadSuggestion,
+    weeklyTrends,
+    challenges,
+    hasData: true,
+  };
 }
 
 function ScoreBar({ label, value }: { label: string; value: number }) {
@@ -1501,12 +1680,89 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
+function WeeklyTrendChart({ trends }: { trends: WeeklyTrendPoint[] }) {
+  if (!trends || trends.length === 0) return null;
+
+  const maxScore = 100;
+  const height = 65;
+  const width = 280;
+  const paddingX = 28;
+  const paddingY = 14;
+
+  const stepX = (width - paddingX * 2) / (trends.length - 1);
+  const points = trends.map((t, i) => {
+    const x = paddingX + i * stepX;
+    const y = height - paddingY - (t.score / maxScore) * (height - paddingY * 2);
+    return { x, y, score: t.score, label: t.label };
+  });
+
+  const pathD = points.reduce((acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`), "");
+  const fillD = `${pathD} L ${points[points.length - 1].x} ${height} L ${points[0].x} ${height} Z`;
+
+  const lastScore = trends[trends.length - 1]?.score ?? 0;
+  const prevScore = trends[trends.length - 2]?.score ?? 0;
+  const diff = lastScore - prevScore;
+
+  return (
+    <div className="mt-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">📈 Progress 4 สัปดาห์</span>
+        {prevScore > 0 && lastScore > 0 && (
+          <span className={`text-[10px] font-black rounded-md px-1.5 py-0.5 ${diff >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-800 text-zinc-400"}`}>
+            {diff >= 0 ? `+${diff}` : diff} pts vs สัปดาห์ก่อน
+          </span>
+        )}
+      </div>
+
+      <div className="mt-2 flex justify-center">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-16 overflow-visible">
+          <defs>
+            <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+            </linearGradient>
+          </defs>
+
+          <path d={fillD} fill="url(#trendGrad)" />
+          <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+
+          {points.map((p, i) => (
+            <g key={i}>
+              <circle cx={p.x} cy={p.y} r={p.score > 0 ? 3.5 : 2} fill="#10b981" stroke="#09090b" strokeWidth="2" />
+              {p.score > 0 && (
+                <text x={p.x} y={p.y - 6} textAnchor="middle" fill="#a1a1aa" fontSize="9" fontWeight="bold">
+                  {p.score}
+                </text>
+              )}
+            </g>
+          ))}
+        </svg>
+      </div>
+
+      <div className="mt-1 flex justify-between text-[10px] font-bold text-zinc-400 px-1">
+        {trends.map((t, i) => (
+          <span key={i} className={i === trends.length - 1 ? "text-emerald-300 font-black" : ""}>
+            {t.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
   return (
     <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Weekly Performance</p>
+          <div className="flex items-center gap-2">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Weekly Performance</p>
+            {report.currentStreak > 0 && (
+              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black text-amber-300">
+                🔥 {report.currentStreak}w streak
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-2xl font-black">{report.hasData ? `${report.score}/100` : "—/100"}</p>
         </div>
         <span className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xl font-black text-emerald-300">
@@ -1514,14 +1770,45 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
         </span>
       </div>
 
+      {/* Fatigue Warning Banner */}
+      {report.fatigueWarning && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-200">
+          <span className="text-sm">⚠️</span>
+          <div>
+            <p className="font-bold text-amber-300">Fatigue Warning (แจ้งเตือนความล้า)</p>
+            <p className="mt-0.5 text-zinc-300 text-[11px] leading-relaxed">
+              สัปดาห์นี้เล่นหนักมาก ({report.uniqueDays} วันฝึก / {report.totalSets} เซต) พักเพิ่มอีก 1 วันไหม? กล้ามเนื้อโตตอนพักผ่อนนะ 💙
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Deload Week Suggestion */}
+      {report.deloadSuggestion && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-xs text-sky-200">
+          <span className="text-sm">🔄</span>
+          <div>
+            <p className="font-bold text-sky-300">คำแนะนำ Deload Week (สัปดาห์ต่อเนื่อง {report.currentStreak}w)</p>
+            <p className="mt-0.5 text-zinc-300 text-[11px] leading-relaxed">
+              คุณฝึกหนักต่อเนื่องมา 4+ สัปดาห์แล้ว! แนะนำให้ Deload 1 สัปดาห์ โดยลดน้ำหนักลง 40–50% เพื่อให้ข้อต่อและ CNS ฟื้นตัวเต็มที่
+            </p>
+          </div>
+        </div>
+      )}
+
       {report.hasData && (
         <>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             <ScoreBar label="Strength ↑" value={report.progress} />
             <ScoreBar label="Volume" value={report.volume} />
             <ScoreBar label="Consistency" value={report.consistency} />
             <ScoreBar label="Completion" value={report.completion} />
+            <ScoreBar label="Recovery 😴" value={report.recovery} />
+            <ScoreBar label="Streak 🔥" value={report.streakBonus} />
           </div>
+
+          <WeeklyTrendChart trends={report.weeklyTrends} />
+
           <div className="mt-3 space-y-2">
             {report.challenges.map((c) => (
               <div
@@ -1537,6 +1824,257 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
       )}
 
       <p className="mt-3 rounded-xl bg-zinc-950 px-3 py-2 text-xs text-zinc-300">{report.message}</p>
+    </div>
+  );
+}
+
+function ConfettiCanvas() {
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#fbbf24"];
+    const particles = Array.from({ length: 65 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * -canvas.height * 0.5,
+      size: Math.random() * 8 + 6,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 4,
+      vy: Math.random() * 4 + 3,
+      rot: Math.random() * 360,
+      vrot: (Math.random() - 0.5) * 10,
+    }));
+
+    let animId: number;
+    const startTime = Date.now();
+
+    const loop = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const elapsed = Date.now() - startTime;
+      const opacity = Math.max(0, 1 - elapsed / 3500);
+
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      for (const p of particles) {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.rot += p.vrot;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rot * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        ctx.restore();
+      }
+      ctx.restore();
+
+      if (elapsed < 3500) {
+        animId = requestAnimationFrame(loop);
+      }
+    };
+
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
+  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-[120]" />;
+}
+
+function PrCelebrationModal({
+  pr,
+  bodyweightKg,
+  onClose,
+}: {
+  pr: {
+    exerciseName: string;
+    machine?: string;
+    recordType: "weight" | "reps" | "volume";
+    oldVal: string;
+    newVal: string;
+  };
+  bodyweightKg: number | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    try {
+      if (typeof window !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate([100, 50, 200]);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+      <ConfettiCanvas />
+      <div className="relative w-full max-w-sm rounded-3xl border border-emerald-500/40 bg-zinc-950 p-6 text-center shadow-2xl shadow-emerald-500/20 animate-in zoom-in-95 duration-200">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-emerald-500/20 to-amber-500/20 border border-emerald-500/40 text-4xl shadow-lg shadow-emerald-500/20">
+          🏆
+        </div>
+
+        <p className="mt-4 text-xs font-black uppercase tracking-widest text-emerald-400">Personal Record!</p>
+        <h3 className="mt-1 text-2xl font-black text-white">{pr.exerciseName}</h3>
+        {pr.machine && (
+          <span className="mt-1 inline-block rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[11px] font-bold text-zinc-300">
+            {pr.machine}
+          </span>
+        )}
+
+        <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-left">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+            {pr.recordType === "weight" ? "Max Weight Record" : pr.recordType === "reps" ? "Best Reps Record" : "Volume Record"}
+          </p>
+          <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
+            <span>เดิม: {pr.oldVal}</span>
+          </div>
+          <div className="mt-1 flex items-center justify-between font-black text-emerald-300 text-sm">
+            <span>ใหม่: {pr.newVal}</span>
+            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">PR 💥</span>
+          </div>
+        </div>
+
+        {bodyweightKg && pr.recordType === "weight" && (
+          <p className="mt-3 text-xs text-zinc-400">
+            🏋️ Relative Strength:{" "}
+            <span className="font-black text-emerald-300">
+              {(Number(pr.newVal.split(" ")[0]) / bodyweightKg).toFixed(2)}x Bodyweight
+            </span>
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-6 w-full rounded-2xl bg-emerald-400 py-3.5 text-sm font-black text-zinc-950 shadow-lg shadow-emerald-400/25 transition active:scale-95 hover:bg-emerald-300"
+        >
+          ลุยต่อเลย! 🔥
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function BodyweightModal({
+  currentWeight,
+  logs,
+  recordsMap,
+  onSave,
+  onClose,
+}: {
+  currentWeight: number | null;
+  logs: BodyweightLog[];
+  recordsMap: Record<string, ExerciseRecords>;
+  onSave: (kg: number) => void;
+  onClose: () => void;
+}) {
+  const [val, setVal] = useState(currentWeight ? String(currentWeight) : "");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const num = parseFloat(val);
+    if (!isNaN(num) && num > 20 && num < 300) {
+      onSave(Math.round(num * 10) / 10);
+      onClose();
+    }
+  };
+
+  const compoundExercises = [
+    { name: "Barbell Bench Press", label: "Bench Press", key: "Barbell Bench Press" },
+    { name: "Barbell Back Squat", label: "Back Squat", key: "Barbell Back Squat" },
+    { name: "Barbell Deadlift", label: "Deadlift", key: "Barbell Deadlift" },
+    { name: "Overhead Barbell Press", label: "Overhead Press", key: "Overhead Barbell Press" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-sm rounded-3xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-xl p-2 text-zinc-400 hover:bg-zinc-900 hover:text-white"
+        >
+          <X size={18} />
+        </button>
+
+        <div className="flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-2xl">
+            ⚖️
+          </div>
+          <div>
+            <h3 className="text-lg font-black text-white">Bodyweight Tracking</h3>
+            <p className="text-xs text-zinc-400">บันทึกน้ำหนักตัว & คำนวณความแข็งแกร่ง</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-5">
+          <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wide">น้ำหนักตัวปัจจุบัน (กก. / kg)</label>
+          <div className="mt-2 flex gap-2">
+            <input
+              type="number"
+              step="0.1"
+              placeholder="เช่น 72.5"
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+              className="flex-1 rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-base font-black text-white outline-none focus:border-emerald-400"
+              autoFocus
+            />
+            <button
+              type="submit"
+              className="rounded-2xl bg-emerald-400 px-5 font-black text-zinc-950 hover:bg-emerald-300 transition active:scale-95"
+            >
+              บันทึก
+            </button>
+          </div>
+        </form>
+
+        {currentWeight && (
+          <div className="mt-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-emerald-300">🏋️ Relative Strength ({currentWeight} kg)</p>
+            <div className="mt-3 space-y-2">
+              {compoundExercises.map((c) => {
+                const rec = recordsMap[c.key]?.maxWeight;
+                if (!rec) return null;
+                const prKg = Math.round(rec.weightLbs * 0.453592 * 10) / 10;
+                const ratio = (prKg / currentWeight).toFixed(2);
+                return (
+                  <div key={c.key} className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-300">{c.label}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-zinc-400">{prKg} kg</span>
+                      <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-black text-emerald-300">
+                        {ratio}x BW
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+              {!compoundExercises.some((c) => recordsMap[c.key]?.maxWeight) && (
+                <p className="text-[11px] text-zinc-500">บันทึกเซต Compound เพื่อดูอัตราส่วนความแข็งแกร่งต่อน้ำหนักตัว</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {logs.length > 0 && (
+          <div className="mt-4">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">ประวัติน้ำหนักย้อนหลัง</p>
+            <div className="mt-2 max-h-32 overflow-y-auto space-y-1.5 pr-1">
+              {logs.slice(0, 5).map((l, i) => (
+                <div key={i} className="flex justify-between rounded-xl bg-zinc-900/40 px-3 py-1.5 text-xs text-zinc-400">
+                  <span>{new Date(l.date).toLocaleDateString("th-TH", { month: "short", day: "numeric" })}</span>
+                  <span className="font-bold text-zinc-200">{l.weightKg} kg</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1587,6 +2125,34 @@ export default function Page() {
   const [substituteModalExercise, setSubstituteModalExercise] = useState<PlanExercise | null>(null);
   const [substituteSearch, setSubstituteSearch] = useState("");
   const [substituteFilter, setSubstituteFilter] = useState<"movement" | "group" | "all">("movement");
+
+  // PR Celebration Modal & Bodyweight State
+  const [prCelebration, setPrCelebration] = useState<{
+    exerciseName: string;
+    machine?: string;
+    recordType: "weight" | "reps" | "volume";
+    oldVal: string;
+    newVal: string;
+  } | null>(null);
+
+  const [bodyweightKg, setBodyweightKg] = useState<number | null>(() => readJson<number | null>(CURRENT_BODYWEIGHT_KEY, null));
+  const [bodyweightLogs, setBodyweightLogs] = useState<BodyweightLog[]>(() => readJson<BodyweightLog[]>(BODYWEIGHT_LOGS_KEY, []));
+  const [isBwModalOpen, setIsBwModalOpen] = useState(false);
+
+  function handleSaveBodyweight(kg: number) {
+    setBodyweightKg(kg);
+    const newEntry: BodyweightLog = {
+      date: new Date().toISOString(),
+      weightKg: kg,
+    };
+    setBodyweightLogs((old) => [newEntry, ...old.filter((o) => getLocalDateKey(o.date) !== getLocalDateKey(newEntry.date))]);
+  }
+
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (!hasCompletedOnboarding()) setShowOnboarding(true);
+  }, []);
 
   const presetPlans = useMemo(() => makePresetPlans(), []);
   const fiveDayLegOncePlan = useMemo(() => makeFiveDayLegOncePlan(), []);
@@ -1646,6 +2212,14 @@ export default function Page() {
   useEffect(() => writeLocalJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
   useEffect(() => writeLocalJson(MACHINE_TAGS_KEY, machineTags), [machineTags]);
   useEffect(() => writeLocalJson(PRESET_SETS_KEY, presetSetsMap), [presetSetsMap]);
+  useEffect(() => {
+    if (bodyweightKg !== null) writeLocalJson(CURRENT_BODYWEIGHT_KEY, bodyweightKg);
+  }, [bodyweightKg]);
+  useEffect(() => writeLocalJson(BODYWEIGHT_LOGS_KEY, bodyweightLogs), [bodyweightLogs]);
+  useEffect(() => {
+    const streak = getComputedStreak(logs);
+    writeLocalJson(WEEK_STREAK_KEY, streak);
+  }, [logs]);
 
   function updatePresetExerciseSets(exerciseId: string, newSets: number) {
     const safeSets = Math.max(1, Math.min(10, newSets));
@@ -2141,6 +2715,17 @@ export default function Page() {
         machine: trimmedTag || undefined,
       };
 
+      const prCheck = checkIsPr(recordsMap, logSet);
+      if (prCheck) {
+        setPrCelebration({
+          exerciseName: logSet.exerciseName,
+          machine: trimmedTag || undefined,
+          recordType: prCheck.type,
+          oldVal: prCheck.oldVal,
+          newVal: prCheck.newVal,
+        });
+      }
+
       const todayKey = getLocalDateKey(logSet.date);
       setLogs((old) => {
         const without = old.filter(
@@ -2192,6 +2777,20 @@ export default function Page() {
       .map(({ alreadySaved, ...item }) => item);
 
     if (validSets.length > 0) {
+      for (const s of validSets) {
+        const prCheck = checkIsPr(recordsMap, s);
+        if (prCheck) {
+          setPrCelebration({
+            exerciseName: s.exerciseName,
+            machine: trimmedTag || undefined,
+            recordType: prCheck.type,
+            oldVal: prCheck.oldVal,
+            newVal: prCheck.newVal,
+          });
+          break;
+        }
+      }
+
       const todayKey = getLocalDateKey(new Date());
       setLogs((old) => {
         const without = old.filter(
@@ -2345,6 +2944,16 @@ export default function Page() {
     updateCustomDay(day.id, (current) => ({ ...current, exercises: current.exercises.filter((item) => item.id !== exerciseId) }));
   }
 
+  function reorderCustomExercises(from: number, to: number) {
+    if (!day || mode !== "custom") return;
+    updateCustomDay(day.id, (current) => {
+      const items = [...current.exercises];
+      const [moved] = items.splice(from, 1);
+      items.splice(to, 0, moved);
+      return { ...current, exercises: items };
+    });
+  }
+
   function updateCustomExercise(exerciseId: string, patch: Partial<PlanExercise>) {
     if (!day || mode !== "custom") return;
     updateCustomDay(day.id, (current) => ({ ...current, exercises: current.exercises.map((item) => (item.id === exerciseId ? { ...item, ...patch } : item)) }));
@@ -2426,6 +3035,23 @@ export default function Page() {
               </p>
               <h1 className="text-base font-black leading-tight sm:text-lg">Workout Tracker</h1>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsBwModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-bold text-zinc-200 transition hover:border-emerald-500/40 active:scale-95"
+            >
+              <span>⚖️</span>
+              <span>{bodyweightKg ? `${bodyweightKg} kg` : "ชั่ง นน."}</span>
+            </button>
+            {performanceReport.currentStreak > 0 && (
+              <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-xs font-black text-amber-300">
+                <span>🔥</span>
+                <span>{performanceReport.currentStreak}w</span>
+              </span>
+            )}
           </div>
         </div>
       </section>
@@ -2578,6 +3204,11 @@ export default function Page() {
                 ))}
               </div>
             )}
+
+            {/* Progress Photos Tracking */}
+            <div className="mt-5">
+              <ProgressPhotos />
+            </div>
           </div>
         )}
 
@@ -2661,6 +3292,23 @@ export default function Page() {
                   <Trash2 size={15} /> Delete
                 </button>
               </div>
+            </div>
+          </details>
+        )}
+
+        {mode === "custom" && day && (
+          <details className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
+            <summary className="cursor-pointer text-base font-black text-emerald-300">
+              🛠️ Drag & Drop Plan Builder ({day.title})
+            </summary>
+            <div className="mt-4">
+              <PlanBuilder
+                exercises={day.exercises}
+                library={exerciseLibrary}
+                onAdd={addExerciseToCurrentDay}
+                onRemove={removeExerciseFromCurrentDay}
+                onReorder={reorderCustomExercises}
+              />
             </div>
           </details>
         )}
@@ -3507,6 +4155,51 @@ export default function Page() {
             )}
           </div>
         </div>
+      )}
+
+      {prCelebration && (
+        <PrCelebrationModal
+          pr={prCelebration}
+          bodyweightKg={bodyweightKg}
+          onClose={() => setPrCelebration(null)}
+        />
+      )}
+
+      {isBwModalOpen && (
+        <BodyweightModal
+          currentWeight={bodyweightKg}
+          logs={bodyweightLogs}
+          recordsMap={recordsMap}
+          onSave={handleSaveBodyweight}
+          onClose={() => setIsBwModalOpen(false)}
+        />
+      )}
+
+      {/* Floating Action Button - Start Today */}
+      {mode !== "today" && day && (
+        <button
+          type="button"
+          onClick={() => {
+            setMode("today");
+            window.scrollTo({ top: 0, behavior: "smooth" });
+          }}
+          className="fixed bottom-24 right-4 z-30 flex items-center gap-2 rounded-full bg-emerald-400 px-5 py-4 font-black text-zinc-950 shadow-2xl shadow-emerald-500/30 transition-all hover:scale-105 active:scale-95"
+          aria-label="Start today's workout"
+        >
+          <PlayCircle size={22} />
+          <span className="hidden sm:inline">เริ่มฝึกวันนี้</span>
+          <span className="sm:hidden">เริ่ม</span>
+        </button>
+      )}
+
+      {/* Onboarding Wizard for new users */}
+      {showOnboarding && (
+        <OnboardingWizard
+          onComplete={(result) => {
+            setDays(result.days);
+            setShowOnboarding(false);
+          }}
+        />
       )}
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
