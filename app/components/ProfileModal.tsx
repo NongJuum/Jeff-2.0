@@ -15,6 +15,7 @@ type Props = {
   preferredUnit?: WeightUnit;
   onUnitChange?: (unit: WeightUnit) => void;
   onExportLogs: () => void;
+  onOpenAssessment?: () => void;
 };
 
 export function ProfileModal({
@@ -26,6 +27,7 @@ export function ProfileModal({
   preferredUnit = "kg",
   onUnitChange,
   onExportLogs,
+  onOpenAssessment,
 }: Props) {
   if (!open) return null;
 
@@ -90,7 +92,7 @@ export function ProfileModal({
             <div className="mt-4 grid grid-cols-3 gap-2 border-t border-zinc-800/80 pt-3 text-center">
               <div>
                 <p className="text-[10px] font-bold uppercase text-zinc-500">เป้าหมาย</p>
-                <p className="text-xs font-black text-emerald-300 mt-0.5">{goalLabels[goal].split(" ")[1]}</p>
+                <p className="text-xs font-black text-emerald-300 mt-0.5">{goalLabels[goal]?.split(" ")[1] || goal}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase text-zinc-500">วันฝึก/สัปดาห์</p>
@@ -98,8 +100,27 @@ export function ProfileModal({
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase text-zinc-500">น้ำหนักตัว</p>
-                <p className="text-xs font-black text-zinc-100 mt-0.5">{bw ? `${Math.round(bw.lbs)} lbs` : "—"}</p>
+                <p className="text-xs font-black text-zinc-100 mt-0.5">
+                  {bw
+                    ? preferredUnit === "kg"
+                      ? `${Math.round(bw.lbs * 0.453592 * 10) / 10} kg`
+                      : `${Math.round(bw.lbs)} lbs`
+                    : "—"}
+                </p>
               </div>
+            </div>
+
+            <div className="mt-3 border-t border-zinc-800/80 pt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenAssessment?.();
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-400 py-2.5 text-xs font-black text-zinc-950 transition hover:bg-emerald-300 active:scale-95 shadow-sm"
+              >
+                <Settings size={14} /> แก้ไขข้อมูลสรีระ & ประเมินแรง AI
+              </button>
             </div>
           </div>
 

@@ -3354,7 +3354,13 @@ export default function Page() {
               title="จัดการน้ำหนักตัว"
             >
               <Scale size={14} className="text-emerald-400" />
-              <span>{bodyweightEntry ? `${Math.round(bodyweightEntry.lbs)} lbs` : "—"}</span>
+              <span>
+                {bodyweightEntry
+                  ? globalWeightUnit === "kg"
+                    ? `${Math.round(bodyweightEntry.lbs * 0.453592 * 10) / 10} kg`
+                    : `${Math.round(bodyweightEntry.lbs)} lbs`
+                  : "—"}
+              </span>
             </button>
             <button
               type="button"
@@ -3918,10 +3924,18 @@ export default function Page() {
                         {/* Trainer Assessment Biomechanical Recommended Note */}
                         {userProfile && (() => {
                           const bioRes = calculatePrescriptionWeight(exercise.name, exercise.load, exercise.reps, userProfile);
+                          const activeU = effectiveUnit;
+                          const displayWeight = activeU === "lbs"
+                            ? `${Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10} lbs`
+                            : `${bioRes.hardwareWeightKg} kg`;
+
                           return (
                             <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
                               <Sparkles size={11} className="text-emerald-400" />
-                              <span>แนะนำ: {bioRes.displayNote}</span>
+                              <span>
+                                แนะนำ AI: {displayWeight}
+                                {bioRes.isPerHand ? " ต่อข้าง" : ""} ({bioRes.displayNote})
+                              </span>
                             </p>
                           );
                         })()}
@@ -4788,6 +4802,13 @@ export default function Page() {
           setShowBodyweightModal(false);
           setBodyweightEntry(getCurrentBodyweight());
         }}
+        preferredUnit={globalWeightUnit}
+        onSaveSuccess={() => {
+          const freshBw = getCurrentBodyweight();
+          setBodyweightEntry(freshBw);
+          const freshProf = getUserProfile();
+          if (freshProf) setUserProfile(freshProf);
+        }}
         currentPrs={prMap}
       />
 
@@ -4817,6 +4838,7 @@ export default function Page() {
         preferredUnit={globalWeightUnit}
         onUnitChange={handleSetGlobalUnit}
         onExportLogs={exportLogsToCsv}
+        onOpenAssessment={() => setShowAssessmentModal(true)}
       />
 
       {/* Trainer Assessment Modal (Stage 2) */}

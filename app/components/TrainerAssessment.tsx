@@ -222,13 +222,43 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-[11px] font-bold text-zinc-400">น้ำหนัก (kg)</label>
-                  <input
-                    type="number"
-                    value={weightKg}
-                    onChange={(e) => setWeightKg(Math.max(30, Number(e.target.value) || 60))}
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-bold text-zinc-100 outline-none focus:border-emerald-400"
-                  />
+                  <div className="mb-1 flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-zinc-400">น้ำหนักตัว</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const nextUnit: WeightUnit = preferredWeightUnit === "kg" ? "lbs" : "kg";
+                        setPreferredWeightUnit(nextUnit);
+                      }}
+                      className="text-[10px] font-black text-emerald-400 underline"
+                      title="กดเพื่อสลับหน่วย"
+                    >
+                      {preferredWeightUnit}
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={
+                        preferredWeightUnit === "lbs"
+                          ? Math.round((weightKg / 0.453592) * 10) / 10
+                          : weightKg
+                      }
+                      onChange={(e) => {
+                        const val = Math.max(20, Number(e.target.value) || 50);
+                        if (preferredWeightUnit === "lbs") {
+                          setWeightKg(Math.round(val * 0.453592 * 10) / 10);
+                        } else {
+                          setWeightKg(val);
+                        }
+                      }}
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-900 pl-3 pr-8 py-2 text-sm font-bold text-zinc-100 outline-none focus:border-emerald-400"
+                    />
+                    <span className="pointer-events-none absolute right-2.5 top-2 text-xs font-bold text-zinc-500">
+                      {preferredWeightUnit}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -479,10 +509,14 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                         </div>
                         <div className="text-right">
                           <span className="rounded-lg bg-zinc-800 px-2.5 py-1 text-xs font-black text-emerald-300">
-                            {calc.hardwareWeightKg} kg
+                            {preferredWeightUnit === "lbs"
+                              ? `${Math.round(calc.hardwareWeightKg * 2.20462 * 10) / 10} lbs`
+                              : `${calc.hardwareWeightKg} kg`}
                           </span>
                           <span className="block text-[10px] text-zinc-500 mt-0.5">
-                            ~{(calc.hardwareWeightKg * 2.20462).toFixed(1)} lbs
+                            {preferredWeightUnit === "lbs"
+                              ? `~${calc.hardwareWeightKg} kg`
+                              : `~${(calc.hardwareWeightKg * 2.20462).toFixed(1)} lbs`}
                           </span>
                         </div>
                       </div>

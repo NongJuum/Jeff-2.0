@@ -25,28 +25,63 @@ export function getCurrentBodyweight(): BodyweightEntry | null {
   }
 }
 
-export function BodyweightManager({ open, onClose, currentPrs }: Props) {
+export function BodyweightManager({ open, onClose, currentPrs, preferredUnit = "kg", onSaveSuccess }: Props & { preferredUnit?: "kg" | "lbs"; onSaveSuccess?: () => void }) {
   const [entry, setEntry] = useState<BodyweightEntry | null>(null);
-  const [inputLbs, setInputLbs] = useState("");
+  const [inputVal, setInputVal] = useState("");
+  const [unit, setUnit] = useState<"kg" | "lbs">(preferredUnit);
 
   useEffect(() => {
     if (open) {
       const current = getCurrentBodyweight();
       setEntry(current);
-      setInputLbs(current ? String(Math.round(current.lbs)) : "");
+      setUnit(preferredUnit);
+      if (current) {
+        if (preferredUnit === "kg") {
+          setInputVal(String(Math.round((current.lbs * 0.453592) * 10) / 10));
+        } else {
+          setInputVal(String(Math.round(current.lbs * 10) / 10));
+        }
+      } else {
+        setInputVal("");
+      }
     }
-  }, [open]);
+  }, [open, preferredUnit]);
 
   if (!open) return null;
 
+  const handleUnitToggle = (newUnit: "kg" | "lbs") => {
+    if (newUnit === unit) return;
+    const num = Number(inputVal);
+    if (num > 0) {
+      if (newUnit === "kg") {
+        setInputVal(String(Math.round((num * 0.453592) * 10) / 10));
+      } else {
+        setInputVal(String(Math.round((num / 0.453592) * 10) / 10));
+      }
+    }
+    setUnit(newUnit);
+  };
+
   const save = () => {
-    const lbs = Number(inputLbs);
-    if (!Number.isFinite(lbs) || lbs <= 0 || lbs > 1000) return;
-    const newEntry: BodyweightEntry = { lbs, updatedAt: new Date().toISOString() };
+    const val = Number(inputVal);
+    if (!Number.isFinite(val) || val <= 0) return;
+    const lbs = unit === "kg" ? val / 0.453592 : val;
+    if (lbs <= 0 || lbs > 1000) return;
+
+    const newEntry: BodyweightEntry = { lbs: Math.round(lbs * 10) / 10, updatedAt: new Date().toISOString() };
     try {
       window.localStorage.setItem(BODYWEIGHT_KEY, JSON.stringify(newEntry));
+      // Sync to haitUserProfileV1 if profile exists
+      const savedProf = window.localStorage.getItem("haitUserProfileV1");
+      if (savedProf) {
+        const parsed = JSON.parse(savedProf);
+        parsed.weightKg = Math.round((newEntry.lbs * 0.453592) * 10) / 10;
+        parsed.updatedAt = new Date().toISOString();
+        window.localStorage.setItem("haitUserProfileV1", JSON.stringify(parsed));
+      }
     } catch {}
     setEntry(newEntry);
+    onSaveSuccess?.();
   };
 
   // คำนวณ Relative Strength สำหรับท่าหลัก
@@ -73,29 +108,51 @@ export function BodyweightManager({ open, onClose, currentPrs }: Props) {
         <div className="p-5 space-y-4">
           {/* Input */}
           <div>
-            <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">
-              น้ำหนักตัวปัจจุบัน
-            </label>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-xs font-bold uppercase text-zinc-400">
+                น้ำหนักตัวปัจจุบัน ({unit})
+              </label>
+              <div className="flex rounded-lg bg-zinc-900 p-0.5 border border-zinc-800 text-[11px] font-bold">
+                <button
+                  type="button"
+                  onClick={() => handleUnitToggle("kg")}
+                  className={`px-2 py-0.5 rounded-md transition ${unit === "kg" ? "bg-emerald-400 text-zinc-950 font-black shadow-sm" : "text-zinc-400 hover:text-zinc-200"}`}
+                >
+                  kg
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUnitToggle("lbs")}
+                  className={`px-2 py-0.5 rounded-md transition ${unit === "lbs" ? "bg-emerald-400 text-zinc-950 font-black shadow-sm" : "text-zinc-400 hover:text-zinc-200"}`}
+                >
+                  lbs
+                </button>
+              </div>
+            </div>
             <div className="flex gap-2">
               <input
                 type="number"
                 inputMode="decimal"
-                value={inputLbs}
-                onChange={(e) => setInputLbs(e.target.value)}
-                placeholder="เช่น 165"
+                step="0.1"
+                value={inputVal}
+                onChange={(e) => setInputVal(e.target.value)}
+                placeholder={unit === "kg" ? "เช่น 70.5" : "เช่น 155"}
                 className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-lg font-black outline-none focus:border-emerald-400"
               />
-              <span className="flex items-center px-3 text-sm font-bold text-zinc-400">lbs</span>
+              <span className="flex items-center px-3 text-sm font-bold text-zinc-400">{unit}</span>
               <button
                 onClick={save}
-                className="rounded-xl bg-emerald-400 px-5 py-3 text-sm font-black text-zinc-950"
+                className="rounded-xl bg-emerald-400 px-5 py-3 text-sm font-black text-zinc-950 hover:bg-emerald-300 transition active:scale-95"
               >
                 Save
               </button>
             </div>
             {entry && (
-              <p className="mt-1 text-[11px] text-zinc-500">
-                อัปเดตล่าสุด: {new Date(entry.updatedAt).toLocaleDateString("th-TH")}
+              <p className="mt-1.5 text-[11px] text-zinc-500 flex items-center justify-between">
+                <span>
+                  บันทึกไว้: <strong>{Math.round(entry.lbs * 0.453592 * 10) / 10} kg</strong> ({Math.round(entry.lbs * 10) / 10} lbs)
+                </span>
+                <span>{new Date(entry.updatedAt).toLocaleDateString("th-TH")}</span>
               </p>
             )}
           </div>
@@ -120,8 +177,10 @@ export function BodyweightManager({ open, onClose, currentPrs }: Props) {
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1.5">
-                        <span>{r.pr!.weightLbs} lbs</span>
-                        <span>เป้าหมาย: {r.target}× BW</span>
+                        <span>
+                          PR: {unit === "kg" ? `${Math.round(r.pr!.weightLbs * 0.453592 * 10) / 10} kg` : `${r.pr!.weightLbs} lbs`}
+                        </span>
+                        <span>เป้าหมาย: {r.target}× BW ({unit === "kg" ? `${Math.round((bw * 0.453592) * r.target * 10) / 10} kg` : `${Math.round(bw * r.target)} lbs`})</span>
                       </div>
                       <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
                         <div
