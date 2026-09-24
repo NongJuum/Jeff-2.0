@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { OnboardingWizard, hasCompletedOnboarding } from "./components/OnboardingWizard";
 import { PlanBuilder } from "./components/PlanBuilder";
+import { MuscleTapPicker } from "./components/MuscleTapPicker";
 import { ProgressPhotos } from "./components/ProgressPhotos";
 import { runMigration, hasMigrated, getMigrationResult, type MigrationResult } from "./lib/migration";
 import { WeeklyTrendChart, type WeeklyScore } from "./components/WeeklyTrendChart";
@@ -3551,10 +3552,18 @@ export default function Page() {
             </details>
 
             {mode === "custom" && (
-              <details className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-                <summary className="cursor-pointer text-xs font-bold text-zinc-300">
-                  <Plus size={16} className="mr-2 inline" /> Add exercise
-                </summary>
+              <>
+                <div className="mt-4">
+                  <MuscleTapPicker
+                    exercises={exerciseLibrary}
+                    onPick={(name) => addExerciseToCurrentDay(name)}
+                  />
+                </div>
+
+                <details className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                  <summary className="cursor-pointer text-xs font-bold text-zinc-300">
+                    <Plus size={16} className="mr-2 inline" /> วิธีอื่น: ค้นหาจากชื่อ / กลุ่มกล้ามเนื้อ
+                  </summary>
 
                 <div className="mt-4">
                   <div className="grid gap-2 sm:grid-cols-[0.8fr_1fr]">
@@ -3601,7 +3610,8 @@ export default function Page() {
                   </div>
                 </div>
               </details>
-            )}
+            </>
+          )}
 
             <div className="mt-4 grid gap-4">
               {visibleExercises.map((baseExercise) => {

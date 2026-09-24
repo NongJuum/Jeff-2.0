@@ -7,6 +7,7 @@
 - **Weekly Trend Chart (T1-T3):** กราฟ SVG แสดงแนวโน้ม Performance Score 4 สัปดาห์ย้อนหลัง พร้อมตัวบ่งชี้ Trend (ขึ้น/ลง/คงที่) และระบบบันทึกคะแนนรายสัปดาห์
 - **Bodyweight & Relative Strength (R1-R3):** หน้าต่าง Bodyweight Manager คำนวณอัตราส่วนความแข็งแรงต่อน้ำหนักตัว (x BW) สำหรับ Bench Press, Squat, Deadlift พร้อมแสดงแถบ Relative Strength ใน Records card
 - **Push Notifications (N1-N3):** ระบบแจ้งเตือนวันและเวลาฝึกแบบ Client-side 100% (Notification API + localStorage scheduler) ไม่ต้องพึ่งพาเซิร์ฟเวอร์หรือบริการภายนอก พร้อมหน้าต่างตั้งค่าเวลาและวันฝึก
+- **Tap Muscle to Add Exercise:** ระบบเลือกท่าฝึกจากการแตะที่กล้ามเนื้อบน 3D Human Anatomy (Front/Back) เพิ่มท่าเข้าตาราง Custom ได้ทันทีใน 3 วินาที
 
 ## [2.1.0] - 2026-09-24
 
