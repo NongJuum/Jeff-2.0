@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.0.0] - 2026-09-24
+
+### 🎁 Added
+- **Migration System (M1-M2):** ระบบ migration ข้อมูลสำหรับผู้ใช้เก่า ประเมิน Level (Beginner/Intermediate/Advanced) จาก Big 3 PRs, คำนวณ Week Streak ย้อนหลัง 52 สัปดาห์ และประมาณค่าน้ำหนักตัวเริ่มต้นพร้อม Migration Toast
+- **Weekly Trend Chart (T1-T3):** กราฟ SVG แสดงแนวโน้ม Performance Score 4 สัปดาห์ย้อนหลัง พร้อมตัวบ่งชี้ Trend (ขึ้น/ลง/คงที่) และระบบบันทึกคะแนนรายสัปดาห์
+- **Bodyweight & Relative Strength (R1-R3):** หน้าต่าง Bodyweight Manager คำนวณอัตราส่วนความแข็งแรงต่อน้ำหนักตัว (x BW) สำหรับ Bench Press, Squat, Deadlift พร้อมแสดงแถบ Relative Strength ใน Records card
+- **Push Notifications (N1-N3):** ระบบแจ้งเตือนวันและเวลาฝึกแบบ Client-side 100% (Notification API + localStorage scheduler) ไม่ต้องพึ่งพาเซิร์ฟเวอร์หรือบริการภายนอก พร้อมหน้าต่างตั้งค่าเวลาและวันฝึก
+
 ## [2.1.0] - 2026-09-24
 
 ### 🎁 Added

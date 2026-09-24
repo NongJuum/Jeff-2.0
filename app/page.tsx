@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Bell,
   CalendarDays,
   Check,
   ChevronDown,
@@ -15,6 +16,7 @@ import {
   Plus,
   RotateCcw,
   Save,
+  Scale,
   Search,
   Sparkles,
   Trash2,
@@ -24,6 +26,11 @@ import {
 import { OnboardingWizard, hasCompletedOnboarding } from "./components/OnboardingWizard";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { ProgressPhotos } from "./components/ProgressPhotos";
+import { runMigration, hasMigrated, getMigrationResult, type MigrationResult } from "./lib/migration";
+import { WeeklyTrendChart, type WeeklyScore } from "./components/WeeklyTrendChart";
+import { BodyweightManager, getCurrentBodyweight, type BodyweightEntry } from "./components/BodyweightManager";
+import { NotificationSettings } from "./components/NotificationSettings";
+import { startNotificationScheduler } from "./lib/notifications";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
 type AppMode = "today" | "preset" | "custom" | "history" | "library";
@@ -64,7 +71,7 @@ type RestTimerState = {
 
 type RestMode = "short" | "normal" | "heavy";
 
-type LogSet = {
+export type LogSet = {
   exerciseId: string;
   exerciseName: string;
   weightLbs: number;
@@ -74,7 +81,7 @@ type LogSet = {
   machine?: string;
 };
 
-type ExerciseRecords = {
+export type ExerciseRecords = {
   maxWeight?: LogSet;
   bestReps?: LogSet;
   bestVolume?: LogSet;
@@ -106,6 +113,7 @@ const PRESET_SETS_KEY = "haitPresetSetsV1";
 const WEEK_STREAK_KEY = "haitWeekStreak";
 const BODYWEIGHT_LOGS_KEY = "haitBodyweightLogsV1";
 const CURRENT_BODYWEIGHT_KEY = "haitCurrentBodyweightKg";
+const WEEKLY_SCORES_KEY = "haitWeeklyScoresV1";
 
 type BodyweightLog = {
   date: string;
@@ -1680,7 +1688,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   );
 }
 
-function WeeklyTrendChart({ trends }: { trends: WeeklyTrendPoint[] }) {
+function WeeklyPerformanceMiniChart({ trends }: { trends: WeeklyTrendPoint[] }) {
   if (!trends || trends.length === 0) return null;
 
   const maxScore = 100;
@@ -1807,7 +1815,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
             <ScoreBar label="Streak 🔥" value={report.streakBonus} />
           </div>
 
-          <WeeklyTrendChart trends={report.weeklyTrends} />
+          <WeeklyPerformanceMiniChart trends={report.weeklyTrends} />
 
           <div className="mt-3 space-y-2">
             {report.challenges.map((c) => (
@@ -2150,6 +2158,26 @@ export default function Page() {
 
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // Migration State (M2)
+  const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
+  const [showMigrationToast, setShowMigrationToast] = useState(false);
+
+  // Weekly Trend Scores (T2)
+  const [weeklyScores, setWeeklyScores] = useState<WeeklyScore[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem(WEEKLY_SCORES_KEY);
+      return raw ? (JSON.parse(raw) as WeeklyScore[]) : [];
+    } catch { return []; }
+  });
+
+  // Bodyweight & Relative Strength (R2)
+  const [showBodyweightModal, setShowBodyweightModal] = useState(false);
+  const [bodyweightEntry, setBodyweightEntry] = useState<BodyweightEntry | null>(() => getCurrentBodyweight());
+
+  // Notification Settings (N3)
+  const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+
   useEffect(() => {
     if (!hasCompletedOnboarding()) setShowOnboarding(true);
   }, []);
@@ -2172,19 +2200,31 @@ export default function Page() {
     const parsed = readJson<LogSet[]>(LATEST_LOGS_KEY, []);
     if (Array.isArray(parsed)) {
       setLogs(parsed);
+      let calculatedRecords: Record<string, ExerciseRecords> = {};
       setRecordsMap((current) => {
         let updated = current;
         for (const log of parsed) {
           updated = updateRecordsWithSet(updated, log);
         }
+        calculatedRecords = updated;
         return updated;
       });
+
+      // Auto-migration สำหรับผู้ใช้เก่า
+      if (!hasMigrated() && parsed.length > 0) {
+        const result = runMigration(parsed, calculatedRecords, days);
+        if (result) {
+          setMigrationResult(result);
+          setShowMigrationToast(true);
+          setTimeout(() => setShowMigrationToast(false), 8000);
+        }
+      }
     }
 
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
-  }, []);
+  }, [days]);
 
   useEffect(() => {
     writeLocalJson(LATEST_LOGS_KEY, logs);
@@ -2520,6 +2560,60 @@ export default function Page() {
     () => computeWeeklyPerformance(logs, days, activePlan),
     [logs, days, activePlan]
   );
+
+  // บันทึก weekly score ทุกครั้งที่ performanceReport เปลี่ยน (สัปดาห์ละครั้ง) (T2)
+  useEffect(() => {
+    if (!performanceReport.hasData) return;
+    if (typeof window === "undefined") return;
+
+    const now = new Date();
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay()); // วันอาทิตย์
+    weekStart.setHours(0, 0, 0, 0);
+    const weekStartISO = weekStart.toISOString();
+
+    setWeeklyScores((prev) => {
+      const existing = prev.find((s) => s.weekStart === weekStartISO);
+      let next: WeeklyScore[];
+      if (existing) {
+        // อัปเดต score ถ้าดีกว่าเดิม
+        if (performanceReport.score > existing.score) {
+          next = prev.map((s) =>
+            s.weekStart === weekStartISO
+              ? { ...s, score: performanceReport.score, rank: performanceReport.rank }
+              : s
+          );
+        } else {
+          return prev; // ไม่อัปเดต
+        }
+      } else {
+        // เพิ่มสัปดาห์ใหม่
+        next = [
+          ...prev,
+          {
+            weekStart: weekStartISO,
+            score: performanceReport.score,
+            rank: performanceReport.rank,
+          },
+        ];
+      }
+      // เก็บเฉพาะ 8 สัปดาห์ล่าสุด
+      next = next
+        .sort((a, b) => new Date(a.weekStart).getTime() - new Date(b.weekStart).getTime())
+        .slice(-8);
+
+      try {
+        window.localStorage.setItem(WEEKLY_SCORES_KEY, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, [performanceReport.score, performanceReport.hasData, performanceReport.rank]);
+
+  // Notification scheduler — ตรวจสอบทุกนาทีว่าถึงเวลาเตือนหรือยัง (N3)
+  useEffect(() => {
+    const cleanup = startNotificationScheduler(days);
+    return cleanup;
+  }, [days]);
 
   const filteredLibrary = useMemo(() => {
     const keyword = librarySearch.trim().toLowerCase();
@@ -3040,11 +3134,20 @@ export default function Page() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsBwModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-bold text-zinc-200 transition hover:border-emerald-500/40 active:scale-95"
+              onClick={() => setShowBodyweightModal(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+              aria-label="Manage bodyweight"
             >
-              <span>⚖️</span>
-              <span>{bodyweightKg ? `${bodyweightKg} kg` : "ชั่ง นน."}</span>
+              <Scale size={14} className="text-emerald-400" />
+              <span>{bodyweightEntry ? `${Math.round(bodyweightEntry.lbs)} lbs` : "น้ำหนักตัว"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowNotificationSettings(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+              aria-label="Notification settings"
+            >
+              <Bell size={14} className="text-emerald-400" />
             </button>
             {performanceReport.currentStreak > 0 && (
               <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-xs font-black text-amber-300">
@@ -3108,7 +3211,14 @@ export default function Page() {
         </div>
 
         {(mode === "today" || mode === "preset" || mode === "custom") && (
-          <WeeklyPerformanceCard report={performanceReport} />
+          <>
+            <WeeklyPerformanceCard report={performanceReport} />
+            {weeklyScores.length >= 2 && (
+              <div className="mt-3">
+                <WeeklyTrendChart scores={weeklyScores.slice(-4)} />
+              </div>
+            )}
+          </>
         )}
 
         {(mode === "today" || mode === "preset") && days === 5 && (
@@ -3696,6 +3806,14 @@ export default function Page() {
                           <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p><p className="mt-1 text-sm font-black text-zinc-100">{records.bestReps ? `${records.bestReps.weightLbs} × ${records.bestReps.reps}` : "—"}</p></div>
                           <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p><p className="mt-1 text-sm font-black text-zinc-100">{records.bestVolume ? `${records.bestVolume.weightLbs} × ${records.bestVolume.reps}` : "—"}</p></div>
                           <div className="rounded-xl bg-zinc-900 px-3 py-2"><p className="text-[10px] font-bold uppercase text-zinc-500">Warmup</p><p className="mt-1 text-sm font-black text-zinc-100">{exercise.warmup && warmups.length > 0 ? `${warmups[0].weight}/${warmups[1].weight}/${warmups[2].weight}` : "Skip"}</p></div>
+                          {bodyweightEntry && records.maxWeight && (
+                            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 col-span-2">
+                              <p className="text-[10px] font-bold uppercase text-emerald-300">Relative Strength</p>
+                              <p className="mt-1 text-sm font-black text-emerald-300">
+                                {(records.maxWeight.weightLbs / bodyweightEntry.lbs).toFixed(2)}× BW
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -4191,6 +4309,46 @@ export default function Page() {
           <span className="sm:hidden">เริ่ม</span>
         </button>
       )}
+
+      {/* Migration Toast for upgraded users */}
+      {showMigrationToast && migrationResult && (
+        <div className="fixed top-20 left-1/2 z-50 -translate-x-1/2 rounded-2xl border border-emerald-500/40 bg-zinc-950/95 px-4 py-3 shadow-2xl backdrop-blur-md max-w-sm animate-in fade-in slide-in-from-top duration-300">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🎉</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black text-emerald-300">อัปเกรดเรียบร้อย!</p>
+              <p className="mt-0.5 text-xs text-zinc-300">
+                เรานำเข้าข้อมูลเดิมของคุณแล้ว — Streak {migrationResult.weekStreak} สัปดาห์
+                {migrationResult.estimatedBodyweightLbs && `, น้ำหนักเริ่มต้น ${migrationResult.estimatedBodyweightLbs} lbs`}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowMigrationToast(false)}
+              className="text-zinc-500 hover:text-zinc-300 shrink-0"
+              aria-label="Close"
+              type="button"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Bodyweight & Relative Strength Manager */}
+      <BodyweightManager
+        open={showBodyweightModal}
+        onClose={() => {
+          setShowBodyweightModal(false);
+          setBodyweightEntry(getCurrentBodyweight());
+        }}
+        currentPrs={prMap}
+      />
+
+      {/* Notification Settings Modal */}
+      <NotificationSettings
+        open={showNotificationSettings}
+        onClose={() => setShowNotificationSettings(false)}
+      />
 
       {/* Onboarding Wizard for new users */}
       {showOnboarding && (
