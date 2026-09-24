@@ -2173,7 +2173,7 @@ export default function Page() {
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exerciseGroupFilter, setExerciseGroupFilter] = useState<MuscleGroup | "All">("All");
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
-  const [compactList, setCompactList] = useState(true);
+  const [compactList, setCompactList] = useState(false);
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
   const [presetSetsMap, setPresetSetsMap] = useState<Record<string, number>>(() => readJson<Record<string, number>>(PRESET_SETS_KEY, {}));
 
@@ -3512,7 +3512,13 @@ export default function Page() {
 
         {(mode === "today" || mode === "preset" || mode === "custom") && (
           <>
-            <WeeklyPerformanceCard report={performanceReport} />
+            <div className="flex items-center justify-between rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300">
+              <span>
+                Weekly Score: {performanceReport.hasData ? `${performanceReport.score}/100 (${performanceReport.rank})` : "—/100"}
+                {performanceReport.currentStreak > 0 && ` · 🔥 ${performanceReport.currentStreak}w streak`}
+              </span>
+              <span className="text-[11px] text-emerald-400 font-medium">แตะเพื่อดูรายละเอียด</span>
+            </div>
             {weeklyScores.length >= 2 && (
               <div className="mt-3">
                 <WeeklyTrendChart scores={weeklyScores.slice(-8)} />
@@ -3960,7 +3966,7 @@ export default function Page() {
                 const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
 
                 return (
-                  <article key={baseExercise.id} className={`rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 ${compactList ? "compact-card" : ""}`}>
+                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div>
                         <div className="flex flex-wrap gap-2">
@@ -4033,23 +4039,16 @@ export default function Page() {
                       </div>
                     </div>
 
-                    <div className="compact-only hidden mb-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5">
-                      <p className="text-xs text-emerald-300 font-bold flex items-center justify-between">
-                        <span>PR: {pr ? `${pr.weightLbs} lbs × ${pr.reps}` : "—"}</span>
-                        <span className="text-zinc-400 font-medium">พัก {formatRestTime(selectedRestSeconds)}</span>
-                      </p>
-                    </div>
-
-                    <div className="hide-when-compact mb-2 flex flex-wrap gap-1.5">
+                    <div className="mb-2 flex flex-wrap gap-1.5">
                       {exercise.muscles.map((muscle) => <span key={muscle} className="rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300">{muscle}</span>)}
                     </div>
 
-                    <div className="hide-when-compact">
+                    <div>
                       <ExerciseMusclePreviewCard exercise={exercise} />
                     </div>
 
                     {(mode === "custom" || mode === "preset" || mode === "today") && (
-                      <details className="hide-when-compact mb-3 rounded-xl bg-zinc-950 p-3">
+                      <details className="mb-3 rounded-xl bg-zinc-950 p-3">
                         <summary className="cursor-pointer text-xs font-bold text-zinc-300">Edit target sets & reps</summary>
 
                         <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -4128,7 +4127,7 @@ export default function Page() {
                       </details>
                     )}
 
-                    <div className="hide-when-compact mb-3">
+                    <div className="mb-3">
                       <button
                         type="button"
                         onClick={() => {
