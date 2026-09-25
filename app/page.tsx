@@ -4147,15 +4147,18 @@ export default function Page() {
         : bioRes.hardwareWeightKg;
     })() : 0;
 
-    // Calculate baseline working weight for warmup recommendations
-    const latestWarmupSet = lastSetMap[effectiveKey]?.[0] ?? (!currentMachine ? lastSetMap[exercise.name]?.[0] : undefined);
-    const baselineWorkingWeight = latestWarmupSet
-      ? (latestWarmupSet.rawValue ?? latestWarmupSet.weightLbs)
-      : (aiWeightSuggestion > 0
-          ? aiWeightSuggestion
-          : (pr?.weightLbs
-              ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs)
-              : 0));
+    // Check set #1 from inputs or logs (Set numbers start at 1, not 0)
+    const inputWeightSet1 = parseFloat(setInputs[0]?.weightLbs);
+    const loggedWeightSet1 = lastSetMap[effectiveKey]?.[1]?.rawValue ?? lastSetMap[effectiveKey]?.[1]?.weightLbs ?? lastSetMap[exercise.name]?.[1]?.rawValue;
+    const prWeight = pr?.weightLbs ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs) : 0;
+
+    const baselineWorkingWeight = 
+      (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0) ? inputWeightSet1 :
+      (loggedWeightSet1 && loggedWeightSet1 > 0) ? loggedWeightSet1 :
+      (aiWeightSuggestion > 0) ? aiWeightSuggestion :
+      (prWeight > 0) ? prWeight :
+      (effectiveUnit === "kg" ? 40 : 90);
+
     const warmupInfo = getIntelligentWarmup(
       exercise,
       index,
@@ -4353,41 +4356,43 @@ export default function Page() {
                           className="min-w-[120px] flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-zinc-200 placeholder-zinc-600 outline-none focus:border-emerald-400 transition"
                         />
                       </div>
-
-                {/* Smart Warmup Strip */}
-                {exercise.warmup && warmupInfo && (
-                  <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950/80 p-2.5">
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="font-bold text-zinc-300 flex items-center gap-1.5">
-                        {warmupInfo.type === "full" && <span className="text-cyan-400">⚡</span>}
-                        {warmupInfo.type === "acclimation" && <span className="text-amber-400">🔥</span>}
-                        {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
-                        {warmupInfo.headline}
-                      </span>
-                      <span className="text-[10px] text-zinc-500">{warmupInfo.note}</span>
                     </div>
 
-                    {warmupInfo.steps.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {warmupInfo.steps.map((step, sIdx) => (
-                          <div
-                            key={sIdx}
-                            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold border ${warmupInfo.type === "full" ? "border-cyan-500/40 bg-cyan-950/30 text-cyan-200" : "border-amber-500/40 bg-amber-950/30 text-amber-200"}`}
-                          >
-                            <span>{step.label}:</span>
-                            <span className="font-black text-white">{step.weight} {effectiveUnit}</span>
-                            <span className="text-zinc-400">× {step.reps}</span>
+                    {/* [Order 4] SMART WARMUP STRIP */}
+                    {warmupInfo && (
+                      <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950 p-2.5">
+                        <div className="flex items-center justify-between text-xs mb-1.5">
+                          <span className="font-bold flex items-center gap-1.5 text-zinc-200">
+                            {warmupInfo.type === "full" && <span className="text-cyan-400">⚡</span>}
+                            {warmupInfo.type === "acclimation" && <span className="text-amber-400">🔥</span>}
+                            {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
+                            {warmupInfo.headline}
+                          </span>
+                          <span className="text-[10px] text-zinc-400">{warmupInfo.note}</span>
+                        </div>
+
+                        {warmupInfo.steps.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            {warmupInfo.steps.map((st, sIdx) => (
+                              <div
+                                key={sIdx}
+                                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold border ${
+                                  warmupInfo.type === "full"
+                                    ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-200"
+                                    : "border-amber-500/50 bg-amber-950/40 text-amber-200"
+                                }`}
+                              >
+                                <span>{st.label}:</span>
+                                <span className="font-black text-white">{st.weight} {effectiveUnit}</span>
+                                <span className="text-zinc-400">× {st.reps}</span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
-                  </div>
-                )}
 
-                {/* [Order 4] PRIMARY ZONE: Working Sets Table */}
-                    </div>
-
-                    {/* [Order 4] PRIMARY ZONE: Working Sets Table */}
+                    {/* [Order 5] PRIMARY ZONE: Working Sets Table */}
                     <div className="mb-3 rounded-2xl bg-zinc-950 p-3 border border-zinc-800/80">
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <div>
