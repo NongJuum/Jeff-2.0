@@ -4270,91 +4270,76 @@ export default function Page() {
                     {/* [Order 2] Integrated 3D Muscle & Target Strip (Inline Layout) */}
                     <ExerciseMusclePreviewCard exercise={exercise} />
 
-                    {/* [Order 3] Machine Swapper & Quick Switch */}
-                    <div className="mb-3 rounded-xl bg-zinc-950 p-2.5 border border-zinc-800/80">
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                          <Dumbbell size={12} className="text-emerald-400" />
-                          เครื่อง / Machine:
-                        </span>
-                        <div className="flex items-center gap-1.5">
-                          {currentMachine && (
-                            <button
-                              type="button"
-                              onClick={() => toggleFavoriteMachine(exercise.name, currentMachine)}
-                              className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition ${
-                                isFavoriteMachine
-                                  ? "bg-amber-400/20 text-amber-300 border border-amber-400/40"
-                                  : "bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800"
-                              }`}
-                              title={isFavoriteMachine ? "ลบเครื่องโปรด" : "ตั้งเป็นเครื่องเล่นประจำ"}
-                            >
-                              <Star size={11} className={isFavoriteMachine ? "fill-amber-400 text-amber-400" : ""} />
-                              {isFavoriteMachine ? "เครื่องโปรด ⭐" : "ตั้งเป็นเครื่องโปรด"}
-                            </button>
-                          )}
-                          {currentMachine && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const currentU = machineUnits[currentMachine] || globalWeightUnit;
-                                const nextU: WeightUnit = currentU === "kg" ? "lbs" : "kg";
-                                saveMachineUnit(currentMachine, nextU);
-                                setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
-                              }}
-                              className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-black text-emerald-300 hover:border-emerald-400 transition"
-                              title="สลับหน่วยเฉพาะเครื่องนี้"
-                            >
-                              ⚙️ {machineUnits[currentMachine] || globalWeightUnit}
-                            </button>
-                          )}
-                          {currentMachine && (
-                            <button
-                              type="button"
-                              onClick={() => updateMachineTag(baseExercise.id, "")}
-                              className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1"
-                            >
-                              ล้าง
-                            </button>
-                          )}
+                    {/* [Order 3] Compact Machine Dropdown Selector */}
+                    <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Dumbbell className="text-cyan-400 shrink-0" size={14} />
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">เครื่อง:</span>
+
+                        <div className="relative flex-1 min-w-0">
+                          <select
+                            value={currentMachine || ""}
+                            onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
+                            className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-cyan-400 transition"
+                          >
+                            <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[getLoadType(exercise)]})</option>
+                            {["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"].map((tag) => (
+                              <option key={tag} value={tag}>
+                                {tag} {lastUsedMachine === tag ? "● ล่าสุด" : ""} {favoriteMachines[exercise.name] === tag ? "⭐" : ""}
+                              </option>
+                            ))}
+                            {currentMachine && !["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine", ""].includes(currentMachine) && (
+                              <option value={currentMachine}>{currentMachine} (กำหนดเอง)</option>
+                            )}
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-2 top-2.5 text-zinc-400" size={14} />
                         </div>
                       </div>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"].map((tag) => {
-                          const isTagFav = favoriteMachines[exercise.name] === tag;
-                          const isLastUsed = lastUsedMachine === tag;
-                          const isSelected = currentMachine === tag;
-                          return (
-                            <button
-                              key={tag}
-                              type="button"
-                              onClick={() => updateMachineTag(baseExercise.id, isSelected ? "" : tag)}
-                              className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition flex items-center gap-1.5 ${
-                                isSelected
-                                  ? "bg-emerald-400 text-zinc-950 font-black shadow-md shadow-emerald-500/25 ring-1 ring-emerald-300"
-                                  : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 border border-zinc-800/80"
-                              }`}
-                            >
-                              <span>{isSelected ? "●" : "○"}</span>
-                              <span>{tag}</span>
-                              {isLastUsed && (
-                                <span className={`text-[9px] px-1 py-0.2 rounded font-black tracking-tight ${
-                                  isSelected ? "bg-zinc-950/20 text-zinc-950" : "bg-emerald-500/20 text-emerald-400"
-                                }`}>
-                                  ล่าสุด
-                                </span>
-                              )}
-                              {isTagFav && <Star size={10} className="fill-amber-400 text-amber-400 ml-0.5" />}
-                            </button>
-                          );
-                        })}
-                        <input
-                          type="text"
-                          placeholder="+ พิมพ์ชื่อเครื่องเอง..."
-                          value={currentMachine}
-                          onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
-                          className="min-w-[120px] flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-zinc-200 placeholder-zinc-600 outline-none focus:border-emerald-400 transition"
-                        />
+
+                      {/* Actions: Favorite ⭐, Unit Toggle ⚙️, and Clear */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {currentMachine && (
+                          <button
+                            type="button"
+                            onClick={() => toggleFavoriteMachine(exercise.name, currentMachine)}
+                            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition border ${
+                              isFavoriteMachine
+                                ? "border-amber-400/40 bg-amber-400/20 text-amber-300"
+                                : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                            }`}
+                            title={isFavoriteMachine ? "ลบเครื่องโปรด" : "ตั้งเป็นเครื่องประจำ"}
+                          >
+                            <Star size={11} className={isFavoriteMachine ? "fill-amber-400 text-amber-400" : ""} />
+                            <span className="hidden sm:inline">{isFavoriteMachine ? "โปรด" : "ตั้งโปรด"}</span>
+                          </button>
+                        )}
+                        
+                        {currentMachine && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const currentU = machineUnits[currentMachine] || globalWeightUnit;
+                              const nextU: WeightUnit = currentU === "kg" ? "lbs" : "kg";
+                              saveMachineUnit(currentMachine, nextU);
+                              setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
+                            }}
+                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[10px] font-black text-emerald-300 hover:border-emerald-400 transition"
+                            title="สลับหน่วยเฉพาะเครื่องนี้"
+                          >
+                            ⚙️ {machineUnits[currentMachine] || globalWeightUnit}
+                          </button>
+                        )}
+
+                        {currentMachine && (
+                          <button
+                            type="button"
+                            onClick={() => updateMachineTag(baseExercise.id, "")}
+                            className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1"
+                            title="รีเซ็ตเครื่องเป็นค่าเริ่มต้น"
+                          >
+                            รีเซ็ต
+                          </button>
+                        )}
                       </div>
                     </div>
 
