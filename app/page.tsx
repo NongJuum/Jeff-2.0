@@ -4137,7 +4137,15 @@ export default function Page() {
                 const setInputs = normalizeSetInputs(rawSetInputs, effectiveSets);
                 const alternatives = getAlternatives(exercise);
                 const effectiveUnit = getEffectiveUnitForExercise(exercise.name, currentMachine);
-                const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
+    const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
+
+    const aiWeightSuggestion = userProfile ? (() => {
+      const muscleInfo = evaluateMuscleMass(userProfile.gender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
+      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier);
+      return effectiveUnit === "lbs"
+        ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
+        : bioRes.hardwareWeightKg;
+    })() : 0;
 
     // Calculate baseline working weight for warmup recommendations
     const latestWarmupSet = lastSetMap[effectiveKey]?.[0] ?? (!currentMachine ? lastSetMap[exercise.name]?.[0] : undefined);
