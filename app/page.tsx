@@ -2205,6 +2205,96 @@ function BodyweightModal({
   );
 }
 
+export type WarmupRecommendation = {
+  type: "full" | "acclimation" | "skip";
+  headline: string;
+  note: string;
+  steps: { label: string; weight: number; reps: string; note: string }[];
+};
+
+function getIntelligentWarmup(
+  currentExercise: PlanExercise,
+  exerciseIndex: number,
+  allDayExercises: PlanExercise[],
+  workingWeight: number,
+  effectiveUnit: WeightUnit,
+  effectiveLoad: LoadType
+): WarmupRecommendation {
+  const movement = currentExercise.movement.toLowerCase();
+  const isIsolation =
+    currentExercise.group === "Arms" ||
+    currentExercise.group === "Abs & Calves" ||
+    movement.includes("isolation") ||
+    movement.includes("raise") ||
+    movement.includes("curl") ||
+    movement.includes("flye") ||
+    movement.includes("pressdown") ||
+    movement.includes("ext");
+
+  if (!currentExercise.warmup || isIsolation || workingWeight <= 0) {
+    return {
+      type: "skip",
+      headline: "พร้อมเริ่มเซตจริงได้ทันที",
+      note: "ท่า Isolation / มัดเล็ก ไม่จำเป็นต้องวอร์มซ้ำ",
+      steps: [],
+    };
+  }
+
+  const currentMuscles = currentExercise.muscles.map((m) => m.toLowerCase());
+  const hasPriorCompoundSameMuscle = allDayExercises.slice(0, exerciseIndex).some((prev) => {
+    const prevMovement = prev.movement.toLowerCase();
+    const prevIsCompound =
+      prevMovement.includes("press") ||
+      prevMovement.includes("row") ||
+      prevMovement.includes("pull") ||
+      prevMovement.includes("squat") ||
+      prevMovement.includes("hinge");
+    return prevIsCompound && prev.muscles.some((m) => currentMuscles.includes(m.toLowerCase()));
+  });
+
+  const step = effectiveUnit === "kg" ? 2.5 : 5;
+  const snap = (w: number) => Math.max(step, Math.round(w / step) * step);
+
+  if (hasPriorCompoundSameMuscle) {
+    return {
+      type: "acclimation",
+      headline: "🔥 กล้ามเนื้ออุ่นแล้ว (Acclimation Set)",
+      note: "เพิ่งผ่านท่าก่อนหน้ามา แนะนำ 1 เซตสั้นๆ เพื่อจับจังหวะมุมเครื่อง",
+      steps: [
+        {
+          label: "Acclimation",
+          weight: snap(workingWeight * 0.65),
+          reps: "2–3",
+          note: "จับจังหวะ ไม่ล้า",
+        },
+      ],
+    };
+  }
+
+  const isBarbell = effectiveLoad === "barbell";
+  const barWeight = effectiveUnit === "kg" ? 20 : 45;
+  const steps = [];
+
+  if (isBarbell && workingWeight > barWeight * 1.3) {
+    steps.push({ label: "W1 (คานเปล่า)", weight: barWeight, reps: "8–10", note: "เปิดข้อต่อ" });
+  } else {
+    steps.push({ label: "W1", weight: snap(workingWeight * 0.4), reps: "8–10", note: "หมุนเวียนเลือด" });
+  }
+  steps.push({ label: "W2", weight: snap(workingWeight * 0.6), reps: "5–6", note: "ปรับฟอร์ม" });
+  steps.push({ label: "W3", weight: snap(workingWeight * 0.8), reps: "2–3", note: "กระตุ้น CNS" });
+
+  if (workingWeight >= (effectiveUnit === "kg" ? 75 : 165)) {
+    steps.push({ label: "W4", weight: snap(workingWeight * 0.9), reps: "1", note: "จับแรงต้านจริง" });
+  }
+
+  return {
+    type: "full",
+    headline: "⚡ ลำดับ Warmup แนะนำ (ท่าหลักแรก)",
+    note: "เตรียมข้อต่อและระบบประสาทสั่งการก่อนยกเซตจริง",
+    steps,
+  };
+}
+
 export default function Page() {
   const initialUiState = sanitizeUiState(readJson<PersistedUiState | null>(UI_STATE_KEY, null));
 
@@ -4049,6 +4139,24 @@ export default function Page() {
                 const effectiveUnit = getEffectiveUnitForExercise(exercise.name, currentMachine);
                 const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
 
+    // Calculate baseline working weight for warmup recommendations
+    const latestWarmupSet = lastSetMap[effectiveKey]?.[0] ?? (!currentMachine ? lastSetMap[exercise.name]?.[0] : undefined);
+    const baselineWorkingWeight = latestWarmupSet
+      ? (latestWarmupSet.rawValue ?? latestWarmupSet.weightLbs)
+      : (aiWeightSuggestion > 0
+          ? aiWeightSuggestion
+          : (pr?.weightLbs
+              ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs)
+              : 0));
+    const warmupInfo = getIntelligentWarmup(
+      exercise,
+      index,
+      day.exercises,
+      baselineWorkingWeight,
+      effectiveUnit,
+      effectiveLoad
+    );
+
                 return (
                   <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
                     <div className="mb-3 flex items-start justify-between gap-3">
@@ -4237,6 +4345,38 @@ export default function Page() {
                           className="min-w-[120px] flex-1 rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-[11px] font-medium text-zinc-200 placeholder-zinc-600 outline-none focus:border-emerald-400 transition"
                         />
                       </div>
+
+                {/* Smart Warmup Strip */}
+                {exercise.warmup && warmupInfo && (
+                  <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950/80 p-2.5">
+                    <div className="flex items-center justify-between text-xs mb-1.5">
+                      <span className="font-bold text-zinc-300 flex items-center gap-1.5">
+                        {warmupInfo.type === "full" && <span className="text-cyan-400">⚡</span>}
+                        {warmupInfo.type === "acclimation" && <span className="text-amber-400">🔥</span>}
+                        {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
+                        {warmupInfo.headline}
+                      </span>
+                      <span className="text-[10px] text-zinc-500">{warmupInfo.note}</span>
+                    </div>
+
+                    {warmupInfo.steps.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {warmupInfo.steps.map((step, sIdx) => (
+                          <div
+                            key={sIdx}
+                            className={`flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold border ${warmupInfo.type === "full" ? "border-cyan-500/40 bg-cyan-950/30 text-cyan-200" : "border-amber-500/40 bg-amber-950/30 text-amber-200"}`}
+                          >
+                            <span>{step.label}:</span>
+                            <span className="font-black text-white">{step.weight} {effectiveUnit}</span>
+                            <span className="text-zinc-400">× {step.reps}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* [Order 4] PRIMARY ZONE: Working Sets Table */}
                     </div>
 
                     {/* [Order 4] PRIMARY ZONE: Working Sets Table */}
