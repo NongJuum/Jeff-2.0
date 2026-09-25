@@ -1307,7 +1307,7 @@ function RealisticAnatomyFigure({
         draggable={false}
       />
 
-      {/* Secondary Muscles Glow Mask (Electric Hot Magenta Glow) */}
+      {/* Secondary Muscles Glow Mask (High-Luminance Neon Yellow Glow) */}
       {secondaryIds.map((id) => (
         <div
           key={`sec-${id}`}
@@ -1318,14 +1318,14 @@ function RealisticAnatomyFigure({
             maskSize: "contain",
             maskPosition: "center",
             maskRepeat: "no-repeat",
-            backgroundColor: "#f43f5e",
-            filter: "drop-shadow(0 0 8px rgba(244, 63, 94, 0.95)) brightness(1.3)",
-            opacity: 0.85,
+            backgroundColor: "#facc15",
+            filter: "drop-shadow(0 0 8px rgba(250, 204, 21, 0.95)) brightness(1.35)",
+            opacity: 0.9,
           } as React.CSSProperties}
         />
       ))}
 
-      {/* Primary Muscles Glow Mask (Universal CVD Safe Cyan Neon Glow) */}
+      {/* Primary Muscles Glow Mask (Universal CVD Safe Electric Cyan Glow) */}
       {primaryIds.map((id) => (
         <div
           key={`pri-${id}`}
@@ -1336,8 +1336,8 @@ function RealisticAnatomyFigure({
             maskSize: "contain",
             maskPosition: "center",
             maskRepeat: "no-repeat",
-            backgroundColor: "#06b6d4",
-            filter: "drop-shadow(0 0 10px rgba(6, 182, 212, 1)) drop-shadow(0 0 18px rgba(0, 242, 254, 0.8)) brightness(1.4)",
+            backgroundColor: "#00f5ff",
+            filter: "drop-shadow(0 0 10px rgba(0, 245, 255, 1)) drop-shadow(0 0 16px rgba(6, 182, 212, 0.8)) brightness(1.4)",
             opacity: 0.95,
           } as React.CSSProperties}
         />
@@ -1404,16 +1404,16 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
                 key={label}
                 className="inline-flex items-center gap-1 rounded-lg border border-cyan-400 bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-200 shadow-sm shadow-cyan-500/20"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#06b6d4] animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f5ff] animate-pulse" />
                 ● หลัก {label}
               </span>
             ))}
             {secondaryLabels.map((label) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 rounded-lg border border-rose-400/50 bg-rose-500/20 px-2 py-0.5 text-[11px] font-bold text-rose-200 shadow-sm shadow-rose-500/20"
+                className="inline-flex items-center gap-1 rounded-lg border border-yellow-400/60 bg-yellow-500/20 px-2 py-0.5 text-[11px] font-bold text-yellow-200 shadow-sm shadow-yellow-500/20"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-rose-400 shadow-[0_0_6px_#f43f5e]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_#facc15]" />
                 ○ รอง {label}
               </span>
             ))}
@@ -1452,10 +1452,10 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Full 3D Anatomy Explorer</span>
             <div className="flex items-center gap-3 text-[10px] text-zinc-400">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#06b6d4]" /> ● Primary (หลัก)
+                <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f5ff]" /> ● Primary (หลัก)
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_6px_#f43f5e]" /> ○ Secondary (รอง)
+                <span className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_6px_#facc15]" /> ○ Secondary (รอง)
               </span>
             </div>
           </div>
@@ -4349,7 +4349,7 @@ export default function Page() {
                         <div className="flex items-center justify-between text-xs mb-1.5">
                           <span className="font-bold flex items-center gap-1.5 text-zinc-200">
                             {warmupInfo.type === "full" && <span className="text-cyan-400">⚡</span>}
-                            {warmupInfo.type === "acclimation" && <span className="text-rose-400">🔥</span>}
+                            {warmupInfo.type === "acclimation" && <span className="text-yellow-400">🔥</span>}
                             {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
                             {warmupInfo.headline}
                           </span>
@@ -4364,7 +4364,7 @@ export default function Page() {
                                 className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold border ${
                                   warmupInfo.type === "full"
                                     ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-200"
-                                    : "border-rose-500/50 bg-rose-950/40 text-rose-200"
+                                    : "border-yellow-500/50 bg-yellow-950/40 text-yellow-200"
                                 }`}
                               >
                                 <span>{st.label}:</span>
