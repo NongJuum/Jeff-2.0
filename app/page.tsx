@@ -1381,9 +1381,9 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
     || primary.some((m) => ["lats", "rhomboids", "upper_back", "lower_back", "glutes", "hamstrings", "rear_delts"].includes(m));
 
   return (
-    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-2.5 sm:p-3">
+    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-2.5 sm:p-3 overflow-hidden">
       {/* Integrated Inline Strip: Left Target Chips + Right Mini 3D Silhouette */}
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-2 min-w-0 w-full">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-zinc-500">
             <span>Target Muscles</span>
@@ -1398,7 +1398,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
           </div>
 
           {/* Primary & Secondary Muscle Chips (CVD Safe & High Contrast) */}
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
             {primaryLabels.map((label) => (
               <span
                 key={label}
@@ -1423,15 +1423,15 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
           </div>
         </div>
 
-        {/* Mini 3D Anatomical Silhouette (~100px height) */}
+        {/* Mini 3D Anatomical Silhouette (~94px height, shrink-0 w-[52px] sm:w-[58px]) */}
         <div
           role="button"
           tabIndex={0}
           onClick={() => setShowFullDiagram((prev) => !prev)}
-          className="shrink-0 cursor-pointer rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-1 transition hover:border-cyan-500/40 active:scale-95"
+          className="shrink-0 w-[52px] sm:w-[58px] cursor-pointer rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-1 transition hover:border-cyan-500/40 active:scale-95 overflow-hidden"
           title="แตะเพื่อดูโมเดล 3D แบบเต็ม"
         >
-          <div className="h-[96px] w-[56px] overflow-hidden flex items-center justify-center">
+          <div className="h-[94px] w-full overflow-hidden flex items-center justify-center">
             <RealisticAnatomyFigure
               side={isBackDominant ? "back" : "front"}
               primary={primary}
@@ -1439,7 +1439,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
               compact
             />
           </div>
-          <p className="text-[9px] font-bold text-center text-zinc-500">
+          <p className="text-[9px] font-bold text-center text-zinc-500 truncate mt-0.5">
             {isBackDominant ? "หลัง (3D)" : "หน้า (3D)"}
           </p>
         </div>
@@ -1769,20 +1769,20 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
   const roundedVal = Math.round(value);
   let statusBadge = "ต้องพักเพิ่ม";
   let barColor = "bg-rose-400";
-  let badgeColor = "text-rose-300 border-rose-500/30 bg-rose-500/10";
+  let badgeColor = "text-rose-200 border-rose-500/40 bg-rose-950/40";
 
   if (value >= 80) {
     statusBadge = "ดีเยี่ยม";
-    barColor = "bg-emerald-400";
-    badgeColor = "text-emerald-300 border-emerald-500/30 bg-emerald-500/10";
+    barColor = "bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]";
+    badgeColor = "text-cyan-200 border-cyan-400/50 bg-cyan-950/40";
   } else if (value >= 60) {
     statusBadge = "ตามเกณฑ์";
-    barColor = "bg-cyan-400";
-    badgeColor = "text-cyan-300 border-cyan-500/30 bg-cyan-500/10";
+    barColor = "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]";
+    badgeColor = "text-sky-200 border-sky-400/50 bg-sky-950/40";
   } else if (value >= 40) {
     statusBadge = "ต้องพัฒนา";
-    barColor = "bg-amber-400";
-    badgeColor = "text-amber-300 border-amber-500/30 bg-amber-500/10";
+    barColor = "bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.5)]";
+    badgeColor = "text-yellow-200 border-yellow-400/60 bg-yellow-950/40";
   }
 
   return (
@@ -1790,10 +1790,10 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
       <div className="flex items-center justify-between text-[10px] font-bold text-zinc-400">
         <span className="truncate pr-1">{label}</span>
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className={`rounded px-1 py-0.2 text-[9px] font-black border ${badgeColor}`}>
-            {statusBadge}
+          <span className={`rounded px-1.5 py-0.5 text-[9px] font-black border ${badgeColor}`}>
+            [{statusBadge}]
           </span>
-          <span className="text-zinc-200">{roundedVal}</span>
+          <span className="text-zinc-200 font-bold">{roundedVal}</span>
         </div>
       </div>
       <div className="mt-1 h-2 overflow-hidden rounded-full bg-zinc-900 border border-zinc-800">
@@ -1898,8 +1898,8 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
 
       {/* Fatigue Warning Banner */}
       {report.fatigueWarning && (
-        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-200">
-          <span className="text-sm">⚠️</span>
+        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-400/50 bg-amber-950/40 p-2.5 text-xs text-amber-200">
+          <span className="text-base shrink-0">⚠️</span>
           <div>
             <p className="font-bold text-amber-300">Fatigue Warning (แจ้งเตือนความล้า)</p>
             <p className="mt-0.5 text-zinc-300 text-[11px] leading-relaxed">
@@ -1911,8 +1911,8 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
 
       {/* Deload Week Suggestion */}
       {report.deloadSuggestion && (
-        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-sky-500/30 bg-sky-500/10 p-2.5 text-xs text-sky-200">
-          <span className="text-sm">🔄</span>
+        <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-sky-400/50 bg-sky-950/40 p-2.5 text-xs text-sky-200">
+          <span className="text-base shrink-0">🔄</span>
           <div>
             <p className="font-bold text-sky-300">คำแนะนำ Deload Week (สัปดาห์ต่อเนื่อง {report.currentStreak}w)</p>
             <p className="mt-0.5 text-zinc-300 text-[11px] leading-relaxed">
@@ -3617,7 +3617,7 @@ export default function Page() {
                   onClick={() => setMode(tab.id as AppMode)}
                   className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
                     mode === tab.id
-                      ? "bg-emerald-400 text-zinc-950 shadow-sm"
+                      ? "bg-cyan-400 text-zinc-950 font-black shadow-md shadow-cyan-500/25"
                       : "text-zinc-400 hover:text-zinc-200"
                   }`}
                 >
@@ -4169,8 +4169,8 @@ export default function Page() {
     );
 
                 return (
-                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
-                    <div className="mb-3 flex items-start justify-between gap-3">
+                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 overflow-hidden w-full max-w-full">
+                    <div className="mb-3 flex items-start justify-between gap-3 min-w-0">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 text-xs font-bold text-zinc-400">#{index + 1}</span>
@@ -4224,8 +4224,8 @@ export default function Page() {
                           if (matchedInjuries.length === 0) return null;
 
                           return (
-                            <div className="mt-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-2 text-xs text-amber-300">
-                              <p className="font-bold flex items-center gap-1">
+                            <div className="mt-2 rounded-xl border border-amber-400/50 bg-amber-950/40 p-2 text-xs text-amber-200">
+                              <p className="font-bold flex items-center gap-1.5 text-amber-300">
                                 <span>⚠️ มีข้อควรระวังสำหรับผู้บาดเจ็บ:</span>
                                 <span>{matchedInjuries.map((i) => INJURY_RULES[i]?.label).join(", ")}</span>
                               </p>
@@ -4235,7 +4235,7 @@ export default function Page() {
                                 if (!subExercise) return null;
                                 return (
                                   <p key={injId} className="mt-1 text-[11px] text-amber-200">
-                                    แนะนำเปลี่ยนเป็น: <strong className="underline cursor-pointer" onClick={() => substituteExercise({ ...exercise, id: baseExercise.id }, subExercise)}>{subExercise}</strong>
+                                    แนะนำเปลี่ยนเป็น: <strong className="underline cursor-pointer text-amber-300 hover:text-white" onClick={() => substituteExercise({ ...exercise, id: baseExercise.id }, subExercise)}>{subExercise}</strong>
                                   </p>
                                 );
                               })}
@@ -4271,8 +4271,8 @@ export default function Page() {
                     <ExerciseMusclePreviewCard exercise={exercise} />
 
                     {/* [Order 3] Compact Machine Dropdown Selector */}
-                    <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 flex items-center justify-between gap-1.5 sm:gap-2 min-w-0 w-full">
+                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
                         <Dumbbell className="text-cyan-400 shrink-0" size={14} />
                         <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">เครื่อง:</span>
 
@@ -4280,7 +4280,7 @@ export default function Page() {
                           <select
                             value={currentMachine || ""}
                             onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
-                            className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-cyan-400 transition"
+                            className="w-full min-w-0 truncate appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-cyan-400 transition"
                           >
                             <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[getLoadType(exercise)]})</option>
                             {["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"].map((tag) => (
@@ -4297,7 +4297,7 @@ export default function Page() {
                       </div>
 
                       {/* Actions: Favorite ⭐, Unit Toggle ⚙️, and Clear */}
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 shrink-0">
                         {currentMachine && (
                           <button
                             type="button"
@@ -4326,7 +4326,7 @@ export default function Page() {
                             className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[10px] font-black text-emerald-300 hover:border-emerald-400 transition"
                             title="สลับหน่วยเฉพาะเครื่องนี้"
                           >
-                            ⚙️ {machineUnits[currentMachine] || globalWeightUnit}
+                            ⚙️ <span className="hidden sm:inline">{machineUnits[currentMachine] || globalWeightUnit}</span>
                           </button>
                         )}
 
@@ -4345,7 +4345,7 @@ export default function Page() {
 
                     {/* [Order 4] SMART WARMUP STRIP */}
                     {warmupInfo && (
-                      <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950 p-2.5">
+                      <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950 p-2.5 w-full">
                         <div className="flex items-center justify-between text-xs mb-1.5">
                           <span className="font-bold flex items-center gap-1.5 text-zinc-200">
                             {warmupInfo.type === "full" && <span className="text-cyan-400">⚡</span>}
@@ -4357,7 +4357,7 @@ export default function Page() {
                         </div>
 
                         {warmupInfo.steps.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2 w-full">
                             {warmupInfo.steps.map((st, sIdx) => (
                               <div
                                 key={sIdx}
@@ -4408,14 +4408,14 @@ export default function Page() {
                         </div>
                       </div>
 
-                      <div className="mb-2 grid grid-cols-[38px_1.25fr_1.25fr_42px] gap-2 items-center text-[11px] font-bold uppercase text-zinc-500">
+                      <div className="mb-2 grid grid-cols-[32px_1fr_1fr_40px] sm:grid-cols-[38px_1.2fr_1.2fr_42px] gap-1.5 sm:gap-2 items-center text-[11px] font-bold uppercase text-zinc-500">
                         <span>Set</span>
                         <div className="flex items-center gap-1">
                           <span>{effectiveUnit}</span>
                           <button
                             type="button"
                             onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
-                            className="rounded bg-zinc-800 px-1 py-0.2 text-[9px] font-bold text-emerald-400 hover:bg-zinc-700 transition"
+                            className="rounded bg-zinc-800 px-1 py-0.2 text-[9px] font-bold text-cyan-400 hover:bg-zinc-700 transition"
                             title="สลับหน่วย kg / lbs สำหรับท่านี้"
                           >
                             ⇄ {effectiveUnit === "kg" ? "lbs" : "kg"}
@@ -4450,7 +4450,7 @@ export default function Page() {
                               <div className="mb-1.5 flex items-center justify-between text-[11px]">
                                 <span className="font-bold text-zinc-400">Set #{setIndex + 1}</span>
                                 {latestSet ? (
-                                  <span className="font-medium text-emerald-400/90 bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-800/30">
+                                  <span className="font-medium text-cyan-400/90 bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-800/30">
                                     ครั้งก่อน: {latestSet.rawValue ?? latestSet.weightLbs} {latestSet.unit || "lbs"} × {latestSet.reps} reps
                                   </span>
                                 ) : aiWeightSuggestion > 0 ? (
@@ -4462,13 +4462,13 @@ export default function Page() {
                                 )}
                               </div>
 
-                              <div className="grid grid-cols-[38px_1.25fr_1.25fr_42px] gap-2 items-center">
+                              <div className="grid grid-cols-[32px_1fr_1fr_40px] sm:grid-cols-[38px_1.2fr_1.2fr_42px] gap-1.5 sm:gap-2 items-center">
                                 <div className="flex items-center justify-center font-black text-zinc-400 text-sm">{setIndex + 1}</div>
-                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400 transition">
+                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-400 transition min-w-0">
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="flex w-6 sm:w-7 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label={`Decrease weight by step for set ${setIndex + 1}`}
                                   >
                                     −
@@ -4480,23 +4480,23 @@ export default function Page() {
                                     onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
                                     onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
                                     aria-label={`Weight in ${effectiveUnit} for set ${setIndex + 1}`}
-                                    className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-base font-semibold outline-none"
+                                    className="min-w-0 w-full text-center text-sm sm:text-base font-bold outline-none bg-transparent px-0.5 py-3"
                                     placeholder={effectivePlaceholderWeight > 0 ? String(effectivePlaceholderWeight) : "0"}
                                   />
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="flex w-6 sm:w-7 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label={`Increase weight by step for set ${setIndex + 1}`}
                                   >
                                     +
                                   </button>
                                 </div>
-                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-400 transition">
+                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-400 transition min-w-0">
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
-                                    className="flex w-6 sm:w-7 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label={`Decrease reps for set ${setIndex + 1}`}
                                   >
                                     −
@@ -4508,13 +4508,13 @@ export default function Page() {
                                     onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, effectiveSets)}
                                     onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps")}
                                     aria-label={`Reps for set ${setIndex + 1}`}
-                                    className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-base font-semibold outline-none"
+                                    className="min-w-0 w-full text-center text-sm sm:text-base font-bold outline-none bg-transparent px-0.5 py-3"
                                     placeholder={latestSet ? String(latestSet.reps) : "0"}
                                   />
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
-                                    className="flex w-6 sm:w-7 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label={`Increase reps for set ${setIndex + 1}`}
                                   >
                                     +
@@ -4524,13 +4524,13 @@ export default function Page() {
                                   onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
                                   aria-label={`Save set ${setIndex + 1}`}
                                   title={set.done ? "เซ็ตนี้บันทึกแล้ว (แตะเพื่อบันทึกซ้ำ)" : "บันทึกเซ็ตนี้"}
-                                  className={`rounded-2xl border py-3 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 ${
+                                  className={`rounded-2xl border py-3 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-cyan-400 ${
                                     set.done
-                                      ? "border-emerald-400 bg-emerald-400 text-zinc-950 shadow-md shadow-emerald-500/25 ring-1 ring-emerald-300"
-                                      : "border-dashed border-zinc-700 bg-zinc-900/60 text-zinc-500 hover:border-emerald-400 hover:text-emerald-300"
+                                      ? "bg-cyan-400 border-cyan-300 text-zinc-950 font-black shadow-md shadow-cyan-500/20"
+                                      : "border-dashed border-zinc-700 bg-zinc-900/50 text-zinc-500 hover:border-cyan-400 hover:text-cyan-300"
                                   }`}
                                 >
-                                  <Check size={18} className={set.done ? "mx-auto stroke-[3]" : "mx-auto stroke-[2] opacity-60"} />
+                                  <Check size={18} className={set.done ? "mx-auto stroke-[3]" : "mx-auto stroke-[1.5] opacity-40"} />
                                 </button>
                               </div>
                             </div>
@@ -5347,7 +5347,7 @@ export default function Page() {
                 }}
                 className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium transition active:scale-95 ${
                   isTabActive
-                    ? "bg-emerald-400 text-zinc-950 font-bold shadow-sm"
+                    ? "bg-cyan-400 text-zinc-950 font-black shadow-md shadow-cyan-500/25"
                     : "bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
                 }`}
               >
