@@ -1307,7 +1307,7 @@ function RealisticAnatomyFigure({
         draggable={false}
       />
 
-      {/* Secondary Muscles Glow Mask (Warm Amber Glow) */}
+      {/* Secondary Muscles Glow Mask (Electric Hot Magenta Glow) */}
       {secondaryIds.map((id) => (
         <div
           key={`sec-${id}`}
@@ -1318,8 +1318,8 @@ function RealisticAnatomyFigure({
             maskSize: "contain",
             maskPosition: "center",
             maskRepeat: "no-repeat",
-            backgroundColor: "#f59e0b",
-            filter: "drop-shadow(0 0 8px rgba(245, 158, 11, 0.95)) brightness(1.2)",
+            backgroundColor: "#f43f5e",
+            filter: "drop-shadow(0 0 8px rgba(244, 63, 94, 0.95)) brightness(1.3)",
             opacity: 0.85,
           } as React.CSSProperties}
         />
@@ -1337,7 +1337,7 @@ function RealisticAnatomyFigure({
             maskPosition: "center",
             maskRepeat: "no-repeat",
             backgroundColor: "#06b6d4",
-            filter: "drop-shadow(0 0 8px rgba(6, 182, 212, 1)) drop-shadow(0 0 16px rgba(0, 242, 254, 0.8)) brightness(1.35)",
+            filter: "drop-shadow(0 0 10px rgba(6, 182, 212, 1)) drop-shadow(0 0 18px rgba(0, 242, 254, 0.8)) brightness(1.4)",
             opacity: 0.95,
           } as React.CSSProperties}
         />
@@ -1402,7 +1402,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
             {primaryLabels.map((label) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 rounded-lg border border-cyan-500/40 bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-300 shadow-sm shadow-cyan-500/20"
+                className="inline-flex items-center gap-1 rounded-lg border border-cyan-400 bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-200 shadow-sm shadow-cyan-500/20"
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#06b6d4] animate-pulse" />
                 ● หลัก {label}
@@ -1411,9 +1411,9 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
             {secondaryLabels.map((label) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-300"
+                className="inline-flex items-center gap-1 rounded-lg border border-rose-400/50 bg-rose-500/20 px-2 py-0.5 text-[11px] font-bold text-rose-200 shadow-sm shadow-rose-500/20"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-rose-400 shadow-[0_0_6px_#f43f5e]" />
                 ○ รอง {label}
               </span>
             ))}
@@ -1455,7 +1455,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
                 <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#06b6d4]" /> ● Primary (หลัก)
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-400 shadow-[0_0_6px_#f59e0b]" /> ○ Secondary (รอง)
+                <span className="h-2 w-2 rounded-full bg-rose-400 shadow-[0_0_6px_#f43f5e]" /> ○ Secondary (รอง)
               </span>
             </div>
           </div>
@@ -4349,7 +4349,7 @@ export default function Page() {
                         <div className="flex items-center justify-between text-xs mb-1.5">
                           <span className="font-bold flex items-center gap-1.5 text-zinc-200">
                             {warmupInfo.type === "full" && <span className="text-cyan-400">⚡</span>}
-                            {warmupInfo.type === "acclimation" && <span className="text-amber-400">🔥</span>}
+                            {warmupInfo.type === "acclimation" && <span className="text-rose-400">🔥</span>}
                             {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
                             {warmupInfo.headline}
                           </span>
@@ -4364,7 +4364,7 @@ export default function Page() {
                                 className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold border ${
                                   warmupInfo.type === "full"
                                     ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-200"
-                                    : "border-amber-500/50 bg-amber-950/40 text-amber-200"
+                                    : "border-rose-500/50 bg-rose-950/40 text-rose-200"
                                 }`}
                               >
                                 <span>{st.label}:</span>
