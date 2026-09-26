@@ -1407,7 +1407,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
     || primary.some((m) => ["lats", "rhomboids", "upper_back", "lower_back", "glutes", "hamstrings", "rear_delts"].includes(m));
 
   return (
-    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-2.5 sm:p-3 overflow-hidden">
+    <div className="mb-3 rounded-2xl border border-zinc-800/60 bg-[#141416] p-2.5 sm:p-3 overflow-hidden">
       {/* Integrated Inline Strip: Left Target Chips + Right Mini 3D Silhouette */}
       <div className="flex items-center justify-between gap-2 min-w-0 w-full">
         <div className="min-w-0 flex-1">
@@ -2348,7 +2348,10 @@ export function evaluateRelativeStrength(
   exerciseName: string,
   loadType: LoadType,
   ratio: number,
-  gender: "male" | "female" = "male"
+  gender: "male" | "female" = "male",
+  userBw?: number | null,
+  currentWeight?: number | null,
+  unit: WeightUnit = "kg"
 ) {
   const name = exerciseName.toLowerCase();
   const femaleFactor = gender === "female" ? 0.68 : 1.0;
@@ -2390,14 +2393,24 @@ export function evaluateRelativeStrength(
 
   const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
 
+  function getDeficitInstruction(targetRatio: number, nextTierLabel: string): string {
+    if (userBw && userBw > 0 && currentWeight !== undefined && currentWeight !== null && currentWeight > 0) {
+      const targetWeight = targetRatio * userBw;
+      const diffWeight = Math.max(0, targetWeight - currentWeight);
+      return `ขาดอีก ${diffWeight.toFixed(1)} ${unit} (หรืออีก ~2 Reps ในน้ำหนักเดิม) เพื่อขึ้นสู่ระดับ ${nextTierLabel}`;
+    }
+    const diffRatio = Math.max(0, targetRatio - ratio);
+    return `เป้าหมาย ${nextTierLabel}: ${targetRatio}× BW (ขาดอีก ${diffRatio.toFixed(2)}×)`;
+  }
+
   if (ratio >= thresholds[2]) {
     return { tier: "Elite" as StrengthTier, label: "🏆 ELITE", badgeClass: "border-yellow-400 bg-yellow-400/20 text-yellow-300 font-mono tracking-wider", nextTarget: "ระดับมาตรฐานสูงสุดแล้ว!" };
   } else if (ratio >= thresholds[1]) {
-    return { tier: "Advanced" as StrengthTier, label: "🔥 ADVANCED", badgeClass: "border-zinc-500 bg-zinc-800 text-zinc-100 font-mono tracking-wider", nextTarget: `เป้าหมาย Elite: ${thresholds[2]}× BW (ขาดอีก ${(thresholds[2] - ratio).toFixed(2)}×)` };
+    return { tier: "Advanced" as StrengthTier, label: "🔥 ADVANCED", badgeClass: "border-zinc-500 bg-zinc-800 text-zinc-100 font-mono tracking-wider", nextTarget: getDeficitInstruction(thresholds[2], "Elite") };
   } else if (ratio >= thresholds[0]) {
-    return { tier: "Intermediate" as StrengthTier, label: "💪 INTERMEDIATE", badgeClass: "border-yellow-500/40 bg-zinc-900 text-yellow-400 font-mono tracking-wider", nextTarget: `เป้าหมาย Advanced: ${thresholds[1]}× BW (ขาดอีก ${(thresholds[1] - ratio).toFixed(2)}×)` };
+    return { tier: "Intermediate" as StrengthTier, label: "💪 INTERMEDIATE", badgeClass: "border-yellow-500/40 bg-zinc-900 text-yellow-400 font-mono tracking-wider", nextTarget: getDeficitInstruction(thresholds[1], "Advanced") };
   } else {
-    return { tier: "Beginner" as StrengthTier, label: "🌱 NOVICE", badgeClass: "border-zinc-800 bg-zinc-950 text-zinc-400 font-mono tracking-wider", nextTarget: `เป้าหมาย Intermediate: ${thresholds[0]}× BW (ขาดอีก ${(thresholds[0] - ratio).toFixed(2)}×)` };
+    return { tier: "Beginner" as StrengthTier, label: "🌱 NOVICE", badgeClass: "border-zinc-800 bg-zinc-950 text-zinc-400 font-mono tracking-wider", nextTarget: getDeficitInstruction(thresholds[0], "Intermediate") };
   }
 }
 
@@ -3671,8 +3684,8 @@ export default function Page() {
   }[mode];
 
   return (
-    <main className="min-h-screen bg-zinc-950 pb-40 text-zinc-50 sm:pb-32">
-      <section className="sticky top-0 z-20 border-b border-zinc-800 bg-zinc-950/95 px-4 py-2.5 backdrop-blur pt-[calc(env(safe-area-inset-top)+0.625rem)]">
+    <main className="min-h-screen bg-black pb-40 text-zinc-50 sm:pb-32">
+      <section className="sticky top-0 z-20 border-b border-zinc-900 bg-black/95 px-4 py-2.5 backdrop-blur pt-[calc(env(safe-area-inset-top)+0.625rem)]">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <img src="/hait-logo.png" alt="HA IT logo" className="h-8 w-8 rounded-xl bg-white object-contain p-1" />
@@ -4372,16 +4385,30 @@ export default function Page() {
     );
 
     const userBwLbs = bodyweightEntry?.lbs ?? (userProfile?.weightKg ? userProfile.weightKg * 2.20462 : null);
+    const userBwActiveUnit = effectiveUnit === "kg"
+      ? (bodyweightEntry ? bodyweightEntry.lbs * 0.453592 : (userProfile?.weightKg ?? null))
+      : userBwLbs;
+    const currentWeightActiveUnit = pr?.weightLbs && pr.weightLbs > 0
+      ? (effectiveUnit === "kg" ? pr.weightLbs * 0.453592 : pr.weightLbs)
+      : baselineWorkingWeight;
     const relativeWeightLbs = pr?.weightLbs && pr.weightLbs > 0
       ? pr.weightLbs
       : (effectiveUnit === "kg" ? baselineWorkingWeight * 2.20462 : baselineWorkingWeight);
     const relativeRatio = userBwLbs && userBwLbs > 0 && relativeWeightLbs > 0 ? relativeWeightLbs / userBwLbs : null;
     const strengthTierInfo = relativeRatio
-      ? evaluateRelativeStrength(exercise.name, getLoadType(exercise), relativeRatio, userProfile?.gender ?? "male")
+      ? evaluateRelativeStrength(
+          exercise.name,
+          getLoadType(exercise),
+          relativeRatio,
+          userProfile?.gender ?? "male",
+          userBwActiveUnit,
+          currentWeightActiveUnit,
+          effectiveUnit
+        )
       : null;
 
                 return (
-                  <article key={baseExercise.id} className="rounded-3xl bg-zinc-950 border border-zinc-800/80 p-4 shadow-2xl overflow-hidden w-full max-w-full">
+                  <article key={baseExercise.id} className="rounded-3xl bg-[#121214] border border-zinc-800/60 p-4 sm:p-5 shadow-xl overflow-hidden w-full max-w-full">
                     <div className="mb-3 flex items-start justify-between gap-3 min-w-0">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -4601,8 +4628,8 @@ export default function Page() {
                       </div>
                     )}
 
-                    {/* [Order 5] PRIMARY ZONE: Working Sets Table */}
-                    <div className="mb-3 rounded-2xl bg-zinc-950 p-3 border border-zinc-800/80">
+                    {/* [Order 5] PRIMARY ZONE: Working Sets Table (Zepp Athletic Standard) */}
+                    <div className="mb-3 rounded-2xl bg-black/40 p-2.5 sm:p-3">
                       <div className="mb-3 flex items-center justify-between gap-2">
                         <div>
                           <p className="text-xs font-bold uppercase text-zinc-400">Working sets</p>
@@ -4670,7 +4697,7 @@ export default function Page() {
                           const effectivePlaceholderWeight = fallbackWeightVal > 0 ? fallbackWeightVal : (aiWeightSuggestion > 0 ? aiWeightSuggestion : 0);
 
                           return (
-                            <div key={setIndex} className="rounded-2xl bg-zinc-900/70 border border-zinc-800/60 p-2 hover:border-zinc-700 transition">
+                            <div key={setIndex} className="rounded-2xl bg-[#141416] p-2 hover:bg-[#18181c] transition">
                               {/* Benchmark Note */}
                               {latestSet && (
                                 <div className="mb-1 flex items-center justify-between text-[10px] px-1">
@@ -4687,8 +4714,8 @@ export default function Page() {
                                   {setIndex + 1 < 10 ? `0${setIndex + 1}` : setIndex + 1}
                                 </div>
 
-                                {/* Weight Input Box */}
-                                <div className="flex flex-1 items-center justify-between rounded-xl bg-black border border-zinc-800 px-1 py-1 focus-within:border-yellow-400 focus-within:ring-1 focus-within:ring-yellow-400 transition min-w-0">
+                                {/* Weight Input Box (Zepp Digital Stepper Cell) */}
+                                <div className="flex flex-1 items-center justify-between bg-[#1a1a1e] rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-yellow-400 transition min-w-0">
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
@@ -4705,10 +4732,10 @@ export default function Page() {
                                       onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
                                       onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
                                       aria-label={`Weight in ${effectiveUnit} for set ${setIndex + 1}`}
-                                      className="w-14 min-w-0 text-center font-mono font-black text-base sm:text-lg text-white bg-transparent outline-none tabular-nums"
+                                      className="w-14 min-w-0 text-xl font-mono font-black text-white tabular-nums text-center bg-transparent outline-none"
                                       placeholder={String(effectivePlaceholderWeight || 0)}
                                     />
-                                    <span className="text-[10px] font-mono font-bold text-yellow-400 uppercase select-none">{effectiveUnit}</span>
+                                    <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-widest select-none">{effectiveUnit}</span>
                                   </div>
                                   <button
                                     type="button"
@@ -4720,8 +4747,8 @@ export default function Page() {
                                   </button>
                                 </div>
 
-                                {/* Reps Input Box */}
-                                <div className="flex flex-1 items-center justify-between rounded-xl bg-black border border-zinc-800 px-1 py-1 focus-within:border-yellow-400 focus-within:ring-1 focus-within:ring-yellow-400 transition min-w-0">
+                                {/* Reps Input Box (Zepp Digital Stepper Cell) */}
+                                <div className="flex flex-1 items-center justify-between bg-[#1a1a1e] rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-yellow-400 transition min-w-0">
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
@@ -4738,10 +4765,10 @@ export default function Page() {
                                       onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, effectiveSets)}
                                       onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps")}
                                       aria-label={`Reps for set ${setIndex + 1}`}
-                                      className="w-12 min-w-0 text-center font-mono font-black text-base sm:text-lg text-white bg-transparent outline-none tabular-nums"
+                                      className="w-12 min-w-0 text-xl font-mono font-black text-white tabular-nums text-center bg-transparent outline-none"
                                       placeholder={latestSet ? String(latestSet.reps) : "0"}
                                     />
-                                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase select-none">REPS</span>
+                                    <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-widest select-none">REPS</span>
                                   </div>
                                   <button
                                     type="button"
@@ -4759,10 +4786,10 @@ export default function Page() {
                                   onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
                                   aria-label={`Save set ${setIndex + 1}`}
                                   title={set.done ? "เซ็ตนี้บันทึกแล้ว (แตะเพื่อบันทึกซ้ำ)" : "บันทึกเซ็ตนี้"}
-                                  className={`w-11 h-10 shrink-0 rounded-xl flex items-center justify-center transition active:scale-90 border ${
+                                  className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition active:scale-90 ${
                                     set.done
-                                      ? "bg-yellow-400 border-yellow-300 text-black shadow-[0_0_12px_rgba(255,229,0,0.4)]"
-                                      : "bg-black border-zinc-800 text-zinc-500 hover:border-yellow-400 hover:text-yellow-400"
+                                      ? "bg-yellow-400 text-black shadow-[0_0_14px_rgba(255,229,0,0.5)] font-black"
+                                      : "bg-[#1a1a1e] text-zinc-500 hover:text-yellow-400"
                                   }`}
                                 >
                                   <Check className={set.done ? "stroke-[3]" : "stroke-[2] opacity-40"} size={18} />

@@ -114,6 +114,12 @@ export const STRENGTH_RATIOS: Record<string, { male: number; female: number }> =
   Flye: { male: 0.45, female: 0.30 },
   LatPull: { male: 0.95, female: 0.65 },
   Row: { male: 0.90, female: 0.58 },
+  ChestSupportedRow: { male: 0.65, female: 0.45 },
+  SeatedCableRow: { male: 0.50, female: 0.35 },
+  IsoLateralHighRow: { male: 0.55, female: 0.38 },
+  IsoLateralLowRow: { male: 0.58, female: 0.40 },
+  InclineMachinePress: { male: 0.75, female: 0.50 },
+  DeclineMachinePress: { male: 0.90, female: 0.60 },
   OHP: { male: 0.68, female: 0.42 },
   LatRaise: { male: 0.18, female: 0.12 },
   RearDelt: { male: 0.30, female: 0.20 },
@@ -357,10 +363,17 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   if (name.includes("leg curl") || name.includes("hamstring curl")) return "LegCurl";
   if (name.includes("squat") || name.includes("v-squat") || name.includes("lunge") || name.includes("step up")) return "Squat";
   if (name.includes("hip thrust") || name.includes("kickback") || name.includes("glute")) return "HipThrust";
+  if (name.includes("incline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "InclineMachinePress";
+  if (name.includes("decline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "DeclineMachinePress";
   if (name.includes("incline")) return "Incline";
   if (name.includes("flye") || name.includes("crossover") || name.includes("pec deck")) return "Flye";
   if (name.includes("bench") || name.includes("chest press") || name.includes("dip")) return "Bench";
   if (name.includes("lat pull") || name.includes("pull up") || name.includes("pulldown") || name.includes("pullover")) return "LatPull";
+  if (name.includes("chest supported row") || name.includes("chest-supported row") || name.includes("seal row")) return "ChestSupportedRow";
+  if (name.includes("high row")) return "IsoLateralHighRow";
+  if (name.includes("low row") && (name.includes("iso") || name.includes("plate") || name.includes("hammer"))) return "IsoLateralLowRow";
+  if (name.includes("seated cable row") || name.includes("cable row") || name.includes("seated row") || name.includes("low row")) return "SeatedCableRow";
+  if (name.includes("iso-lateral") && name.includes("row")) return "IsoLateralHighRow";
   if (name.includes("row")) return "Row";
   if (name.includes("shrug")) return "Shrug";
   if (name.includes("lat raise") || name.includes("lateral raise") || name.includes("y raise")) return "LatRaise";
@@ -491,9 +504,20 @@ export function calculatePrescriptionWeight(
     force = (force / 2) * (profile.bilateralDeficit ? 0.88 : 1.0);
   }
 
+  const lowerName = exerciseName.toLowerCase();
   const radAngle = (profile.angleThetaDeg * Math.PI) / 180;
   const denominator = Math.cos(radAngle) + profile.frictionCoeff;
-  const rawWeightKg = force * profile.leverageRatio * profile.camModifier * (profile.pulleyRatio / denominator);
+  let rawWeightKg = force * profile.leverageRatio * profile.camModifier * (profile.pulleyRatio / denominator);
+
+  // Biomechanical Safety Clamp: Cable Row / Seated Row max baseline
+  // Ensure Cable Row / Seated Row does not recommend > 0.55x BW for hypertrophy rep ranges (8-12 reps).
+  // For a 60-70 kg lifter, Cable Row must prescribe 30-35 kg (65-75 lbs), never 132 lbs.
+  if (cat === "SeatedCableRow" || lowerName.includes("cable row") || lowerName.includes("seated row")) {
+    const maxCableRowKg = bw * 0.55;
+    if (rawWeightKg > maxCableRowKg) {
+      rawWeightKg = maxCableRowKg;
+    }
+  }
 
   const isIsolation = cat === "LatRaise" || cat === "Flye" || cat === "Bicep" || cat === "Tricep" || cat === "RearDelt" || cat === "LegExt" || cat === "LegCurl";
 
