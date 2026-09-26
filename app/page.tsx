@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronUp,
   ClipboardList,
   Cog,
   Download,
@@ -14,6 +15,7 @@ import {
   Flame,
   Library,
   MinusCircle,
+  MoreVertical,
   PlayCircle,
   Plus,
   RotateCcw,
@@ -2458,6 +2460,64 @@ export default function Page() {
   const [presetSetsMap, setPresetSetsMap] = useState<Record<string, number>>(() => readJson<Record<string, number>>(PRESET_SETS_KEY, {}));
   const [cardioLogs, setCardioLogs] = useState<CardioLog[]>(() => readJson<CardioLog[]>(CARDIO_LOGS_KEY, []));
 
+  // Active Session Engine & Accordion States (Hevy/Strong Style)
+  const [sessionStartTime, setSessionStartTime] = useState<number>(() => Date.now());
+  const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState<number>(0);
+  const [expandedExercises, setExpandedExercises] = useState<Record<string, boolean>>({});
+  const [showFinishCelebration, setShowFinishCelebration] = useState(false);
+  const [finishedWorkoutStats, setFinishedWorkoutStats] = useState<{ durationStr: string; totalSets: number; totalVolumeKg: number } | null>(null);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setSessionElapsedSeconds(Math.floor((Date.now() - sessionStartTime) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [sessionStartTime]);
+
+  function formatStopwatch(totalSec: number): string {
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return `${m < 10 ? `0${m}` : m}:${s < 10 ? `0${s}` : s}`;
+  }
+
+  function toggleExerciseAccordion(exerciseId: string) {
+    setExpandedExercises((prev) => {
+      const isCurrentlyExpanded = prev[exerciseId] ?? true;
+      return {
+        ...prev,
+        [exerciseId]: !isCurrentlyExpanded,
+      };
+    });
+  }
+
+  function handleTriggerFinishWorkout(dayTitle: string, currentDayExercises: PlanExercise[]) {
+    // Calculate stats
+    let totalSetsDone = 0;
+    let totalVol = 0;
+
+    currentDayExercises.forEach((ex) => {
+      const exInputs = inputs[ex.id] || [];
+      exInputs.forEach((s) => {
+        if (s.done) {
+          totalSetsDone += 1;
+          const w = parseFloat(s.weightLbs) || 0;
+          const r = parseFloat(s.reps) || 0;
+          totalVol += w * r;
+        }
+      });
+    });
+
+    const durationStr = formatStopwatch(sessionElapsedSeconds);
+    const totalVolumeKg = Math.round(totalVol * 0.453592);
+
+    setFinishedWorkoutStats({
+      durationStr,
+      totalSets: totalSetsDone,
+      totalVolumeKg,
+    });
+    setShowFinishCelebration(true);
+  }
+
   // Cardio Quick-Input State
   const [cardioType, setCardioType] = useState<"treadmill" | "incline_walk" | "rower" | "bike" | "outdoor">("treadmill");
   const [cardioDuration, setCardioDuration] = useState<string>("");
@@ -3750,6 +3810,40 @@ export default function Page() {
             )}
           </div>
         </div>
+
+        {/* 1. Sticky Active Session Topbar (Hevy/Strong Style) */}
+        {["today", "preset", "custom"].includes(mode) && day && (
+          <div className="mt-2.5 pt-2 border-t border-zinc-800/80 mx-auto flex max-w-5xl items-center justify-between gap-3">
+            {/* Left: Overview label / workout badge */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-xs font-bold text-yellow-300 uppercase tracking-wider">
+                <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse shadow-[0_0_8px_#FFE500]" />
+                <span>{day.title}</span>
+              </span>
+              <span className="text-[11px] font-mono text-zinc-500 hidden sm:inline">
+                {day.exercises.length} ท่า
+              </span>
+            </div>
+
+            {/* Center: Large Digital Session Stopwatch */}
+            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-xl shadow-inner">
+              <Activity size={14} className="text-yellow-400 animate-bounce" />
+              <span className="font-mono font-black text-base sm:text-lg tracking-tight text-white tabular-nums">
+                {formatStopwatch(sessionElapsedSeconds)}
+              </span>
+            </div>
+
+            {/* Right: Prominent Volt Yellow Finish Button */}
+            <button
+              type="button"
+              onClick={() => handleTriggerFinishWorkout(day.title, day.exercises)}
+              className="flex items-center gap-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-3.5 py-1.5 text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.35)] transition active:scale-95"
+            >
+              <Check size={15} className="stroke-[3]" />
+              <span>Finish</span>
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="mx-auto max-w-5xl px-4 py-3">
@@ -4407,116 +4501,113 @@ export default function Page() {
         )
       : null;
 
+                const isExpanded = expandedExercises[baseExercise.id] ?? true;
+                const completedSetsCount = setInputs.filter((s) => s.done).length;
+
                 return (
-                  <article key={baseExercise.id} className="rounded-3xl bg-[#121214] border border-zinc-800/60 p-4 sm:p-5 shadow-xl overflow-hidden w-full max-w-full">
-                    <div className="mb-3 flex items-start justify-between gap-3 min-w-0">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 text-xs font-bold text-zinc-400">#{index + 1}</span>
-                          <span className="rounded-full bg-yellow-400/10 px-2.5 py-0.5 text-xs font-bold text-yellow-300">{exercise.group}</span>
-                          <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">{exercise.movement}</span>
-                          <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">
-                            {LOAD_LABELS[getLoadType(exercise)]}
-                          </span>
-                          {mode === "preset" && substituteMap[baseExercise.id] && (
-                            <span className="rounded-full bg-blue-400/10 px-2.5 py-0.5 text-xs font-bold text-blue-300">Subbed</span>
-                          )}
-                          {exercise.warmup ? (
-                            <span className="rounded-full bg-orange-400/10 px-2.5 py-0.5 text-xs font-bold text-orange-300">
-                              <Flame className="mr-1 inline" size={11} /> Warmup
-                            </span>
-                          ) : null}
+                  <article key={baseExercise.id} className="rounded-3xl bg-[#121214] border border-zinc-800/60 shadow-xl overflow-hidden w-full max-w-full transition-all">
+                    {/* Accordion Exercise Header Bar (Clickable to Expand/Collapse) */}
+                    <div
+                      onClick={() => toggleExerciseAccordion(baseExercise.id)}
+                      className="cursor-pointer p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-[#161619] transition select-none"
+                    >
+                      {/* Left: Movement Icon Badge + Exercise Name + Completed Sets Badge */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 text-yellow-400 font-black text-sm">
+                          {exercise.group.slice(0, 2).toUpperCase()}
                         </div>
 
-                        <h3 className="mt-2 text-xl sm:text-2xl font-black uppercase tracking-tight text-white font-mono">{exercise.name}</h3>
-                        {strengthTierInfo && relativeRatio && (
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-xs font-black tabular-nums uppercase ${strengthTierInfo.badgeClass}`}>
-                              <span>{strengthTierInfo.label}</span>
-                              <span className="opacity-60">·</span>
-                              <span>{relativeRatio.toFixed(2)}× BW</span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-mono font-bold text-zinc-500">#{index + 1}</span>
+                            <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white font-mono truncate">
+                              {exercise.name}
+                            </h3>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold font-mono ${
+                              completedSetsCount === effectiveSets
+                                ? "bg-yellow-400 text-black font-black shadow-[0_0_8px_rgba(250,204,21,0.4)]"
+                                : completedSetsCount > 0
+                                ? "bg-yellow-400/20 text-yellow-300 border border-yellow-500/30"
+                                : "bg-zinc-800/80 text-zinc-400"
+                            }`}>
+                              <span>{effectiveSets} Sets</span>
+                              <span>·</span>
+                              <span>{completedSetsCount}/{effectiveSets}</span>
                             </span>
-                            <span className="text-[11px] font-medium text-zinc-400 truncate">
-                              {strengthTierInfo.nextTarget}
+                            <span className="text-[11px] text-zinc-500 hidden sm:inline truncate">
+                              {LOAD_LABELS[getLoadType(exercise)]}
                             </span>
                           </div>
-                        )}
-                        <p className="mt-0.5 text-xs font-bold text-zinc-400 uppercase tracking-widest font-mono">
-                          {effectiveSets} hard working sets × {exercise.reps} reps
-                        </p>
-
-                        {/* Trainer Assessment Biomechanical Recommended Note */}
-                        {userProfile && (() => {
-                          const muscleInfo = evaluateMuscleMass(userProfile.gender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
-                          const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier, currentMachine);
-                          const activeU = effectiveUnit;
-                          const displayWeight = activeU === "lbs"
-                            ? `${Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10} lbs`
-                            : `${bioRes.hardwareWeightKg} kg`;
-
-                          return (
-                            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-[11px] font-bold text-yellow-300">
-                              <Sparkles size={11} className="text-yellow-400 font-bold" />
-                              <span>
-                                แนะนำ AI: {displayWeight}
-                                {bioRes.isPerHand ? " ต่อข้าง" : ""} ({bioRes.displayNote})
-                              </span>
-                            </p>
-                          );
-                        })()}
-
-                        {/* Injury Alert Badge */}
-                        {userProfile && userProfile.injuries?.length > 0 && (() => {
-                          const matchedInjuries = userProfile.injuries.filter((injId) => {
-                            const rule = INJURY_RULES[injId];
-                            return rule && rule.warns.some((w) => exercise.name.toLowerCase().includes(w.toLowerCase()));
-                          });
-
-                          if (matchedInjuries.length === 0) return null;
-
-                          return (
-                            <div className="mt-2 rounded-xl border border-amber-400/50 bg-amber-950/40 p-2 text-xs text-amber-200">
-                              <p className="font-bold flex items-center gap-1.5 text-amber-300">
-                                <span>⚠️ มีข้อควรระวังสำหรับผู้บาดเจ็บ:</span>
-                                <span>{matchedInjuries.map((i) => INJURY_RULES[i]?.label).join(", ")}</span>
-                              </p>
-                              {matchedInjuries.map((injId) => {
-                                const subs = INJURY_RULES[injId]?.substitutes;
-                                const subExercise = subs ? subs[exercise.name] : null;
-                                if (!subExercise) return null;
-                                return (
-                                  <p key={injId} className="mt-1 text-[11px] text-amber-200">
-                                    แนะนำเปลี่ยนเป็น: <strong className="underline cursor-pointer text-amber-300 hover:text-white" onClick={() => substituteExercise({ ...exercise, id: baseExercise.id }, subExercise)}>{subExercise}</strong>
-                                  </p>
-                                );
-                              })}
-                            </div>
-                          );
-                        })()}
+                        </div>
                       </div>
 
-                      <div className="flex flex-col gap-2 shrink-0">
+                      {/* Right: Actions (YouTube / Delete) + Options & Chevron Indicator */}
+                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <a
                           href={youtubeSearch(`${exercise.name} proper form`)}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-2xl bg-zinc-50 p-2.5 text-zinc-950 transition hover:bg-zinc-200"
+                          className="rounded-xl bg-zinc-900 border border-zinc-800 p-2 text-zinc-400 hover:text-white transition"
                           aria-label="Watch demo"
                           title="ดูคลิปสอนท่าทางที่ถูกต้อง"
                         >
-                          <PlayCircle size={20} />
+                          <PlayCircle size={16} />
                         </a>
                         {mode === "custom" && (
                           <button
                             onClick={() => removeExerciseFromCurrentDay(baseExercise.id)}
-                            className="rounded-2xl border border-red-500/40 bg-red-500/10 p-2.5 text-red-300 transition hover:bg-red-500/20"
+                            className="rounded-xl border border-red-500/30 bg-red-500/10 p-2 text-red-300 transition hover:bg-red-500/20"
                             aria-label="Remove exercise"
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => toggleExerciseAccordion(baseExercise.id)}
+                          className="rounded-xl bg-zinc-900 border border-zinc-800 p-2 text-zinc-400 hover:text-yellow-400 transition"
+                          aria-label={isExpanded ? "Collapse exercise" : "Expand exercise"}
+                        >
+                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                        </button>
                       </div>
                     </div>
+
+                    {/* Accordion Expanded Body */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 sm:px-5 sm:pb-5 border-t border-zinc-900/80 pt-3">
+                        <div className="mb-3">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded-full bg-yellow-400/10 px-2.5 py-0.5 text-xs font-bold text-yellow-300">{exercise.group}</span>
+                            <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">{exercise.movement}</span>
+                            <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">
+                              {LOAD_LABELS[getLoadType(exercise)]}
+                            </span>
+                            {mode === "preset" && substituteMap[baseExercise.id] && (
+                              <span className="rounded-full bg-blue-400/10 px-2.5 py-0.5 text-xs font-bold text-blue-300">Subbed</span>
+                            )}
+                            {exercise.warmup ? (
+                              <span className="rounded-full bg-orange-400/10 px-2.5 py-0.5 text-xs font-bold text-orange-300">
+                                <Flame className="mr-1 inline" size={11} /> Warmup
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {strengthTierInfo && relativeRatio && (
+                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                              <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-xs font-black tabular-nums uppercase ${strengthTierInfo.badgeClass}`}>
+                                <span>{strengthTierInfo.label}</span>
+                                <span className="opacity-60">·</span>
+                                <span>{relativeRatio.toFixed(2)}× BW</span>
+                              </span>
+                              <span className="text-[11px] font-medium text-zinc-400 truncate">
+                                {strengthTierInfo.nextTarget}
+                              </span>
+                            </div>
+                          )}
+                        </div>
 
                     {/* [Order 2] Integrated 3D Muscle & Target Strip (Inline Layout) */}
                     <ExerciseMusclePreviewCard exercise={exercise} />
@@ -4676,21 +4767,21 @@ export default function Page() {
                         </div>
                       </div>
 
-                      <div className="mb-2 flex items-center justify-between text-[11px] font-bold uppercase text-zinc-500 px-1">
-                        <span className="w-8 text-center font-mono">Set</span>
-                        <div className="flex-1 text-center flex items-center justify-center gap-1">
-                          <span>Weight ({effectiveUnit})</span>
+                      <div className="mb-2.5 flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-zinc-500 px-1 border-b border-zinc-900 pb-1.5">
+                        <span className="w-8 text-center font-mono">SET</span>
+                        <div className="flex-1 text-center flex items-center justify-center gap-1.5">
+                          <span>WEIGHT ({effectiveUnit.toUpperCase()})</span>
                           <button
                             type="button"
                             onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
-                            className="rounded bg-zinc-800 px-1.5 py-0.5 text-[9px] font-bold text-yellow-400 hover:bg-zinc-700 transition"
+                            className="rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[9px] font-bold text-yellow-400 hover:border-yellow-400/50 transition"
                             title="สลับหน่วย kg / lbs สำหรับท่านี้"
                           >
-                            ⇄ {effectiveUnit === "kg" ? "lbs" : "kg"}
+                            ⇄ {effectiveUnit === "kg" ? "LBS" : "KG"}
                           </button>
                         </div>
-                        <span className="flex-1 text-center">Reps</span>
-                        <span className="w-11 text-center">Save</span>
+                        <span className="flex-1 text-center">REPS</span>
+                        <span className="w-11 text-center">DONE</span>
                       </div>
 
                       <div className="space-y-2">
@@ -5242,6 +5333,8 @@ export default function Page() {
                         >
                           Next
                         </button>
+                      </div>
+                    )}
                       </div>
                     )}
                   </article>
@@ -5817,6 +5910,67 @@ export default function Page() {
                 ปิดหน้าต่าง
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Workout Finished Celebration Sheet (Summary Modal - Apple HIG / Hevy Style) */}
+      {showFinishCelebration && finishedWorkoutStats && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/85 p-0 sm:p-4 backdrop-blur-md animate-in fade-in duration-250">
+          <div className="relative w-full max-w-md overflow-hidden rounded-t-[32px] sm:rounded-3xl border border-zinc-800/90 bg-zinc-950 p-6 sm:p-7 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom duration-300">
+            {/* Top Glow & Badge */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 rounded-full bg-yellow-400/20 border border-yellow-400/40 flex items-center justify-center text-yellow-300 shadow-[0_0_25px_rgba(250,204,21,0.4)] mb-4">
+                <Trophy size={34} className="text-yellow-400 stroke-[2.5]" />
+              </div>
+              <span className="text-xs font-mono font-black uppercase tracking-widest text-yellow-400 bg-yellow-950/40 border border-yellow-800/40 px-3 py-1 rounded-full mb-1">
+                WORKOUT COMPLETED!
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-mono font-black text-white uppercase tracking-tight mt-1">
+                ยอดเยี่ยมมาก! 🎉
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1 max-w-xs">
+                คุณทำตามแผนการฝึกของวันนี้สำเร็จแล้ว บันทึกข้อมูลเข้าสู่ระบบเรียบร้อย
+              </p>
+            </div>
+
+            {/* Stats Metric Cards Grid */}
+            <div className="grid grid-cols-3 gap-2.5 my-6">
+              <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800/80 p-3 text-center">
+                <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">เวลาฝึก</p>
+                <p className="text-lg font-mono font-black text-white mt-1 tabular-nums">
+                  {finishedWorkoutStats.durationStr}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800/80 p-3 text-center">
+                <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">เซ็ตที่สำเร็จ</p>
+                <p className="text-lg font-mono font-black text-yellow-300 mt-1 tabular-nums">
+                  {finishedWorkoutStats.totalSets}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-zinc-900/90 border border-zinc-800/80 p-3 text-center">
+                <p className="text-[10px] font-black uppercase tracking-wider text-zinc-500">Total Volume</p>
+                <p className="text-lg font-mono font-black text-white mt-1 tabular-nums">
+                  {finishedWorkoutStats.totalVolumeKg} <span className="text-[10px] text-zinc-400">kg</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Full Width Done / บันทึกผล Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowFinishCelebration(false);
+                setSessionElapsedSeconds(0);
+                setSessionStartTime(Date.now());
+              }}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black py-4 text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(250,204,21,0.4)] transition active:scale-[0.98]"
+            >
+              <Check size={18} className="stroke-[3]" />
+              <span>Done / บันทึกผล</span>
+            </button>
           </div>
         </div>
       )}
