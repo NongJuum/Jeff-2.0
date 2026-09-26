@@ -339,6 +339,20 @@ function loadPermanentRecords(): Record<string, ExerciseRecords> {
     }
   }
 
+  // 4. Sanitize records where weightLbs appears inflated (>600) due to double conversion
+  for (const key of Object.keys(result)) {
+    const rec = result[key];
+    if (rec?.maxWeight && rec.maxWeight.weightLbs > 600 && rec.maxWeight.rawValue !== undefined && rec.maxWeight.unit === "kg") {
+      rec.maxWeight.weightLbs = convertWeight(rec.maxWeight.rawValue, "kg", "lbs");
+    }
+    if (rec?.bestReps && rec.bestReps.weightLbs > 600 && rec.bestReps.rawValue !== undefined && rec.bestReps.unit === "kg") {
+      rec.bestReps.weightLbs = convertWeight(rec.bestReps.rawValue, "kg", "lbs");
+    }
+    if (rec?.bestVolume && rec.bestVolume.weightLbs > 600 && rec.bestVolume.rawValue !== undefined && rec.bestVolume.unit === "kg") {
+      rec.bestVolume.weightLbs = convertWeight(rec.bestVolume.rawValue, "kg", "lbs");
+    }
+  }
+
   return result;
 }
 
@@ -861,46 +875,50 @@ function getWarmupSets(bestWeight?: number) {
 function getRestSeconds(exercise: PlanExercise) {
   const movement = exercise.movement.toLowerCase();
   const name = exercise.name.toLowerCase();
+  const load = (exercise.load ?? "").toLowerCase();
 
-  const isMachineCompound =
-    name.includes("machine") ||
-    name.includes("smith") ||
-    name.includes("leg press") ||
-    name.includes("hack squat") ||
-    name.includes("pendulum") ||
-    name.includes("belt squat") ||
-    name.includes("v-squat");
+  // Heavy machine / cable compounds
+  const heavyMachines = ["cable", "selectorized", "plate-loaded", "smith"];
+  const isHeavyMachine = heavyMachines.some((m) => load.includes(m));
 
-  if ((movement === "hinge" && !name.includes("pull through")) || name.includes("deadlift") || name.includes("rdl")) {
-    return 210;
-  }
-
-  if (
+  // Barbell free-weight compounds (squat, deadlift, bench press, press, row, vertical pull, glute)
+  const isCompound =
     movement.includes("press") ||
     movement.includes("row") ||
     movement.includes("vertical pull") ||
     movement.includes("squat") ||
-    movement.includes("glute bridge") ||
-    movement.includes("glute press")
-  ) {
-    return isMachineCompound ? 150 : 180;
-  }
+    movement.includes("glute") ||
+    name.includes("deadlift") ||
+    name.includes("bench press");
 
-  if (exercise.group === "Abs & Calves") {
-    return 60;
-  }
-
-  if (
+  // Isolation / single-joint exercises
+  const isIsolation =
     movement.includes("flye") ||
     movement.includes("raise") ||
     movement.includes("curl") ||
     movement.includes("triceps") ||
     movement.includes("isolation") ||
-    movement.includes("rear delt")
-  ) {
-    return 120;
+    movement.includes("rear delt");
+
+  // Small muscle groups (arms, face pull)
+  const isSmallMuscle =
+    (exercise.group ?? "").toLowerCase().includes("arms") ||
+    name.includes("face pull");
+
+  if (isCompound && !isHeavyMachine) {
+    return 180; // Compounds
+  }
+  if (isHeavyMachine) {
+    return 120; // Heavy machines
+  }
+  if (isIsolation) {
+    return 90; // Isolation
+  }
+  if (isSmallMuscle) {
+    return 60; // Small muscles
   }
 
+  // Default fallback
   return 120;
 }
 
@@ -2340,6 +2358,11 @@ export default function Page() {
 
   // Stage 1 Unit Hierarchy State (haitMachineUnitsV1, haitExerciseUnitsV1, haitUserProfileV1)
   const [exerciseUnits, setExerciseUnits] = useState<Record<string, WeightUnit>>(() => getExerciseUnitsMap());
+  // PR Edit Modal State
+  const [editingPrExercise, setEditingPrExercise] = useState<{ name: string; machine?: string } | null>(null);
+  const [editPrWeight, setEditPrWeight] = useState<string>("");
+  const [editPrReps, setEditPrReps] = useState<string>("");
+  const [editPrUnit, setEditPrUnit] = useState<WeightUnit>("kg");
   const [machineUnits, setMachineUnits] = useState<Record<string, WeightUnit>>(() => getMachineUnitsMap());
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getUserProfile());
 
@@ -3191,60 +3214,7 @@ export default function Page() {
 
     if (!Number.isFinite(enteredVal) || !Number.isFinite(reps) || enteredVal <= 0 || reps <= 0) return;
 
-    const effectiveUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
-    const weightLbs = effectiveUnit === "kg" ? convertWeight(enteredVal, "kg", "lbs") : enteredVal;
-
-    if (!item.done) {
-      const trimmedTag = (machineTag ?? "").trim();
-      const logSet: LogSet = {
-        exerciseId: exercise.id,
-        exerciseName: exercise.name,
-        weightLbs,
-        reps,
-        setNumber: setIndex + 1,
-        date: new Date().toISOString(),
-        machine: trimmedTag || undefined,
-        unit: effectiveUnit,
-        rawValue: enteredVal,
-      };
-
-      const prCheck = checkIsPr(recordsMap, logSet);
-      if (prCheck) {
-        setPrCelebration({
-          exerciseName: logSet.exerciseName,
-          machine: trimmedTag || undefined,
-          recordType: prCheck.type,
-          oldVal: prCheck.oldVal,
-          newVal: prCheck.newVal,
-        });
-      }
-
-      const todayKey = getLocalDateKey(logSet.date);
-      setLogs((old) => {
-        const without = old.filter(
-          (l) =>
-            !(
-              l.exerciseName === logSet.exerciseName &&
-              (l.machine || "") === (logSet.machine || "") &&
-              l.setNumber === logSet.setNumber &&
-              getLocalDateKey(l.date) === todayKey
-            )
-        );
-        return [...without, logSet];
-      });
-
-      setRecordsMap((old) => updateRecordsWithSet(old, logSet));
-
-      // Auto start rest timer on completing working set
-      startRestTimer(exercise);
-
-      // Auto advance focus to the next set row
-      const nextWeightInput = document.getElementById(`weight-input-${exercise.id}-${setIndex + 1}`);
-      if (nextWeightInput) {
-        setTimeout(() => (nextWeightInput as HTMLInputElement)?.focus(), 50);
-      }
-    }
-
+    // Toggle UI state only; rest timer still triggers
     setInputs((old) => {
       const current = normalizeSetInputs(old[exercise.id], exercise.sets);
       const updated = current.map((set, index) => (index === setIndex ? { ...set, done: true } : set));
@@ -3252,6 +3222,15 @@ export default function Page() {
       writeLocalJson(SET_INPUTS_KEY, newInputs);
       return newInputs;
     });
+
+    // Start rest timer after marking set as done
+    startRestTimer(exercise);
+
+    // Auto advance focus to the next set row
+    const nextWeightInput = document.getElementById(`weight-input-${exercise.id}-${setIndex + 1}`);
+    if (nextWeightInput) {
+      setTimeout(() => (nextWeightInput as HTMLInputElement)?.focus(), 50);
+    }
   }
 
   function saveAllSets(exercise: PlanExercise, machineTag?: string) {
@@ -4636,7 +4615,12 @@ export default function Page() {
                             <Trophy size={14} /> Records {currentMachine && <span className="text-emerald-400 font-semibold normal-case">({currentMachine})</span>}
                           </p>
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2 cursor-pointer hover:border-cyan-400 border border-transparent transition" onClick={() => {
+                    setEditingPrExercise({ name: exercise.name, machine: currentMachine });
+                    setEditPrWeight(records.maxWeight ? (records.maxWeight.rawValue !== undefined ? records.maxWeight.rawValue.toString() : (records.maxWeight.unit === "kg" ? (records.maxWeight.weightLbs * 0.453592).toFixed(1) : records.maxWeight.weightLbs.toString())) : "");
+                    setEditPrReps(records.maxWeight?.reps?.toString() ?? "");
+                    setEditPrUnit(records.maxWeight?.unit ?? "kg");
+                  }}>
                               <p className="text-[10px] font-bold uppercase text-zinc-500">Max</p>
                               <div className="mt-1">
                                 {records.maxWeight ? (
@@ -4647,6 +4631,7 @@ export default function Page() {
                                         : `${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs`}
                                       {" × "}{records.maxWeight.reps}
                                     </p>
+                    <span className="text-[10px] text-cyan-400">แก้ไข/ประวัติ ✎</span>
                                     <p className="text-[10px] text-zinc-500">
                                       {records.maxWeight.unit === "kg" && records.maxWeight.rawValue !== undefined
                                         ? `(${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs)`
@@ -4682,7 +4667,7 @@ export default function Page() {
                             </div>
                             <div className="rounded-xl bg-zinc-900 px-3 py-2">
                               <p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p>
-                              <p className="mt-1 text-sm font-black text-zinc-100">{records.bestVolume ? `${records.bestVolume.weightLbs} × ${records.bestVolume.reps}` : "—"}</p>
+                              <p className="mt-1 text-sm font-black text-zinc-100">{records.bestVolume ? `${Math.round(records.bestVolume.weightLbs * records.bestVolume.reps)}` : "—"}</p>
                             </div>
                             <div className="rounded-xl bg-zinc-900 px-3 py-2">
                               <p className="text-[10px] font-bold uppercase text-zinc-500">Warmup</p>
@@ -4722,6 +4707,99 @@ export default function Page() {
                         </div>
 
                         {/* Edit target sets & reps */}
+{editingPrExercise && (
+  <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+    <div className="w-full max-w-md rounded-xl bg-zinc-950 p-6 border border-zinc-800">
+      <h2 className="text-lg font-bold text-emerald-300 mb-4">
+        Edit PR - {editingPrExercise.name}{editingPrExercise.machine ? ` (${editingPrExercise.machine})` : ''}
+      </h2>
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        <input
+          type="number"
+          placeholder="Weight"
+          value={editPrWeight}
+          onChange={e => setEditPrWeight(e.target.value)}
+          className="rounded-xl bg-zinc-900 p-2 text-zinc-100"
+        />
+        <select
+          value={editPrUnit}
+          onChange={e => setEditPrUnit(e.target.value as WeightUnit)}
+          className="rounded-xl bg-zinc-900 p-2 text-zinc-100"
+        >
+          <option value="kg">kg</option>
+          <option value="lbs">lbs</option>
+        </select>
+      </div>
+      <input
+        type="number"
+        placeholder="Reps"
+        value={editPrReps}
+        onChange={e => setEditPrReps(e.target.value)}
+        className="w-full rounded-xl bg-zinc-900 p-2 mb-4 text-zinc-100"
+      />
+      <div className="flex justify-end gap-2 mb-4">
+        <button
+          onClick={() => setEditingPrExercise(null)}
+          className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-200"
+        >Cancel</button>
+        <button
+          onClick={() => {
+            const weightNum = Number(editPrWeight);
+            const repsNum = Number(editPrReps);
+            if (!weightNum || !repsNum) return;
+            const weightLbs = editPrUnit === 'kg' ? convertWeight(weightNum, 'kg', 'lbs') : weightNum;
+            const key = getEffectiveExerciseKey(editingPrExercise.name, editingPrExercise.machine);
+            setRecordsMap(prev => {
+              const rec = { ...(prev[key] ?? {}) };
+              rec.maxWeight = {
+                exerciseId: '',
+                exerciseName: editingPrExercise.name,
+                weightLbs,
+                reps: repsNum,
+                setNumber: 0,
+                date: new Date().toISOString(),
+                machine: editingPrExercise.machine,
+                unit: editPrUnit,
+                rawValue: weightNum,
+              };
+              return { ...prev, [key]: { ...rec } };
+            });
+            setEditingPrExercise(null);
+          }}
+          className="px-4 py-2 rounded-xl bg-emerald-400 text-zinc-950"
+        >Save</button>
+      </div>
+      <h3 className="text-sm font-bold text-zinc-400 mb-2">Recent Sets</h3>
+      <ul className="max-h-48 overflow-y-auto mb-4">
+        {logs
+          .filter(l => getEffectiveExerciseKey(l.exerciseName, l.machine) === getEffectiveExerciseKey(editingPrExercise.name, editingPrExercise.machine))
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 5)
+          .map((log, idx) => (
+            <li key={idx} className="flex justify-between items-center text-sm py-1 border-b border-zinc-800">
+              <span>{log.reps}× {log.unit === 'kg' ? `${log.rawValue} kg` : `${log.weightLbs} lbs`}</span>
+              <button
+                onClick={() => {
+                  setLogs(old => old.filter((_, i) => i !== logs.indexOf(log)));
+                  // simple PR recalculation placeholder: remove maxWeight if it matches deleted log
+                  const key = getEffectiveExerciseKey(log.exerciseName, log.machine);
+                  setRecordsMap(prev => {
+                    const newMap = { ...prev };
+                    const rec = newMap[key];
+                    if (rec && rec.maxWeight && rec.maxWeight.date === log.date) {
+                      delete rec.maxWeight;
+                    }
+                    return newMap;
+                  });
+                }}
+                className="text-xs text-red-500"
+              >Delete</button>
+            </li>
+          ))}
+      </ul>
+    </div>
+  </dialog>
+)}
                         {(mode === "custom" || mode === "preset" || mode === "today") && (
                           <div className="rounded-xl bg-zinc-900/60 border border-zinc-800/80 p-3">
                             <p className="text-xs font-bold text-zinc-400 mb-2">Edit target sets & reps</p>
