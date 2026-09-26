@@ -180,6 +180,54 @@ export interface MechanicalProfile {
   tareWeight: number; // e.g. barbell 20kg, smith 11kg
 }
 
+export type BiomechanicalProfile = {
+  baseRatio: { male: number; female: number };
+  pulleyRatio: number;      // 1.0 = direct stack, 2.0 = functional trainer
+  isPerHand: boolean;        // true = user plates/pins one arm at a time (Iso-Lateral / DB)
+  stabilityFactor: number;  // 1.15 for chest-supported, 0.90 for free/core-loaded
+};
+
+export function resolveMechanicalProfile(exerciseName: string, machineTag = ""): BiomechanicalProfile {
+  const text = `${exerciseName} ${machineTag}`.toLowerCase();
+
+  // 1. Iso-Lateral / Hammer Machines (Weights loaded per side)
+  const isIso = text.includes("iso-lateral") || text.includes("iso lateral") || text.includes("hammer") || text.includes("mts");
+  const isChestSupported = text.includes("chest support") || text.includes("supported") || text.includes("seal row") || text.includes("t-bar");
+
+  // 2. Row Category
+  if (text.includes("high row")) {
+    return { baseRatio: { male: 0.36, female: 0.24 }, pulleyRatio: 1.0, isPerHand: true, stabilityFactor: 1.15 };
+  }
+  if (text.includes("low row")) {
+    return { baseRatio: { male: 0.38, female: 0.25 }, pulleyRatio: 1.0, isPerHand: true, stabilityFactor: 1.15 };
+  }
+  if (isChestSupported && text.includes("row")) {
+    return { baseRatio: { male: 0.65, female: 0.44 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.15 };
+  }
+  if (text.includes("cable row") || text.includes("seated row")) {
+    return { baseRatio: { male: 0.48, female: 0.32 }, pulleyRatio: 1.0, isPerHand: false, stabilityFactor: 0.90 };
+  }
+
+  // 3. Chest Press Category
+  if (text.includes("incline")) {
+    return { baseRatio: { male: isIso ? 0.35 : 0.65, female: isIso ? 0.23 : 0.42 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.10 };
+  }
+  if (text.includes("decline")) {
+    return { baseRatio: { male: isIso ? 0.45 : 0.85, female: isIso ? 0.30 : 0.55 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.10 };
+  }
+  if (text.includes("chest press") || text.includes("bench")) {
+    return { baseRatio: { male: isIso ? 0.40 : 0.78, female: isIso ? 0.26 : 0.50 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.05 };
+  }
+
+  // 4. Pulldowns
+  if (text.includes("pulldown") || text.includes("pull down")) {
+    return { baseRatio: { male: isIso ? 0.34 : 0.62, female: isIso ? 0.22 : 0.40 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.05 };
+  }
+
+  // 5. Default Fallbacks
+  return { baseRatio: { male: 0.40, female: 0.25 }, pulleyRatio: 1.0, isPerHand: false, stabilityFactor: 1.0 };
+}
+
 export function getDefaultMechanicalProfile(load: string, exerciseName: string): MechanicalProfile {
   const lowerName = exerciseName.toLowerCase();
 
@@ -483,18 +531,63 @@ export function calculatePrescriptionWeight(
   load: string,
   repsStr: string,
   userProfile: UserProfile,
-  mMusc: number = 1.0
+  mMusc: number = 1.0,
+  machineTag: string = ""
 ): BiomechanicalResult {
   const bw = userProfile.weightKg;
-  const cat = getExerciseStrengthCategory(exerciseName);
-  const ratioEntry = STRENGTH_RATIOS[cat] || { male: 0.8, female: 0.5 };
-  const s_ratio = userProfile.gender === "female" ? ratioEntry.female : ratioEntry.male;
-
+  const isFemale = userProfile.gender === "female";
   const e_exp = getExperienceModifier(userProfile.expMonths).modifier;
   const r_rep = getRepsModifier(repsStr);
   const g_goal = getGoalModifier(userProfile.goal);
-  // Use provided muscle mass modifier (default 1.0) or compute if not supplied
   const m_musc = mMusc;
+
+  const combinedText = `${exerciseName} ${machineTag}`.toLowerCase();
+  const isRowChestOrPulldown =
+    combinedText.includes("row") ||
+    combinedText.includes("press") ||
+    combinedText.includes("bench") ||
+    combinedText.includes("pulldown") ||
+    combinedText.includes("pull down");
+
+  // Check if we should use specialized resolveMechanicalProfile
+  const mechProfile = resolveMechanicalProfile(exerciseName, machineTag);
+
+  // If exercise matches a machine/row/press/pulldown profile:
+  // F_physio = Bodyweight × BaseRatio × ExpFactor × RepFactor × StabilityFactor * GoalMod * MuscMod
+  // W_hardware = F_physio × pulleyRatio
+  if (isRowChestOrPulldown && (mechProfile.baseRatio.male !== 0.40 || combinedText.includes("row") || combinedText.includes("press") || combinedText.includes("pulldown"))) {
+    const baseRatio = isFemale ? mechProfile.baseRatio.female : mechProfile.baseRatio.male;
+    const f_physio = bw * baseRatio * e_exp * r_rep * mechProfile.stabilityFactor * g_goal * m_musc;
+    const rawWeightKg = f_physio * mechProfile.pulleyRatio;
+
+    const step = 2.5;
+    let snapped = Math.round(rawWeightKg / step) * step;
+    snapped = Math.max(step, snapped);
+    snapped = Math.round(snapped * 100) / 100;
+
+    let displayNote = `แผ่น/สลักน้ำหนัก ${snapped} kg`;
+    if (mechProfile.isPerHand) {
+      displayNote = `ดัมเบล / สลักข้างละ ${snapped} kg`;
+    } else if (mechProfile.pulleyRatio > 1.0) {
+      displayNote = `เสียบสลักพิน ${snapped} kg (รอกทด ${mechProfile.pulleyRatio}:1)`;
+    }
+
+    return {
+      exerciseName,
+      targetWeightKg: Math.round(rawWeightKg * 10) / 10,
+      hardwareWeightKg: snapped,
+      platesPerSideKg: undefined,
+      tareWeightKg: 0,
+      isPerHand: mechProfile.isPerHand,
+      minHardwareStep: step,
+      displayNote,
+    };
+  }
+
+  // Standard Fallback for Compound Barbell / Dumbbell / Squat / Leg Press etc.
+  const cat = getExerciseStrengthCategory(exerciseName);
+  const ratioEntry = STRENGTH_RATIOS[cat] || { male: 0.8, female: 0.5 };
+  const s_ratio = isFemale ? ratioEntry.female : ratioEntry.male;
 
   let force = bw * s_ratio * e_exp * r_rep * g_goal * m_musc;
 
@@ -510,8 +603,6 @@ export function calculatePrescriptionWeight(
   let rawWeightKg = force * profile.leverageRatio * profile.camModifier * (profile.pulleyRatio / denominator);
 
   // Biomechanical Safety Clamp: Cable Row / Seated Row max baseline
-  // Ensure Cable Row / Seated Row does not recommend > 0.55x BW for hypertrophy rep ranges (8-12 reps).
-  // For a 60-70 kg lifter, Cable Row must prescribe 30-35 kg (65-75 lbs), never 132 lbs.
   if (cat === "SeatedCableRow" || lowerName.includes("cable row") || lowerName.includes("seated row")) {
     const maxCableRowKg = bw * 0.55;
     if (rawWeightKg > maxCableRowKg) {

@@ -4357,7 +4357,7 @@ export default function Page() {
 
     const aiWeightSuggestion = userProfile ? (() => {
       const muscleInfo = evaluateMuscleMass(userProfile.gender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
-      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier);
+      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier, currentMachine);
       return effectiveUnit === "lbs"
         ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
         : bioRes.hardwareWeightKg;
@@ -4448,7 +4448,7 @@ export default function Page() {
                         {/* Trainer Assessment Biomechanical Recommended Note */}
                         {userProfile && (() => {
                           const muscleInfo = evaluateMuscleMass(userProfile.gender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
-                          const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier);
+                          const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier, currentMachine);
                           const activeU = effectiveUnit;
                           const displayWeight = activeU === "lbs"
                             ? `${Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10} lbs`
@@ -4528,21 +4528,38 @@ export default function Page() {
                         <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">เครื่อง:</span>
 
                         <div className="relative flex-1 min-w-0">
-                          <select
-                            value={currentMachine || ""}
-                            onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
-                            className="w-full min-w-0 truncate appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
-                          >
-                            <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[getLoadType(exercise)]})</option>
-                            {["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"].map((tag) => (
-                              <option key={tag} value={tag}>
-                                {tag} {lastUsedMachine === tag ? "● ล่าสุด" : ""} {favoriteMachines[exercise.name] === tag ? "⭐" : ""}
-                              </option>
-                            ))}
-                            {currentMachine && !["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine", ""].includes(currentMachine) && (
-                              <option value={currentMachine}>{currentMachine} (กำหนดเอง)</option>
-                            )}
-                          </select>
+                          {(() => {
+                            const exNameLower = exercise.name.toLowerCase();
+                            const isRow = exNameLower.includes("row");
+                            const isChest = exNameLower.includes("press") || exNameLower.includes("bench") || exNameLower.includes("chest");
+                            const isPulldown = exNameLower.includes("pulldown") || exNameLower.includes("pull down") || exNameLower.includes("lat pull");
+
+                            const contextualMachineOptions = isRow
+                              ? ["Standard Selectorized", "Chest-Supported Machine", "Iso-Lateral High Row", "Iso-Lateral Low Row", "Seated Cable (Free)", "T-Bar Supported"]
+                              : isChest
+                              ? ["Standard Machine Press", "Incline Machine Press", "Decline Machine Press", "Iso-Lateral Flat", "Iso-Lateral Incline", "Converging Cable"]
+                              : isPulldown
+                              ? ["Lat Pulldown (Pin-Loaded)", "Iso-Lateral Front Pulldown", "Dual Cable Pulldown"]
+                              : ["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"];
+
+                            return (
+                              <select
+                                value={currentMachine || ""}
+                                onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
+                                className="w-full min-w-0 truncate appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
+                              >
+                                <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[getLoadType(exercise)]})</option>
+                                {contextualMachineOptions.map((tag) => (
+                                  <option key={tag} value={tag}>
+                                    {tag} {lastUsedMachine === tag ? "● ล่าสุด" : ""} {favoriteMachines[exercise.name] === tag ? "⭐" : ""}
+                                  </option>
+                                ))}
+                                {currentMachine && !contextualMachineOptions.includes(currentMachine) && (
+                                  <option value={currentMachine}>{currentMachine} (กำหนดเอง) {favoriteMachines[exercise.name] === currentMachine ? "⭐" : ""}</option>
+                                )}
+                              </select>
+                            );
+                          })()}
                           <ChevronDown className="pointer-events-none absolute right-2 top-2.5 text-zinc-400" size={14} />
                         </div>
                       </div>
@@ -4688,7 +4705,7 @@ export default function Page() {
 
                           const aiWeightSuggestion = userProfile ? (() => {
                             const muscleInfo = evaluateMuscleMass(userProfile.gender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
-                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier);
+                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier, currentMachine);
                             return effectiveUnit === "lbs"
                               ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
                               : bioRes.hardwareWeightKg;
