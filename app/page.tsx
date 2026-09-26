@@ -872,54 +872,42 @@ function getWarmupSets(bestWeight?: number) {
   ];
 }
 
-function getRestSeconds(exercise: PlanExercise) {
-  const movement = exercise.movement.toLowerCase();
+function getSmartRestSeconds(
+  exercise: PlanExercise,
+  currentWeightLbs: number,
+  userBwLbs: number | null,
+  reps: number
+): number {
   const name = exercise.name.toLowerCase();
-  const load = (exercise.load ?? "").toLowerCase();
+  const mov = exercise.movement.toLowerCase();
+  const isHeavySpine = name.includes("deadlift") || name.includes("squat") || name.includes("rdl") || mov.includes("hinge");
+  const isCompound = isHeavySpine || mov.includes("press") || mov.includes("row") || mov.includes("vertical pull") || name.includes("bench");
+  const isSmall = exercise.group === "Arms" || exercise.group === "Abs & Calves" || mov.includes("raise") || mov.includes("curl") || mov.includes("pressdown") || mov.includes("ext");
 
-  // Heavy machine / cable compounds
-  const heavyMachines = ["cable", "selectorized", "plate-loaded", "smith"];
-  const isHeavyMachine = heavyMachines.some((m) => load.includes(m));
+  const ratio = userBwLbs && userBwLbs > 0 && currentWeightLbs > 0 ? currentWeightLbs / userBwLbs : 1.0;
 
-  // Barbell free-weight compounds (squat, deadlift, bench press, press, row, vertical pull, glute)
-  const isCompound =
-    movement.includes("press") ||
-    movement.includes("row") ||
-    movement.includes("vertical pull") ||
-    movement.includes("squat") ||
-    movement.includes("glute") ||
-    name.includes("deadlift") ||
-    name.includes("bench press");
-
-  // Isolation / single-joint exercises
-  const isIsolation =
-    movement.includes("flye") ||
-    movement.includes("raise") ||
-    movement.includes("curl") ||
-    movement.includes("triceps") ||
-    movement.includes("isolation") ||
-    movement.includes("rear delt");
-
-  // Small muscle groups (arms, face pull)
-  const isSmallMuscle =
-    (exercise.group ?? "").toLowerCase().includes("arms") ||
-    name.includes("face pull");
-
-  if (isCompound && !isHeavyMachine) {
-    return 180; // Compounds
-  }
-  if (isHeavyMachine) {
-    return 120; // Heavy machines
-  }
-  if (isIsolation) {
-    return 90; // Isolation
-  }
-  if (isSmallMuscle) {
-    return 60; // Small muscles
+  // Heavy CNS / Spinal Load (Deadlift, Squat)
+  if (isHeavySpine) {
+    if (ratio >= 1.5 || reps <= 5) return 210; // 3:30 min for max strength
+    if (ratio >= 1.2 || reps <= 8) return 180; // 3:00 min
+    return 150; // 2:30 min
   }
 
-  // Default fallback
-  return 120;
+  // Compound Upper / Machine (Bench, Rows, Pulldowns)
+  if (isCompound) {
+    if (reps <= 6 || ratio >= 1.2) return 150; // 2:30 min heavy
+    if (reps >= 12) return 90; // 1:30 min pump/endurance
+    return 120; // 2:00 min standard hypertrophy
+  }
+
+  // Isolation & Small Muscle Groups (Arms, Delts, Abs)
+  if (isSmall) {
+    if (exercise.group === "Abs & Calves") return 45; // 45s
+    if (reps >= 15) return 60; // 1:00 min
+    return 75; // 1:15 min
+  }
+
+  return 90;
 }
 
 function formatRestTime(seconds: number) {
@@ -929,8 +917,14 @@ function formatRestTime(seconds: number) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-function getRestSecondsByMode(exercise: PlanExercise, mode: RestMode) {
-  const normal = getRestSeconds(exercise);
+function getRestSecondsByMode(
+  exercise: PlanExercise,
+  mode: RestMode,
+  currentWeightLbs = 0,
+  userBwLbs: number | null = null,
+  reps = 10
+) {
+  const normal = getSmartRestSeconds(exercise, currentWeightLbs, userBwLbs, reps);
 
   if (mode === "short") return Math.max(30, normal - 30);
   if (mode === "heavy") return normal + 30;
@@ -2313,6 +2307,86 @@ function getIntelligentWarmup(
   };
 }
 
+function playCountdownBeep(freq = 660) {
+  if (typeof window === "undefined") return;
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, now);
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.15);
+  } catch {}
+}
+
+export type StrengthTier = "Beginner" | "Intermediate" | "Advanced" | "Elite";
+
+export function evaluateRelativeStrength(
+  exerciseName: string,
+  loadType: LoadType,
+  ratio: number,
+  gender: "male" | "female" = "male"
+) {
+  const name = exerciseName.toLowerCase();
+  const femaleFactor = gender === "female" ? 0.68 : 1.0;
+  const isHammerIso = name.includes("iso-lateral") || name.includes("iso lateral") || name.includes("hammer") || name.includes("mts");
+
+  let baseThresholds = [0.85, 1.15, 1.45]; // Horizontal Press default
+
+  if (isHammerIso) {
+    if (name.includes("incline")) baseThresholds = [0.75, 1.05, 1.35];
+    else if (name.includes("decline")) baseThresholds = [0.95, 1.30, 1.65];
+    else if (name.includes("shoulder") || name.includes("overhead")) baseThresholds = [0.60, 0.85, 1.10];
+    else if (name.includes("pulldown")) baseThresholds = [0.80, 1.10, 1.35];
+    else if (name.includes("row")) baseThresholds = [0.85, 1.15, 1.45];
+    else if (name.includes("leg press")) baseThresholds = [1.90, 2.80, 3.60];
+    else baseThresholds = [0.90, 1.25, 1.55];
+  } else if (name.includes("leg press")) {
+    baseThresholds = [1.80, 2.60, 3.40];
+  } else if (name.includes("hack") || name.includes("pendulum") || name.includes("v-squat")) {
+    baseThresholds = [1.30, 1.80, 2.30];
+  } else if (name.includes("hip thrust")) {
+    baseThresholds = [1.20, 1.70, 2.30];
+  } else if ((name.includes("deadlift") && !name.includes("romanian") && !name.includes("rdl")) || name.includes("trap bar")) {
+    baseThresholds = [1.40, 1.85, 2.35];
+  } else if (name.includes("squat") || name.includes("rdl") || name.includes("romanian")) {
+    baseThresholds = [1.15, 1.55, 1.95];
+  } else if (name.includes("incline")) {
+    baseThresholds = name.includes("db") ? [0.55, 0.80, 1.05] : [0.70, 0.95, 1.25];
+  } else if (name.includes("shoulder") || name.includes("overhead")) {
+    baseThresholds = name.includes("db") ? [0.45, 0.65, 0.85] : [0.55, 0.75, 0.95];
+  } else if (name.includes("pulldown") || name.includes("pull up")) {
+    baseThresholds = [0.75, 1.00, 1.25];
+  } else if (name.includes("row") || name.includes("seal")) {
+    baseThresholds = name.includes("one arm") ? [0.35, 0.50, 0.65] : [0.75, 1.05, 1.35];
+  } else if (name.includes("curl") && (name.includes("leg") || name.includes("hamstring"))) {
+    baseThresholds = [0.50, 0.75, 1.00];
+  } else if (name.includes("flat db") || (name.includes("db") && name.includes("press"))) {
+    baseThresholds = [0.65, 0.90, 1.15];
+  }
+
+  const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
+
+  if (ratio >= thresholds[2]) {
+    return { tier: "Elite" as StrengthTier, label: "🏆 ELITE", badgeClass: "border-yellow-400 bg-yellow-400/20 text-yellow-300 font-mono tracking-wider", nextTarget: "ระดับมาตรฐานสูงสุดแล้ว!" };
+  } else if (ratio >= thresholds[1]) {
+    return { tier: "Advanced" as StrengthTier, label: "🔥 ADVANCED", badgeClass: "border-zinc-500 bg-zinc-800 text-zinc-100 font-mono tracking-wider", nextTarget: `เป้าหมาย Elite: ${thresholds[2]}× BW (ขาดอีก ${(thresholds[2] - ratio).toFixed(2)}×)` };
+  } else if (ratio >= thresholds[0]) {
+    return { tier: "Intermediate" as StrengthTier, label: "💪 INTERMEDIATE", badgeClass: "border-yellow-500/40 bg-zinc-900 text-yellow-400 font-mono tracking-wider", nextTarget: `เป้าหมาย Advanced: ${thresholds[1]}× BW (ขาดอีก ${(thresholds[1] - ratio).toFixed(2)}×)` };
+  } else {
+    return { tier: "Beginner" as StrengthTier, label: "🌱 NOVICE", badgeClass: "border-zinc-800 bg-zinc-950 text-zinc-400 font-mono tracking-wider", nextTarget: `เป้าหมาย Intermediate: ${thresholds[0]}× BW (ขาดอีก ${(thresholds[0] - ratio).toFixed(2)}×)` };
+  }
+}
+
 export default function Page() {
   const initialUiState = sanitizeUiState(readJson<PersistedUiState | null>(UI_STATE_KEY, null));
 
@@ -2730,6 +2804,9 @@ export default function Page() {
           targetEndTimestamp: undefined,
         }));
       } else {
+        if (remaining === 3 || remaining === 2 || remaining === 1) {
+          playCountdownBeep(740);
+        }
         setRestTimer((current) => {
           if (!current.running) return current;
           return {
@@ -2761,12 +2838,15 @@ export default function Page() {
 
   const restProgress = restTimer.totalSeconds > 0 ? Math.round(((restTimer.totalSeconds - restTimer.secondsLeft) / restTimer.totalSeconds) * 100) : 0;
 
-  function startRestTimer(exercise: PlanExercise) {
+  function startRestTimer(exercise: PlanExercise, currentWeightLbs?: number, lastReps?: number) {
     if (!restTimerEnabled) return;
     requestNotificationPermission();
 
     const mode = restModeMap[exercise.id] ?? "normal";
-    const seconds = customRestMap[exercise.id] ?? getRestSecondsByMode(exercise, mode);
+    const userBw = bodyweightEntry?.lbs ?? (userProfile?.weightKg ? userProfile.weightKg * 2.20462 : null);
+    const weightLbs = currentWeightLbs ?? (prMap[exercise.name]?.weightLbs || 0);
+    const reps = lastReps ?? 10;
+    const seconds = customRestMap[exercise.id] ?? getRestSecondsByMode(exercise, mode, weightLbs, userBw, reps);
     const targetEnd = Date.now() + seconds * 1000;
 
     setRestTimer({
@@ -3224,7 +3304,9 @@ export default function Page() {
     });
 
     // Start rest timer after marking set as done
-    startRestTimer(exercise);
+    const effectiveUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
+    const weightInLbs = effectiveUnit === "kg" ? convertWeight(enteredVal, "kg", "lbs") : enteredVal;
+    startRestTimer(exercise, weightInLbs, reps);
 
     // Auto advance focus to the next set row
     const nextWeightInput = document.getElementById(`weight-input-${exercise.id}-${setIndex + 1}`);
@@ -3517,7 +3599,7 @@ export default function Page() {
           <div className="flex items-center gap-2">
             <img src="/hait-logo.png" alt="HA IT logo" className="h-8 w-8 rounded-xl bg-white object-contain p-1" />
             <div>
-              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-emerald-300">
+              <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-yellow-300">
                 <Dumbbell size={14} /> HA IT
               </p>
               <h1 className="text-base font-black leading-tight sm:text-lg">Workout Tracker</h1>
@@ -3528,11 +3610,11 @@ export default function Page() {
             <button
               type="button"
               onClick={() => setShowAssessmentModal(true)}
-              className="flex items-center gap-1 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-black text-emerald-300 transition hover:bg-emerald-500/20 active:scale-95"
+              className="flex items-center gap-1 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-1.5 text-xs font-black text-yellow-300 transition hover:bg-yellow-500/20 active:scale-95"
               aria-label="Trainer Assessment"
               title="แบบประเมินตนเองและเป้าหมาย"
             >
-              <Activity size={14} className="text-emerald-400" />
+              <Activity size={14} className="text-yellow-400" />
               <span>{userProfile ? "ผลประเมิน" : "ประเมินตัวเอง"}</span>
             </button>
             <button
@@ -3542,7 +3624,7 @@ export default function Page() {
               aria-label="Manage bodyweight"
               title="จัดการน้ำหนักตัว"
             >
-              <Scale size={14} className="text-emerald-400" />
+              <Scale size={14} className="text-yellow-400" />
               <span>
                 {bodyweightEntry
                   ? globalWeightUnit === "kg"
@@ -3558,7 +3640,7 @@ export default function Page() {
               aria-label="Notification settings"
               title="ตั้งค่าการแจ้งเตือน"
             >
-              <Bell size={15} className="text-emerald-400" />
+              <Bell size={15} className="text-yellow-400" />
             </button>
             <button
               type="button"
@@ -3567,7 +3649,7 @@ export default function Page() {
               aria-label="Profile and Settings"
               title="โปรไฟล์และการตั้งค่า"
             >
-              <Cog size={15} className="text-emerald-400" />
+              <Cog size={15} className="text-yellow-400" />
             </button>
             {performanceReport.currentStreak > 0 && (
               <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-black text-amber-300">
@@ -3581,7 +3663,7 @@ export default function Page() {
 
       <section className="mx-auto max-w-5xl px-4 py-3">
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3">
-          <p className="text-[10px] font-black uppercase tracking-wide text-emerald-300">{pageMeta.eyebrow}</p>
+          <p className="text-[10px] font-black uppercase tracking-wide text-yellow-300">{pageMeta.eyebrow}</p>
           <h2 className="mt-1 text-lg font-black">{pageMeta.title}</h2>
 
           {["today", "preset", "custom"].includes(mode) && (
@@ -3594,10 +3676,10 @@ export default function Page() {
                 <button
                   key={tab.id}
                   onClick={() => setMode(tab.id as AppMode)}
-                  className={`flex-1 rounded-lg py-1.5 text-xs font-bold transition ${
+                  className={`flex-1 rounded-lg py-1.5 text-xs transition ${
                     mode === tab.id
-                      ? "bg-cyan-400 text-zinc-950 font-black shadow-md shadow-cyan-500/25"
-                      : "text-zinc-400 hover:text-zinc-200"
+                      ? "bg-yellow-400 text-black font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.3)]"
+                      : "text-zinc-400 hover:text-zinc-200 font-bold"
                   }`}
                 >
                   {tab.label}
@@ -4147,13 +4229,22 @@ export default function Page() {
       effectiveLoad
     );
 
+    const userBwLbs = bodyweightEntry?.lbs ?? (userProfile?.weightKg ? userProfile.weightKg * 2.20462 : null);
+    const relativeWeightLbs = pr?.weightLbs && pr.weightLbs > 0
+      ? pr.weightLbs
+      : (effectiveUnit === "kg" ? baselineWorkingWeight * 2.20462 : baselineWorkingWeight);
+    const relativeRatio = userBwLbs && userBwLbs > 0 && relativeWeightLbs > 0 ? relativeWeightLbs / userBwLbs : null;
+    const strengthTierInfo = relativeRatio
+      ? evaluateRelativeStrength(exercise.name, getLoadType(exercise), relativeRatio, userProfile?.gender ?? "male")
+      : null;
+
                 return (
                   <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 overflow-hidden w-full max-w-full">
                     <div className="mb-3 flex items-start justify-between gap-3 min-w-0">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
                           <span className="rounded-full bg-zinc-950 px-2.5 py-0.5 text-xs font-bold text-zinc-400">#{index + 1}</span>
-                          <span className="rounded-full bg-emerald-400/10 px-2.5 py-0.5 text-xs font-bold text-emerald-300">{exercise.group}</span>
+                          <span className="rounded-full bg-yellow-400/10 px-2.5 py-0.5 text-xs font-bold text-yellow-300">{exercise.group}</span>
                           <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">{exercise.movement}</span>
                           <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">
                             {LOAD_LABELS[getLoadType(exercise)]}
@@ -4169,6 +4260,18 @@ export default function Page() {
                         </div>
 
                         <h3 className="mt-2 text-lg sm:text-xl font-black leading-snug tracking-tight text-white">{exercise.name}</h3>
+                        {strengthTierInfo && relativeRatio && (
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-xs font-black tabular-nums uppercase ${strengthTierInfo.badgeClass}`}>
+                              <span>{strengthTierInfo.label}</span>
+                              <span className="opacity-60">·</span>
+                              <span>{relativeRatio.toFixed(2)}× BW</span>
+                            </span>
+                            <span className="text-[11px] font-medium text-zinc-400 truncate">
+                              {strengthTierInfo.nextTarget}
+                            </span>
+                          </div>
+                        )}
                         <p className="mt-0.5 text-xs sm:text-sm font-medium text-zinc-400">
                           {effectiveSets} hard working sets × {exercise.reps} reps
                         </p>
@@ -4443,11 +4546,11 @@ export default function Page() {
 
                               <div className="grid grid-cols-[32px_1fr_1fr_40px] sm:grid-cols-[38px_1.2fr_1.2fr_42px] gap-1.5 sm:gap-2 items-center">
                                 <div className="flex items-center justify-center font-black text-zinc-400 text-sm">{setIndex + 1}</div>
-                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-400 transition min-w-0">
+                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-yellow-400 focus-within:ring-2 focus-within:ring-yellow-400 transition min-w-0">
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label={`Decrease weight by step for set ${setIndex + 1}`}
                                   >
                                     −
@@ -4459,23 +4562,23 @@ export default function Page() {
                                     onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
                                     onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
                                     aria-label={`Weight in ${effectiveUnit} for set ${setIndex + 1}`}
-                                    className="min-w-0 w-full text-center text-sm sm:text-base font-bold outline-none bg-transparent px-0.5 py-3"
+                                    className="min-w-0 w-full text-center text-sm sm:text-base font-bold tabular-nums tracking-tight font-mono outline-none bg-transparent px-0.5 py-3"
                                     placeholder={effectivePlaceholderWeight > 0 ? String(effectivePlaceholderWeight) : "0"}
                                   />
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label={`Increase weight by step for set ${setIndex + 1}`}
                                   >
                                     +
                                   </button>
                                 </div>
-                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-400 transition min-w-0">
+                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-yellow-400 focus-within:ring-2 focus-within:ring-yellow-400 transition min-w-0">
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
-                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label={`Decrease reps for set ${setIndex + 1}`}
                                   >
                                     −
@@ -4487,13 +4590,13 @@ export default function Page() {
                                     onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, effectiveSets)}
                                     onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps")}
                                     aria-label={`Reps for set ${setIndex + 1}`}
-                                    className="min-w-0 w-full text-center text-sm sm:text-base font-bold outline-none bg-transparent px-0.5 py-3"
+                                    className="min-w-0 w-full text-center text-sm sm:text-base font-bold tabular-nums tracking-tight font-mono outline-none bg-transparent px-0.5 py-3"
                                     placeholder={latestSet ? String(latestSet.reps) : "0"}
                                   />
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
-                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-cyan-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label={`Increase reps for set ${setIndex + 1}`}
                                   >
                                     +
@@ -4503,10 +4606,10 @@ export default function Page() {
                                   onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
                                   aria-label={`Save set ${setIndex + 1}`}
                                   title={set.done ? "เซ็ตนี้บันทึกแล้ว (แตะเพื่อบันทึกซ้ำ)" : "บันทึกเซ็ตนี้"}
-                                  className={`rounded-2xl border py-3 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-cyan-400 ${
+                                  className={`rounded-2xl border py-3 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 ${
                                     set.done
-                                      ? "bg-cyan-400 border-cyan-300 text-zinc-950 font-black shadow-md shadow-cyan-500/20"
-                                      : "border-dashed border-zinc-700 bg-zinc-900/50 text-zinc-500 hover:border-cyan-400 hover:text-cyan-300"
+                                      ? "bg-yellow-400 border-yellow-300 text-black font-black shadow-[0_0_10px_rgba(250,204,21,0.4)]"
+                                      : "border-dashed border-zinc-700 bg-zinc-900/50 text-zinc-500 hover:border-yellow-400 hover:text-yellow-300"
                                   }`}
                                 >
                                   <Check size={18} className={set.done ? "mx-auto stroke-[3]" : "mx-auto stroke-[1.5] opacity-40"} />
@@ -4519,10 +4622,31 @@ export default function Page() {
                       <button
                         onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
                         aria-label="Finish working sets and clear inputs"
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-bold text-zinc-950 active:scale-[0.99] transition hover:bg-emerald-300 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase tracking-widest py-3.5 shadow-lg shadow-yellow-500/20 active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-yellow-400"
                       >
                         <Save size={18} /> Finish & clear
                       </button>
+
+                      {/* RPE Quick Feedback Strip */}
+                      <div className="mt-2.5 grid grid-cols-5 gap-1.5">
+                        {[
+                          { val: 6, label: "สบายมาก", col: "border-zinc-800 text-zinc-400 hover:border-yellow-400" },
+                          { val: 7, label: "พอดี", col: "border-zinc-800 text-zinc-300 hover:border-yellow-400" },
+                          { val: 8, label: "เริ่มล้า", col: "border-yellow-500/30 text-yellow-400 hover:border-yellow-400" },
+                          { val: 9, label: "หนักมาก", col: "border-yellow-500/60 text-yellow-300 hover:border-yellow-400" },
+                          { val: 10, label: "RPE 10 (Max)", col: "border-red-500/50 text-red-400 hover:border-red-400" },
+                        ].map((r) => (
+                          <button
+                            key={r.val}
+                            type="button"
+                            onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
+                            className={`rounded-lg border bg-zinc-950 py-1.5 text-center transition active:scale-95 ${r.col}`}
+                          >
+                            <span className="block font-black text-xs tabular-nums font-mono">{r.val}</span>
+                            <span className="text-[9px] block leading-tight">{r.label}</span>
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     {/* [Order 5] Rest Timer Controls */}
@@ -4530,7 +4654,7 @@ export default function Page() {
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <p className="text-xs font-bold uppercase text-zinc-500">Rest Timer</p>
-                          <p className="mt-1 text-2xl font-black text-emerald-300">
+                          <p className="mt-1 text-2xl font-black text-yellow-300 tabular-nums tracking-tight font-mono">
                             {restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0
                               ? formatRestTime(restTimer.secondsLeft)
                               : formatRestTime(selectedRestSeconds)}
@@ -4539,8 +4663,8 @@ export default function Page() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => setRestTimerEnabled((value) => !value)}
-                            className={`rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-emerald-400 ${
-                              restTimerEnabled ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-400"
+                            className={`rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-yellow-400 ${
+                              restTimerEnabled ? "bg-yellow-400 text-black font-black" : "bg-zinc-900 text-zinc-400"
                             }`}
                             aria-label={restTimerEnabled ? "Disable rest timer" : "Enable rest timer"}
                             type="button"
@@ -4553,7 +4677,7 @@ export default function Page() {
                                 ? stopRestTimer()
                                 : startRestTimer({ ...exercise, id: baseExercise.id })
                             }
-                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400"
                             aria-label={restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop rest timer" : "Start rest timer"}
                             type="button"
                           >
@@ -4566,8 +4690,8 @@ export default function Page() {
                           <button
                             key={mode}
                             onClick={() => setRestMode({ ...exercise, id: baseExercise.id }, mode as RestMode)}
-                            className={`rounded-xl px-2 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-emerald-400 ${
-                              restMode === mode ? "bg-zinc-50 text-zinc-950" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+                            className={`rounded-xl px-2 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-yellow-400 ${
+                              restMode === mode ? "bg-yellow-400 text-black font-black" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
                             }`}
                             aria-label={`Set rest preset ${label}`}
                             type="button"
@@ -4579,7 +4703,7 @@ export default function Page() {
                       <div className="mt-2 grid grid-cols-2 gap-2">
                         <button
                           onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, -30)}
-                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 tabular-nums font-mono"
                           aria-label="Decrease rest by 30 seconds"
                           type="button"
                         >
@@ -4587,7 +4711,7 @@ export default function Page() {
                         </button>
                         <button
                           onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, 30)}
-                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 tabular-nums font-mono"
                           aria-label="Increase rest by 30 seconds"
                           type="button"
                         >
@@ -4596,7 +4720,7 @@ export default function Page() {
                       </div>
                       {restTimer.exerciseId === baseExercise.id && restTimer.totalSeconds > 0 && (
                         <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
-                          <div className="h-full rounded-full bg-emerald-400 transition-all" style={{ width: `${restProgress}%` }} />
+                          <div className="h-full rounded-full bg-yellow-400 transition-all shadow-[0_0_8px_rgba(250,204,21,0.5)]" style={{ width: `${restProgress}%` }} />
                         </div>
                       )}
                     </div>
@@ -5423,10 +5547,10 @@ export default function Page() {
                   else if (key === "library") setMode("library");
                   else setShowProfileModal(true);
                 }}
-                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] font-medium transition active:scale-95 ${
+                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] transition active:scale-95 ${
                   isTabActive
-                    ? "bg-cyan-400 text-zinc-950 font-black shadow-md shadow-cyan-500/25"
-                    : "bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+                    ? "bg-yellow-400 text-black font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.3)]"
+                    : "bg-zinc-900 text-zinc-300 hover:bg-zinc-800 font-medium"
                 }`}
               >
                 <Icon size={18} />
