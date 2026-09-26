@@ -1319,7 +1319,7 @@ function RealisticAnatomyFigure({
         draggable={false}
       />
 
-      {/* Secondary Muscles Glow Mask (High-Luminance Neon Yellow Glow) */}
+      {/* Secondary Muscles Glow Mask (Electric Purple Glow) */}
       {secondaryIds.map((id) => (
         <div
           key={`sec-${id}`}
@@ -1330,14 +1330,14 @@ function RealisticAnatomyFigure({
             maskSize: "contain",
             maskPosition: "center",
             maskRepeat: "no-repeat",
-            backgroundColor: "#facc15",
-            filter: "drop-shadow(0 0 8px rgba(250, 204, 21, 0.95)) brightness(1.35)",
+            backgroundColor: "#a855f7",
+            filter: "drop-shadow(0 0 8px rgba(168, 85, 247, 0.95)) brightness(1.35)",
             opacity: 0.9,
           } as React.CSSProperties}
         />
       ))}
 
-      {/* Primary Muscles Glow Mask (Universal CVD Safe Electric Cyan Glow) */}
+      {/* Primary Muscles Glow Mask (HYROX Volt Yellow Glow) */}
       {primaryIds.map((id) => (
         <div
           key={`pri-${id}`}
@@ -1348,8 +1348,8 @@ function RealisticAnatomyFigure({
             maskSize: "contain",
             maskPosition: "center",
             maskRepeat: "no-repeat",
-            backgroundColor: "#00f5ff",
-            filter: "drop-shadow(0 0 10px rgba(0, 245, 255, 1)) drop-shadow(0 0 16px rgba(6, 182, 212, 0.8)) brightness(1.4)",
+            backgroundColor: "#FFE500",
+            filter: "drop-shadow(0 0 10px rgba(255, 229, 0, 1)) drop-shadow(0 0 16px rgba(234, 179, 8, 0.8)) brightness(1.4)",
             opacity: 0.95,
           } as React.CSSProperties}
         />
@@ -1409,23 +1409,23 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
             </button>
           </div>
 
-          {/* Primary & Secondary Muscle Chips (CVD Safe & High Contrast) */}
+          {/* Primary (Volt Yellow) & Secondary (Electric Purple) Muscle Chips */}
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5 min-w-0 flex-1">
             {primaryLabels.map((label) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 rounded-lg border border-cyan-400 bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-200 shadow-sm shadow-cyan-500/20"
+                className="inline-flex items-center gap-1 rounded-md border border-yellow-400 bg-yellow-400/20 px-2 py-0.5 text-[10px] font-black uppercase text-yellow-300 shadow-sm shadow-yellow-500/20"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f5ff] animate-pulse" />
+                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_#FFE500]" />
                 ● หลัก {label}
               </span>
             ))}
             {secondaryLabels.map((label) => (
               <span
                 key={label}
-                className="inline-flex items-center gap-1 rounded-lg border border-yellow-400/60 bg-yellow-500/20 px-2 py-0.5 text-[11px] font-bold text-yellow-200 shadow-sm shadow-yellow-500/20"
+                className="inline-flex items-center gap-1 rounded-md border border-purple-400/60 bg-purple-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-purple-200 shadow-sm shadow-purple-500/20"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 shadow-[0_0_6px_#facc15]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_6px_#a855f7]" />
                 ○ รอง {label}
               </span>
             ))}
@@ -1440,7 +1440,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
           role="button"
           tabIndex={0}
           onClick={() => setShowFullDiagram((prev) => !prev)}
-          className="shrink-0 w-[52px] sm:w-[58px] cursor-pointer rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-1 transition hover:border-cyan-500/40 active:scale-95 overflow-hidden"
+          className="shrink-0 w-[52px] sm:w-[58px] cursor-pointer rounded-xl border border-zinc-800 bg-gradient-to-b from-zinc-900 to-zinc-950 p-1 transition hover:border-yellow-400/40 active:scale-95 overflow-hidden"
           title="แตะเพื่อดูโมเดล 3D แบบเต็ม"
         >
           <div className="h-[94px] w-full overflow-hidden flex items-center justify-center">
@@ -1464,10 +1464,10 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Full 3D Anatomy Explorer</span>
             <div className="flex items-center gap-3 text-[10px] text-zinc-400">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#00f5ff]" /> ● Primary (หลัก)
+                <span className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_6px_#FFE500]" /> ● Primary (หลัก)
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-yellow-400 shadow-[0_0_6px_#facc15]" /> ○ Secondary (รอง)
+                <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_6px_#a855f7]" /> ○ Secondary (รอง)
               </span>
             </div>
           </div>
@@ -1785,8 +1785,8 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
 
   if (value >= 80) {
     statusBadge = "ดีเยี่ยม";
-    barColor = "bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]";
-    badgeColor = "text-cyan-200 border-cyan-400/50 bg-cyan-950/40";
+    barColor = "bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]";
+    badgeColor = "text-yellow-300 border-yellow-400/50 bg-yellow-950/40";
   } else if (value >= 60) {
     statusBadge = "ตามเกณฑ์";
     barColor = "bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.5)]";
@@ -4239,7 +4239,7 @@ export default function Page() {
       : null;
 
                 return (
-                  <article key={baseExercise.id} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-3 overflow-hidden w-full max-w-full">
+                  <article key={baseExercise.id} className="rounded-3xl bg-zinc-950 border border-zinc-800/80 p-4 shadow-2xl overflow-hidden w-full max-w-full">
                     <div className="mb-3 flex items-start justify-between gap-3 min-w-0">
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-1.5">
@@ -4259,7 +4259,7 @@ export default function Page() {
                           ) : null}
                         </div>
 
-                        <h3 className="mt-2 text-lg sm:text-xl font-black leading-snug tracking-tight text-white">{exercise.name}</h3>
+                        <h3 className="mt-2 text-xl sm:text-2xl font-black uppercase tracking-tight text-white font-mono">{exercise.name}</h3>
                         {strengthTierInfo && relativeRatio && (
                           <div className="mt-2 flex flex-wrap items-center gap-2">
                             <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-xs font-black tabular-nums uppercase ${strengthTierInfo.badgeClass}`}>
@@ -4272,7 +4272,7 @@ export default function Page() {
                             </span>
                           </div>
                         )}
-                        <p className="mt-0.5 text-xs sm:text-sm font-medium text-zinc-400">
+                        <p className="mt-0.5 text-xs font-bold text-zinc-400 uppercase tracking-widest font-mono">
                           {effectiveSets} hard working sets × {exercise.reps} reps
                         </p>
 
@@ -4355,14 +4355,14 @@ export default function Page() {
                     {/* [Order 3] Compact Machine Dropdown Selector */}
                     <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 flex items-center justify-between gap-1.5 sm:gap-2 min-w-0 w-full">
                       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-                        <Dumbbell className="text-cyan-400 shrink-0" size={14} />
+                        <Dumbbell className="text-yellow-400 shrink-0" size={14} />
                         <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">เครื่อง:</span>
 
                         <div className="relative flex-1 min-w-0">
                           <select
                             value={currentMachine || ""}
                             onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
-                            className="w-full min-w-0 truncate appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-cyan-400 transition"
+                            className="w-full min-w-0 truncate appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
                           >
                             <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[getLoadType(exercise)]})</option>
                             {["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"].map((tag) => (
@@ -4430,7 +4430,7 @@ export default function Page() {
                       <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950 p-2.5 w-full">
                         <div className="flex items-center justify-between text-xs mb-1.5">
                           <span className="font-bold flex items-center gap-1.5 text-zinc-200">
-                            {warmupInfo.type === "full" && <span className="text-cyan-400">⚡</span>}
+                            {warmupInfo.type === "full" && <span className="text-yellow-400">⚡</span>}
                             {warmupInfo.type === "acclimation" && <span className="text-yellow-400">🔥</span>}
                             {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
                             {warmupInfo.headline}
@@ -4445,7 +4445,7 @@ export default function Page() {
                                 key={sIdx}
                                 className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold border ${
                                   warmupInfo.type === "full"
-                                    ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-200"
+                                    ? "border-yellow-500/50 bg-yellow-950/40 text-yellow-200"
                                     : "border-yellow-500/50 bg-yellow-950/40 text-yellow-200"
                                 }`}
                               >
@@ -4490,23 +4490,24 @@ export default function Page() {
                         </div>
                       </div>
 
-                      <div className="mb-2 grid grid-cols-[32px_1fr_1fr_40px] sm:grid-cols-[38px_1.2fr_1.2fr_42px] gap-1.5 sm:gap-2 items-center text-[11px] font-bold uppercase text-zinc-500">
-                        <span>Set</span>
-                        <div className="flex items-center gap-1">
-                          <span>{effectiveUnit}</span>
+                      <div className="mb-2 flex items-center justify-between text-[11px] font-bold uppercase text-zinc-500 px-1">
+                        <span className="w-8 text-center font-mono">Set</span>
+                        <div className="flex-1 text-center flex items-center justify-center gap-1">
+                          <span>Weight ({effectiveUnit})</span>
                           <button
                             type="button"
                             onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
-                            className="rounded bg-zinc-800 px-1 py-0.2 text-[9px] font-bold text-cyan-400 hover:bg-zinc-700 transition"
+                            className="rounded bg-zinc-800 px-1.5 py-0.5 text-[9px] font-bold text-yellow-400 hover:bg-zinc-700 transition"
                             title="สลับหน่วย kg / lbs สำหรับท่านี้"
                           >
                             ⇄ {effectiveUnit === "kg" ? "lbs" : "kg"}
                           </button>
                         </div>
-                        <span>Reps</span>
-                        <span>Save</span>
+                        <span className="flex-1 text-center">Reps</span>
+                        <span className="w-11 text-center">Save</span>
                       </div>
-                      <div className="space-y-3">
+
+                      <div className="space-y-2">
                         {setInputs.map((set, setIndex) => {
                           const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1] ?? (!currentMachine ? lastSetMap[exercise.name]?.[setIndex + 1] : undefined);
                           const fallbackRepVal = latestSet ? Number(latestSet.reps) : 10;
@@ -4527,92 +4528,102 @@ export default function Page() {
                           const effectivePlaceholderWeight = fallbackWeightVal > 0 ? fallbackWeightVal : (aiWeightSuggestion > 0 ? aiWeightSuggestion : 0);
 
                           return (
-                            <div key={setIndex} className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 p-2">
-                              {/* Previous Session Performance / Benchmark */}
-                              <div className="mb-1.5 flex items-center justify-between text-[11px]">
-                                <span className="font-bold text-zinc-400">Set #{setIndex + 1}</span>
-                                {latestSet ? (
-                                  <span className="font-medium text-cyan-400/90 bg-cyan-950/40 px-2 py-0.5 rounded-md border border-cyan-800/30">
+                            <div key={setIndex} className="rounded-2xl bg-zinc-900/70 border border-zinc-800/60 p-2 hover:border-zinc-700 transition">
+                              {/* Benchmark Note */}
+                              {latestSet && (
+                                <div className="mb-1 flex items-center justify-between text-[10px] px-1">
+                                  <span className="text-zinc-500 font-mono">Set #{setIndex + 1}</span>
+                                  <span className="font-mono text-yellow-400/90 bg-yellow-950/30 px-1.5 py-0.5 rounded border border-yellow-800/30">
                                     ครั้งก่อน: {latestSet.rawValue ?? latestSet.weightLbs} {latestSet.unit || "lbs"} × {latestSet.reps} reps
                                   </span>
-                                ) : aiWeightSuggestion > 0 ? (
-                                  <span className="font-medium text-zinc-400 bg-zinc-800/50 px-2 py-0.5 rounded-md">
-                                    เป้าหมาย AI: ~{aiWeightSuggestion} {effectiveUnit}
-                                  </span>
-                                ) : (
-                                  <span className="text-zinc-500">เป้าหมาย: {exercise.reps} reps</span>
-                                )}
-                              </div>
+                                </div>
+                              )}
 
-                              <div className="grid grid-cols-[32px_1fr_1fr_40px] sm:grid-cols-[38px_1.2fr_1.2fr_42px] gap-1.5 sm:gap-2 items-center">
-                                <div className="flex items-center justify-center font-black text-zinc-400 text-sm">{setIndex + 1}</div>
-                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-yellow-400 focus-within:ring-2 focus-within:ring-yellow-400 transition min-w-0">
+                              <div className="flex items-center gap-1.5 sm:gap-2">
+                                {/* Set Number */}
+                                <div className="w-8 shrink-0 text-center font-mono font-black text-sm text-zinc-400">
+                                  {setIndex + 1 < 10 ? `0${setIndex + 1}` : setIndex + 1}
+                                </div>
+
+                                {/* Weight Input Box */}
+                                <div className="flex flex-1 items-center justify-between rounded-xl bg-black border border-zinc-800 px-1 py-1 focus-within:border-yellow-400 focus-within:ring-1 focus-within:ring-yellow-400 transition min-w-0">
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
-                                    aria-label={`Decrease weight by step for set ${setIndex + 1}`}
+                                    className="w-7 h-8 shrink-0 flex items-center justify-center text-zinc-400 hover:text-yellow-400 font-black text-lg select-none"
+                                    aria-label={`Decrease weight for set ${setIndex + 1}`}
                                   >
                                     −
                                   </button>
-                                  <input
-                                    id={`weight-input-${baseExercise.id}-${setIndex}`}
-                                    inputMode="decimal"
-                                    value={set.weightLbs}
-                                    onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
-                                    onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
-                                    aria-label={`Weight in ${effectiveUnit} for set ${setIndex + 1}`}
-                                    className="min-w-0 w-full text-center text-sm sm:text-base font-bold tabular-nums tracking-tight font-mono outline-none bg-transparent px-0.5 py-3"
-                                    placeholder={effectivePlaceholderWeight > 0 ? String(effectivePlaceholderWeight) : "0"}
-                                  />
+                                  <div className="flex items-baseline gap-1 justify-center flex-1 min-w-0">
+                                    <input
+                                      id={`weight-input-${baseExercise.id}-${setIndex}`}
+                                      inputMode="decimal"
+                                      value={set.weightLbs}
+                                      onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
+                                      onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
+                                      aria-label={`Weight in ${effectiveUnit} for set ${setIndex + 1}`}
+                                      className="w-14 min-w-0 text-center font-mono font-black text-base sm:text-lg text-white bg-transparent outline-none tabular-nums"
+                                      placeholder={String(effectivePlaceholderWeight || 0)}
+                                    />
+                                    <span className="text-[10px] font-mono font-bold text-yellow-400 uppercase select-none">{effectiveUnit}</span>
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
-                                    aria-label={`Increase weight by step for set ${setIndex + 1}`}
+                                    className="w-7 h-8 shrink-0 flex items-center justify-center text-zinc-400 hover:text-yellow-400 font-black text-lg select-none"
+                                    aria-label={`Increase weight for set ${setIndex + 1}`}
                                   >
                                     +
                                   </button>
                                 </div>
-                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-yellow-400 focus-within:ring-2 focus-within:ring-yellow-400 transition min-w-0">
+
+                                {/* Reps Input Box */}
+                                <div className="flex flex-1 items-center justify-between rounded-xl bg-black border border-zinc-800 px-1 py-1 focus-within:border-yellow-400 focus-within:ring-1 focus-within:ring-yellow-400 transition min-w-0">
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
-                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="w-7 h-8 shrink-0 flex items-center justify-center text-zinc-400 hover:text-yellow-400 font-black text-lg select-none"
                                     aria-label={`Decrease reps for set ${setIndex + 1}`}
                                   >
                                     −
                                   </button>
-                                  <input
-                                    id={`rep-input-${baseExercise.id}-${setIndex}`}
-                                    inputMode="numeric"
-                                    value={set.reps}
-                                    onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, effectiveSets)}
-                                    onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps")}
-                                    aria-label={`Reps for set ${setIndex + 1}`}
-                                    className="min-w-0 w-full text-center text-sm sm:text-base font-bold tabular-nums tracking-tight font-mono outline-none bg-transparent px-0.5 py-3"
-                                    placeholder={latestSet ? String(latestSet.reps) : "0"}
-                                  />
+                                  <div className="flex items-baseline gap-1 justify-center flex-1 min-w-0">
+                                    <input
+                                      id={`rep-input-${baseExercise.id}-${setIndex}`}
+                                      inputMode="numeric"
+                                      value={set.reps}
+                                      onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, effectiveSets)}
+                                      onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps")}
+                                      aria-label={`Reps for set ${setIndex + 1}`}
+                                      className="w-12 min-w-0 text-center font-mono font-black text-base sm:text-lg text-white bg-transparent outline-none tabular-nums"
+                                      placeholder={latestSet ? String(latestSet.reps) : "0"}
+                                    />
+                                    <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase select-none">REPS</span>
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
-                                    className="flex w-6 sm:w-7 shrink-0 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="w-7 h-8 shrink-0 flex items-center justify-center text-zinc-400 hover:text-yellow-400 font-black text-lg select-none"
                                     aria-label={`Increase reps for set ${setIndex + 1}`}
                                   >
                                     +
                                   </button>
                                 </div>
+
+                                {/* Checkmark Button */}
                                 <button
+                                  type="button"
                                   onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
                                   aria-label={`Save set ${setIndex + 1}`}
                                   title={set.done ? "เซ็ตนี้บันทึกแล้ว (แตะเพื่อบันทึกซ้ำ)" : "บันทึกเซ็ตนี้"}
-                                  className={`rounded-2xl border py-3 transition active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 ${
+                                  className={`w-11 h-10 shrink-0 rounded-xl flex items-center justify-center transition active:scale-90 border ${
                                     set.done
-                                      ? "bg-yellow-400 border-yellow-300 text-black font-black shadow-[0_0_10px_rgba(250,204,21,0.4)]"
-                                      : "border-dashed border-zinc-700 bg-zinc-900/50 text-zinc-500 hover:border-yellow-400 hover:text-yellow-300"
+                                      ? "bg-yellow-400 border-yellow-300 text-black shadow-[0_0_12px_rgba(255,229,0,0.4)]"
+                                      : "bg-black border-zinc-800 text-zinc-500 hover:border-yellow-400 hover:text-yellow-400"
                                   }`}
                                 >
-                                  <Check size={18} className={set.done ? "mx-auto stroke-[3]" : "mx-auto stroke-[1.5] opacity-40"} />
+                                  <Check className={set.done ? "stroke-[3]" : "stroke-[2] opacity-40"} size={18} />
                                 </button>
                               </div>
                             </div>
@@ -4739,7 +4750,7 @@ export default function Page() {
                             <Trophy size={14} /> Records {currentMachine && <span className="text-yellow-400 font-bold font-semibold normal-case">({currentMachine})</span>}
                           </p>
                           <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-xl bg-zinc-900 px-3 py-2 cursor-pointer hover:border-cyan-400 border border-transparent transition" onClick={() => {
+                            <div className="rounded-xl bg-zinc-900 px-3 py-2 cursor-pointer hover:border-yellow-400 border border-transparent transition" onClick={() => {
                     setEditingPrExercise({ name: exercise.name, machine: currentMachine });
                     setEditPrWeight(records.maxWeight ? (records.maxWeight.rawValue !== undefined ? records.maxWeight.rawValue.toString() : (records.maxWeight.unit === "kg" ? (records.maxWeight.weightLbs * 0.453592).toFixed(1) : records.maxWeight.weightLbs.toString())) : "");
                     setEditPrReps(records.maxWeight?.reps?.toString() ?? "");
@@ -4755,7 +4766,7 @@ export default function Page() {
                                         : `${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs`}
                                       {" × "}{records.maxWeight.reps}
                                     </p>
-                    <span className="text-[10px] text-cyan-400">แก้ไข/ประวัติ ✎</span>
+                    <span className="text-[10px] text-yellow-400 font-bold">แก้ไข/ประวัติ ✎</span>
                                     <p className="text-[10px] text-zinc-500">
                                       {records.maxWeight.unit === "kg" && records.maxWeight.rawValue !== undefined
                                         ? `(${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs)`
