@@ -1363,7 +1363,7 @@ function DayMuscleOverviewCard({ summary }: { summary: MuscleSummary }) {
     <details className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Daily Muscle Map · 3D Anatomy</p>
+          <p className="text-[11px] font-bold uppercase tracking-wide text-yellow-300">Daily Muscle Map · 3D Anatomy</p>
           <p className="mt-1 text-sm font-semibold text-zinc-100">{summary.hasData ? summary.summaryText : "Show day 3D anatomy"}</p>
         </div>
         <span className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-800 transition">Show 3D</span>
@@ -1403,7 +1403,7 @@ function ExerciseMusclePreviewCard({ exercise }: { exercise: PlanExercise }) {
             <button
               type="button"
               onClick={() => setShowFullDiagram((prev) => !prev)}
-              className="text-emerald-400 hover:text-emerald-300 underline underline-offset-2 capitalize font-semibold transition"
+              className="text-yellow-400 font-bold hover:text-yellow-300 underline underline-offset-2 capitalize font-semibold transition"
             >
               {showFullDiagram ? "ย่อรูปหุ่น 3D" : "ขยาย 3D คู่ (หน้า/หลัง)"}
             </button>
@@ -1846,7 +1846,7 @@ function WeeklyPerformanceMiniChart({ trends }: { trends: WeeklyTrendPoint[] }) 
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">📈 Progress 4 สัปดาห์</span>
         {prevScore > 0 && lastScore > 0 && (
-          <span className={`text-[10px] font-black rounded-md px-1.5 py-0.5 ${diff >= 0 ? "bg-emerald-500/20 text-emerald-300" : "bg-zinc-800 text-zinc-400"}`}>
+          <span className={`text-[10px] font-black rounded-md px-1.5 py-0.5 ${diff >= 0 ? "bg-yellow-500/20 text-yellow-300" : "bg-zinc-800 text-zinc-400"}`}>
             {diff >= 0 ? `+${diff}` : diff} pts vs สัปดาห์ก่อน
           </span>
         )}
@@ -1879,7 +1879,7 @@ function WeeklyPerformanceMiniChart({ trends }: { trends: WeeklyTrendPoint[] }) 
 
       <div className="mt-1 flex justify-between text-[10px] font-bold text-zinc-400 px-1">
         {trends.map((t, i) => (
-          <span key={i} className={i === trends.length - 1 ? "text-emerald-300 font-black" : ""}>
+          <span key={i} className={i === trends.length - 1 ? "text-yellow-300 font-black" : ""}>
             {t.label}
           </span>
         ))}
@@ -1894,7 +1894,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
       <div className="flex items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">Weekly Performance</p>
+            <p className="text-[11px] font-bold uppercase tracking-wide text-yellow-300">Weekly Performance</p>
             {report.currentStreak > 0 && (
               <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black text-amber-300">
                 🔥 {report.currentStreak}w streak
@@ -1903,7 +1903,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
           </div>
           <p className="mt-1 text-2xl font-black">{report.hasData ? `${report.score}/100` : "—/100"}</p>
         </div>
-        <span className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xl font-black text-emerald-300">
+        <span className="rounded-2xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-xl font-black text-yellow-300">
           {report.emoji} {report.rank}
         </span>
       </div>
@@ -1951,7 +1951,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
             {report.challenges.map((c) => (
               <div
                 key={c.name}
-                className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs ${c.done ? "bg-emerald-500/10 text-emerald-300" : "bg-zinc-950 text-zinc-400"}`}
+                className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs ${c.done ? "bg-yellow-500/10 text-yellow-300" : "bg-zinc-950 text-zinc-400"}`}
               >
                 <span className="font-bold">{c.done ? "✅" : "⬜"} {c.name}</span>
                 <span className="text-[10px] font-black">{c.progress}</span>
@@ -2052,12 +2052,12 @@ function PrCelebrationModal({
   return (
     <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in duration-200">
       <ConfettiCanvas />
-      <div className="relative w-full max-w-sm rounded-3xl border border-emerald-500/40 bg-zinc-950 p-6 text-center shadow-2xl shadow-emerald-500/20 animate-in zoom-in-95 duration-200">
-        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-emerald-500/20 to-amber-500/20 border border-emerald-500/40 text-4xl shadow-lg shadow-emerald-500/20">
+      <div className="relative w-full max-w-sm rounded-3xl border border-yellow-500/40 bg-zinc-950 p-6 text-center shadow-2xl shadow-yellow-500/20 animate-in zoom-in-95 duration-200">
+        <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-tr from-yellow-500/20 to-amber-500/20 border border-yellow-500/40 text-4xl shadow-lg shadow-yellow-500/20">
           🏆
         </div>
 
-        <p className="mt-4 text-xs font-black uppercase tracking-widest text-emerald-400">Personal Record!</p>
+        <p className="mt-4 text-xs font-black uppercase tracking-widest text-yellow-400 font-bold">Personal Record!</p>
         <h3 className="mt-1 text-2xl font-black text-white">{pr.exerciseName}</h3>
         {pr.machine && (
           <span className="mt-1 inline-block rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[11px] font-bold text-zinc-300">
@@ -2065,23 +2065,23 @@ function PrCelebrationModal({
           </span>
         )}
 
-        <div className="mt-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-left">
+        <div className="mt-5 rounded-2xl border border-yellow-500/20 bg-yellow-500/5 p-4 text-left">
           <p className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
             {pr.recordType === "weight" ? "Max Weight Record" : pr.recordType === "reps" ? "Best Reps Record" : "Volume Record"}
           </p>
           <div className="mt-2 flex items-center justify-between text-xs text-zinc-400">
             <span>เดิม: {pr.oldVal}</span>
           </div>
-          <div className="mt-1 flex items-center justify-between font-black text-emerald-300 text-sm">
+          <div className="mt-1 flex items-center justify-between font-black text-yellow-300 text-sm">
             <span>ใหม่: {pr.newVal}</span>
-            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">PR 💥</span>
+            <span className="rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs text-yellow-300">PR 💥</span>
           </div>
         </div>
 
         {bodyweightKg && pr.recordType === "weight" && (
           <p className="mt-3 text-xs text-zinc-400">
             🏋️ Relative Strength:{" "}
-            <span className="font-black text-emerald-300">
+            <span className="font-black text-yellow-300">
               {(Number(pr.newVal.split(" ")[0]) / bodyweightKg).toFixed(2)}x Bodyweight
             </span>
           </p>
@@ -2090,7 +2090,7 @@ function PrCelebrationModal({
         <button
           type="button"
           onClick={onClose}
-          className="mt-6 w-full rounded-2xl bg-emerald-400 py-3.5 text-sm font-black text-zinc-950 shadow-lg shadow-emerald-400/25 transition active:scale-95 hover:bg-emerald-300"
+          className="mt-6 w-full rounded-2xl bg-yellow-400 text-black font-black py-3.5 text-sm font-black text-zinc-950 shadow-lg shadow-yellow-500/25 transition active:scale-95 hover:bg-yellow-300"
         >
           ลุยต่อเลย! 🔥
         </button>
@@ -2141,7 +2141,7 @@ function BodyweightModal({
         </button>
 
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-2xl">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-yellow-500/10 border border-yellow-500/30 text-2xl">
             ⚖️
           </div>
           <div>
@@ -2159,12 +2159,12 @@ function BodyweightModal({
               placeholder="เช่น 72.5"
               value={val}
               onChange={(e) => setVal(e.target.value)}
-              className="flex-1 rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-base font-black text-white outline-none focus:border-emerald-400"
+              className="flex-1 rounded-2xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-base font-black text-white outline-none focus:border-yellow-400"
               autoFocus
             />
             <button
               type="submit"
-              className="rounded-2xl bg-emerald-400 px-5 font-black text-zinc-950 hover:bg-emerald-300 transition active:scale-95"
+              className="rounded-2xl bg-yellow-400 text-black font-black px-5 font-black text-zinc-950 hover:bg-yellow-300 transition active:scale-95"
             >
               บันทึก
             </button>
@@ -2173,7 +2173,7 @@ function BodyweightModal({
 
         {currentWeight && (
           <div className="mt-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-300">🏋️ Relative Strength ({currentWeight} kg)</p>
+            <p className="text-xs font-bold uppercase tracking-wider text-yellow-300">🏋️ Relative Strength ({currentWeight} kg)</p>
             <div className="mt-3 space-y-2">
               {compoundExercises.map((c) => {
                 const rec = recordsMap[c.key]?.maxWeight;
@@ -2185,7 +2185,7 @@ function BodyweightModal({
                     <span className="text-zinc-300">{c.label}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-zinc-400">{prKg} kg</span>
-                      <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-black text-emerald-300">
+                      <span className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 font-black text-yellow-300">
                         {ratio}x BW
                       </span>
                     </div>
@@ -3745,14 +3745,14 @@ export default function Page() {
                   setShowScoreModal(true);
                 }
               }}
-              className="flex cursor-pointer items-center justify-between rounded-xl bg-zinc-900 px-3 py-2.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800/90 active:scale-[0.99] border border-zinc-800 hover:border-emerald-500/30"
+              className="flex cursor-pointer items-center justify-between rounded-xl bg-zinc-900 px-3 py-2.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800/90 active:scale-[0.99] border border-zinc-800 hover:border-yellow-500/30"
             >
               <span className="flex items-center gap-1.5">
-                <Trophy className="text-emerald-400" size={14} />
+                <Trophy className="text-yellow-400 font-bold" size={14} />
                 Weekly Score: {performanceReport.hasData ? `${performanceReport.score}/100 (${performanceReport.rank})` : "—/100"}
                 {performanceReport.currentStreak > 0 && ` · 🔥 ${performanceReport.currentStreak}w streak`}
               </span>
-              <span className="text-[11px] text-emerald-400 font-medium underline underline-offset-2">แตะเพื่อดูรายละเอียด</span>
+              <span className="text-[11px] text-yellow-400 font-bold font-medium underline underline-offset-2">แตะเพื่อดูรายละเอียด</span>
             </div>
             {weeklyScores.length >= 2 && (
               <div className="mt-3">
@@ -3766,8 +3766,8 @@ export default function Page() {
           <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
             <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { setFiveDayMode("twoLegDays"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "twoLegDays" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"}`}>2 Leg Days</button>
-              <button onClick={() => { setFiveDayMode("oneLegDay"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "oneLegDay" ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"}`}>1 Leg Day</button>
+              <button onClick={() => { setFiveDayMode("twoLegDays"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "twoLegDays" ? "bg-yellow-400 text-black font-black" : "bg-zinc-950 text-zinc-300"}`}>2 Leg Days</button>
+              <button onClick={() => { setFiveDayMode("oneLegDay"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "oneLegDay" ? "bg-yellow-400 text-black font-black" : "bg-zinc-950 text-zinc-300"}`}>1 Leg Day</button>
             </div>
           </div>
         )}
@@ -3783,19 +3783,19 @@ export default function Page() {
                 <div className="flex gap-1 rounded-xl bg-zinc-950 p-1">
                   <button
                     onClick={() => setHistoryRange("all")}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "all" ? "bg-emerald-400 text-zinc-950" : "text-zinc-400 hover:text-zinc-200"}`}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "all" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-zinc-200"}`}
                   >
                     ทั้งหมด
                   </button>
                   <button
                     onClick={() => setHistoryRange("30d")}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "30d" ? "bg-emerald-400 text-zinc-950" : "text-zinc-400 hover:text-zinc-200"}`}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "30d" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-zinc-200"}`}
                   >
                     30 วัน
                   </button>
                   <button
                     onClick={() => setHistoryRange("14d")}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "14d" ? "bg-emerald-400 text-zinc-950" : "text-zinc-400 hover:text-zinc-200"}`}
+                    className={`rounded-lg px-2.5 py-1 text-xs font-bold transition ${historyRange === "14d" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-zinc-200"}`}
                   >
                     14 วัน
                   </button>
@@ -3804,7 +3804,7 @@ export default function Page() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={exportLogsToCsv}
-                      className="flex items-center gap-1.5 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/20"
+                      className="flex items-center gap-1.5 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs font-bold text-yellow-300 transition hover:bg-yellow-500/20"
                       aria-label="Export history to CSV"
                     >
                       <Download size={15} /> Export CSV
@@ -3830,7 +3830,7 @@ export default function Page() {
               <div className="space-y-3 pr-1">
                 {Object.entries(recentLogsByDate).map(([date, items]) => (
                   <div key={date} className="rounded-2xl bg-zinc-950 p-3">
-                    <h4 className="mb-3 text-sm font-black text-emerald-300">{date}</h4>
+                    <h4 className="mb-3 text-sm font-black text-yellow-300">{date}</h4>
                     <div className="space-y-2">
                       {items.map((item, index) => (
                         <div key={`${item.date}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
@@ -3839,7 +3839,7 @@ export default function Page() {
                               <p className="font-bold leading-tight flex items-center flex-wrap gap-1.5">
                                 <span>{item.exerciseName}</span>
                                 {item.machine && (
-                                  <span className="rounded-md bg-emerald-400/10 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-500/20">
+                                  <span className="rounded-md bg-yellow-400/10 px-1.5 py-0.5 text-[10px] font-bold text-yellow-300 border border-yellow-500/20">
                                     {item.machine}
                                   </span>
                                 )}
@@ -3847,7 +3847,7 @@ export default function Page() {
                               <p className="mt-1 text-[11px] text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
                             </div>
                             <div className="text-right">
-                              <p className="whitespace-nowrap text-sm font-black text-emerald-300">
+                              <p className="whitespace-nowrap text-sm font-black text-yellow-300">
                                 {item.rawValue !== undefined && item.unit
                                   ? `${item.rawValue} ${item.unit}`
                                   : `${Math.round(item.weightLbs * 10) / 10} lbs`}
@@ -3899,7 +3899,7 @@ export default function Page() {
 
                 return (
                   <details key={group} className="rounded-2xl bg-zinc-950 p-3" open={librarySearch.trim().length > 0}>
-                    <summary className="cursor-pointer text-sm font-black text-emerald-300">
+                    <summary className="cursor-pointer text-sm font-black text-yellow-300">
                       <Library size={14} className="mr-2 inline" /> {group} · {names.length}
                     </summary>
 
@@ -3927,8 +3927,8 @@ export default function Page() {
         )}
 
         {mode === "custom" && selectedCustomPlan && (
-          <details className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
-            <summary className="cursor-pointer text-base font-black text-emerald-300">Plan settings</summary>
+          <details className="mt-4 rounded-3xl border border-yellow-400/20 bg-zinc-900 p-4">
+            <summary className="cursor-pointer text-base font-black text-yellow-300">Plan settings</summary>
 
             <div className="mt-4 grid gap-3">
               <div>
@@ -3949,7 +3949,7 @@ export default function Page() {
                 </button>
                 <button
                   onClick={addCustomDay}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-3 py-3 text-xs font-black text-zinc-950"
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-yellow-400 text-black font-black px-3 py-3 text-xs font-black text-zinc-950"
                 >
                   <Plus size={15} /> Day
                 </button>
@@ -3965,8 +3965,8 @@ export default function Page() {
         )}
 
         {mode === "custom" && day && (
-          <details className="mt-4 rounded-3xl border border-emerald-400/20 bg-zinc-900 p-4">
-            <summary className="cursor-pointer text-base font-black text-emerald-300">
+          <details className="mt-4 rounded-3xl border border-yellow-400/20 bg-zinc-900 p-4">
+            <summary className="cursor-pointer text-base font-black text-yellow-300">
               🛠️ Drag & Drop Plan Builder ({day.title})
             </summary>
             <div className="mt-4">
@@ -3988,7 +3988,7 @@ export default function Page() {
                 if (isPresetLike) setSelectedDay(index);
                 else setSelectedCustomDay(index);
                 setActiveExerciseIndex(0);
-              }} className={`min-w-[136px] snap-start rounded-xl px-3 py-2.5 text-left transition ${activeDayIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-900 text-zinc-300"}`}>
+              }} className={`min-w-[136px] snap-start rounded-xl px-3 py-2.5 text-left transition ${activeDayIndex === index ? "bg-yellow-400 text-black font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.3)]" : "bg-zinc-900 text-zinc-300"}`}>
                 <CalendarDays size={16} />
                 <p className="mt-1 line-clamp-2 text-sm font-bold leading-5">{item.title}</p>
                 <p className="mt-1 hidden text-[11px] opacity-70 sm:block">{item.subtitle}</p>
@@ -4030,7 +4030,7 @@ export default function Page() {
                             key={group}
                             onClick={() => toggleDayFocus(group)}
                             className={`rounded-full px-3 py-2 text-xs font-bold ${
-                              day.focus.includes(group) ? "bg-emerald-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
+                              day.focus.includes(group) ? "bg-yellow-400 text-black font-black" : "bg-zinc-800 text-zinc-300"
                             }`}
                           >
                             {group}
@@ -4040,7 +4040,7 @@ export default function Page() {
 
                       <button
                         onClick={recommendIntoCurrentDay}
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-400 px-4 py-3 text-sm font-black text-zinc-950"
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 text-black font-black px-4 py-3 text-sm font-black text-zinc-950"
                       >
                         <Sparkles size={16} /> Recommend
                       </button>
@@ -4086,7 +4086,7 @@ export default function Page() {
                       setCompactList(true);
                     }}
                     className={`min-w-[96px] snap-start rounded-xl px-3 py-2.5 text-left text-xs ${
-                      activeExerciseIndex === index ? "bg-emerald-400 text-zinc-950" : "bg-zinc-950 text-zinc-300"
+                      activeExerciseIndex === index ? "bg-yellow-400 text-black font-black uppercase shadow-[0_0_12px_rgba(250,204,21,0.3)]" : "bg-zinc-950 text-zinc-300"
                     }`}
                   >
                     <span className="block text-[11px] font-bold">#{index + 1}</span>
@@ -4162,7 +4162,7 @@ export default function Page() {
                             {item.group} · {item.movement} · {LOAD_LABELS[getLoadType(item)]} · {item.tier}
                           </span>
                         </span>
-                        <Plus size={18} className="text-emerald-300" />
+                        <Plus size={18} className="text-yellow-300" />
                       </button>
                     ))}
                   </div>
@@ -4286,8 +4286,8 @@ export default function Page() {
                             : `${bioRes.hardwareWeightKg} kg`;
 
                           return (
-                            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
-                              <Sparkles size={11} className="text-emerald-400" />
+                            <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-[11px] font-bold text-yellow-300">
+                              <Sparkles size={11} className="text-yellow-400 font-bold" />
                               <span>
                                 แนะนำ AI: {displayWeight}
                                 {bioRes.isPerHand ? " ต่อข้าง" : ""} ({bioRes.displayNote})
@@ -4405,7 +4405,7 @@ export default function Page() {
                               saveMachineUnit(currentMachine, nextU);
                               setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
                             }}
-                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[10px] font-black text-emerald-300 hover:border-emerald-400 transition"
+                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[10px] font-black text-yellow-300 hover:border-yellow-400 transition"
                             title="สลับหน่วยเฉพาะเครื่องนี้"
                           >
                             ⚙️ <span className="hidden sm:inline">{machineUnits[currentMachine] || globalWeightUnit}</span>
@@ -4472,7 +4472,7 @@ export default function Page() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => removeManualSet(baseExercise.id, effectiveSets)}
-                            className="flex items-center gap-1 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 select-none"
+                            className="flex items-center gap-1 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 select-none"
                             disabled={setInputs.length <= 1}
                             aria-label="Remove last set"
                             type="button"
@@ -4481,7 +4481,7 @@ export default function Page() {
                           </button>
                           <button
                             onClick={() => addManualSet(baseExercise.id, effectiveSets)}
-                            className="flex items-center gap-1 rounded-xl bg-emerald-400 px-3 py-2 text-xs font-bold text-zinc-950 transition hover:bg-emerald-300 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400 select-none"
+                            className="flex items-center gap-1 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black active:scale-95 transition focus-visible:ring-2 focus-visible:ring-yellow-400 select-none"
                             aria-label="Add additional set"
                             type="button"
                           >
@@ -4727,7 +4727,7 @@ export default function Page() {
 
                     {/* [Order 6] Secondary Tools Accordion (Progressive Disclosure) */}
                     <details className="rounded-xl bg-zinc-950 border border-zinc-800/80 p-3">
-                      <summary className="cursor-pointer py-1 text-xs font-bold text-zinc-400 hover:text-emerald-400 transition flex items-center justify-between">
+                      <summary className="cursor-pointer py-1 text-xs font-bold text-zinc-400 hover:text-yellow-400 font-bold transition flex items-center justify-between">
                         <span>🏆 สถิติเดิม PR, Warmup & การตั้งค่าเพิ่มเติม</span>
                         <ChevronDown size={14} className="text-zinc-500" />
                       </summary>
@@ -4736,7 +4736,7 @@ export default function Page() {
                         {/* Records & Relative Strength Grid */}
                         <div>
                           <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
-                            <Trophy size={14} /> Records {currentMachine && <span className="text-emerald-400 font-semibold normal-case">({currentMachine})</span>}
+                            <Trophy size={14} /> Records {currentMachine && <span className="text-yellow-400 font-bold font-semibold normal-case">({currentMachine})</span>}
                           </p>
                           <div className="grid grid-cols-2 gap-2">
                             <div className="rounded-xl bg-zinc-900 px-3 py-2 cursor-pointer hover:border-cyan-400 border border-transparent transition" onClick={() => {
@@ -4749,7 +4749,7 @@ export default function Page() {
                               <div className="mt-1">
                                 {records.maxWeight ? (
                                   <>
-                                    <p className="text-sm font-black text-emerald-300">
+                                    <p className="text-sm font-black text-yellow-300">
                                       {records.maxWeight.rawValue !== undefined && records.maxWeight.unit
                                         ? `${records.maxWeight.rawValue} ${records.maxWeight.unit}`
                                         : `${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs`}
@@ -4805,9 +4805,9 @@ export default function Page() {
                               const target = isBench ? 1.5 : isSquat ? 2.0 : isDL ? 2.5 : null;
 
                               return (
-                                <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 col-span-2">
+                                <div className="rounded-xl bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 col-span-2">
                                   <div className="flex items-center justify-between">
-                                    <p className="text-[10px] font-bold uppercase text-emerald-300">Relative Strength</p>
+                                    <p className="text-[10px] font-bold uppercase text-yellow-300">Relative Strength</p>
                                     {target && (
                                       <span className="text-[10px] text-zinc-400 font-medium">
                                         เป้าหมาย: {target}× BW
@@ -4815,11 +4815,11 @@ export default function Page() {
                                     )}
                                   </div>
                                   <div className="mt-1 flex items-baseline justify-between">
-                                    <p className="text-sm font-black text-emerald-300">
+                                    <p className="text-sm font-black text-yellow-300">
                                       {ratio.toFixed(2)}× BW
                                     </p>
                                     {target && (
-                                      <span className={`text-[10px] font-bold ${ratio >= target ? "text-emerald-300" : "text-amber-400"}`}>
+                                      <span className={`text-[10px] font-bold ${ratio >= target ? "text-yellow-300" : "text-amber-400"}`}>
                                         {ratio >= target ? "✓ บรรลุเป้าหมาย" : `ขาดอีก ${(target - ratio).toFixed(2)}×`}
                                       </span>
                                     )}
@@ -4834,7 +4834,7 @@ export default function Page() {
 {editingPrExercise && (
   <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
     <div className="w-full max-w-md rounded-xl bg-zinc-950 p-6 border border-zinc-800">
-      <h2 className="text-lg font-bold text-emerald-300 mb-4">
+      <h2 className="text-lg font-bold text-yellow-300 mb-4">
         Edit PR - {editingPrExercise.name}{editingPrExercise.machine ? ` (${editingPrExercise.machine})` : ''}
       </h2>
       <div className="grid grid-cols-2 gap-2 mb-4">
@@ -4890,7 +4890,7 @@ export default function Page() {
             });
             setEditingPrExercise(null);
           }}
-          className="px-4 py-2 rounded-xl bg-emerald-400 text-zinc-950"
+          className="px-4 py-2 rounded-xl bg-yellow-400 text-black font-black"
         >Save</button>
       </div>
       <h3 className="text-sm font-bold text-zinc-400 mb-2">Recent Sets</h3>
@@ -4930,7 +4930,7 @@ export default function Page() {
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                               <div>
                                 <label className="mb-1 block text-xs font-bold text-zinc-500">Target Sets</label>
-                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-emerald-400 transition">
+                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-yellow-400 transition">
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -4940,7 +4940,7 @@ export default function Page() {
                                         updatePresetExerciseSets(baseExercise.id, effectiveSets - 1);
                                       }
                                     }}
-                                    className="flex w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-8 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label="Decrease sets"
                                   >
                                     −
@@ -4967,7 +4967,7 @@ export default function Page() {
                                         updatePresetExerciseSets(baseExercise.id, effectiveSets + 1);
                                       }
                                     }}
-                                    className="flex w-8 items-center justify-center text-zinc-400 hover:text-emerald-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
+                                    className="flex w-8 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
                                     aria-label="Increase sets"
                                   >
                                     +
@@ -5012,11 +5012,11 @@ export default function Page() {
                               setSubstituteSearch("");
                               setSubstituteFilter("movement");
                             }}
-                            className="flex w-full items-center justify-between gap-2 rounded-xl bg-zinc-900 border border-zinc-800 px-3.5 py-3 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                            className="flex w-full items-center justify-between gap-2 rounded-xl bg-zinc-900 border border-zinc-800 px-3.5 py-3 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-yellow-400"
                             aria-label={`Substitute ${exercise.name}`}
                           >
                             <span className="flex items-center gap-2">
-                              <RotateCcw size={14} className="text-emerald-400" />
+                              <RotateCcw size={14} className="text-yellow-400 font-bold" />
                               <span>Substitute Exercise</span>
                             </span>
                             <span className="rounded-lg bg-zinc-800 px-2 py-1 text-[11px] text-zinc-400">
@@ -5031,7 +5031,7 @@ export default function Page() {
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
                           onClick={() => setActiveExerciseIndex(Math.max(0, activeExerciseIndex - 1))}
-                          className="rounded-xl bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                          className="rounded-xl bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-yellow-400"
                           disabled={activeExerciseIndex === 0}
                           aria-label="Go to previous exercise"
                         >
@@ -5039,7 +5039,7 @@ export default function Page() {
                         </button>
                         <button
                           onClick={() => setActiveExerciseIndex(Math.min(day.exercises.length - 1, activeExerciseIndex + 1))}
-                          className="rounded-xl bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-950 disabled:opacity-40 transition hover:bg-zinc-200 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                          className="rounded-xl bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-950 disabled:opacity-40 transition hover:bg-zinc-200 focus-visible:ring-2 focus-visible:ring-yellow-400"
                           disabled={activeExerciseIndex >= day.exercises.length - 1}
                           aria-label="Go to next exercise"
                         >
@@ -5059,20 +5059,20 @@ export default function Page() {
       {restTimer.running && restTimer.secondsLeft > 0 && (
         <aside
           aria-label="Active rest timer"
-          className="fixed bottom-16 left-3 right-3 z-40 mx-auto max-w-md rounded-2xl border border-emerald-500/40 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur-md transition-all duration-300"
+          className="fixed bottom-16 left-3 right-3 z-40 mx-auto max-w-md rounded-2xl border border-yellow-500/40 bg-zinc-950/95 p-3 shadow-2xl backdrop-blur-md transition-all duration-300"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
                 <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yellow-400 text-black font-black opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-yellow-400" />
                 </span>
                 <p className="truncate text-xs font-bold text-zinc-400">
                   {restTimer.exerciseName ? `Rest · ${restTimer.exerciseName}` : "Rest Timer"}
                 </p>
               </div>
-              <p className="mt-0.5 text-xl font-black tracking-tight text-emerald-300">
+              <p className="mt-0.5 text-xl font-black tracking-tight text-yellow-300">
                 {formatRestTime(restTimer.secondsLeft)}
               </p>
             </div>
@@ -5094,7 +5094,7 @@ export default function Page() {
                   };
                   adjustRestSeconds(ex, 30);
                 }}
-                className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400"
                 aria-label="Add 30 seconds to rest timer"
               >
                 +30s
@@ -5113,7 +5113,7 @@ export default function Page() {
           {restTimer.totalSeconds > 0 && (
             <div className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-900">
               <div
-                className="h-full rounded-full bg-emerald-400 transition-all duration-300 ease-linear"
+                className="h-full rounded-full bg-yellow-400 text-black font-black transition-all duration-300 ease-linear"
                 style={{ width: `${restProgress}%` }}
               />
             </div>
@@ -5134,7 +5134,7 @@ export default function Page() {
             <div className="border-b border-zinc-800 px-5 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-emerald-400">
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-yellow-400 font-bold">
                     Substitute Exercise
                   </p>
                   <h3 id="substitute-dialog-title" className="mt-0.5 truncate text-lg font-black">
@@ -5144,7 +5144,7 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => setSubstituteModalExercise(null)}
-                  className="rounded-xl bg-zinc-900 p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-emerald-400"
+                  className="rounded-xl bg-zinc-900 p-2 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100 focus-visible:ring-2 focus-visible:ring-yellow-400"
                   aria-label="Close substitution modal"
                 >
                   <X size={20} />
@@ -5181,7 +5181,7 @@ export default function Page() {
                   onClick={() => setSubstituteFilter("movement")}
                   className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
                     substituteFilter === "movement"
-                      ? "bg-emerald-400 text-zinc-950"
+                      ? "bg-yellow-400 text-black font-black"
                       : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
                   }`}
                 >
@@ -5192,7 +5192,7 @@ export default function Page() {
                   onClick={() => setSubstituteFilter("group")}
                   className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
                     substituteFilter === "group"
-                      ? "bg-emerald-400 text-zinc-950"
+                      ? "bg-yellow-400 text-black font-black"
                       : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
                   }`}
                 >
@@ -5203,7 +5203,7 @@ export default function Page() {
                   onClick={() => setSubstituteFilter("all")}
                   className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold transition ${
                     substituteFilter === "all"
-                      ? "bg-emerald-400 text-zinc-950"
+                      ? "bg-yellow-400 text-black font-black"
                       : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
                   }`}
                 >
@@ -5230,7 +5230,7 @@ export default function Page() {
                   const isRelatedMovement = getRelatedMovements(substituteModalExercise.movement).includes(candidate.movement);
 
                   const tierStyles = {
-                    "S+": "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+                    "S+": "bg-yellow-500/20 text-yellow-300 border-yellow-500/30",
                     "S": "bg-teal-500/20 text-teal-300 border-teal-500/30",
                     "A+": "bg-blue-500/20 text-blue-300 border-blue-500/30",
                     "A": "bg-zinc-800 text-zinc-400 border-zinc-700",
@@ -5246,9 +5246,9 @@ export default function Page() {
                       }}
                       className={`flex w-full items-center justify-between gap-3 rounded-2xl border p-3.5 text-left transition ${
                         isSelected
-                          ? "border-emerald-500/50 bg-emerald-500/10 text-zinc-100"
+                          ? "border-yellow-400/50 bg-yellow-500/10 text-zinc-100"
                           : isRelatedMovement
-                            ? "border-emerald-500/25 bg-emerald-500/5 text-zinc-300 hover:border-emerald-500/40 hover:bg-zinc-900"
+                            ? "border-yellow-400/25 bg-yellow-500/5 text-zinc-300 hover:border-yellow-500/40 hover:bg-zinc-900"
                             : "border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-700 hover:bg-zinc-900"
                       }`}
                     >
@@ -5261,8 +5261,8 @@ export default function Page() {
                         </div>
                         <p className="mt-1 text-xs text-zinc-400">
                           {candidate.group} · {candidate.movement}
-                          {isRelatedMovement && <span className="ml-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-black text-emerald-300">Same Movement</span>}
-                          <span className={`ml-1.5 rounded-md border px-1.5 py-0.5 text-[10px] font-black ${focusPct >= 90 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : focusPct >= 70 ? "border-zinc-700 bg-zinc-900 text-zinc-300" : "border-amber-500/30 bg-amber-500/10 text-amber-300"}`}>
+                          {isRelatedMovement && <span className="ml-1.5 rounded-md border border-yellow-500/30 bg-yellow-400/15 px-1.5 py-0.5 text-[10px] font-black text-yellow-300">Same Movement</span>}
+                          <span className={`ml-1.5 rounded-md border px-1.5 py-0.5 text-[10px] font-black ${focusPct >= 90 ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-300" : focusPct >= 70 ? "border-zinc-700 bg-zinc-900 text-zinc-300" : "border-amber-500/30 bg-amber-500/10 text-amber-300"}`}>
                             {LOAD_LABELS[candidate.load]} · {focusPct}%
                           </span>
                         </p>
@@ -5272,11 +5272,11 @@ export default function Page() {
                       </div>
 
                       {isSelected ? (
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-400 text-zinc-950">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-yellow-400 text-black font-black">
                           <Check size={16} />
                         </span>
                       ) : (
-                        <span className="shrink-0 rounded-xl bg-zinc-800 px-2.5 py-1.5 text-xs font-bold text-zinc-300 hover:bg-emerald-400 hover:text-zinc-950 transition">
+                        <span className="shrink-0 rounded-xl bg-zinc-800 px-2.5 py-1.5 text-xs font-bold text-zinc-300 hover:bg-yellow-400 text-black font-black hover:text-zinc-950 transition">
                           Select
                         </span>
                       )}
@@ -5332,7 +5332,7 @@ export default function Page() {
             setMode("today");
             window.scrollTo({ top: 0, behavior: "smooth" });
           }}
-          className="fixed bottom-24 right-4 z-30 flex items-center gap-2 rounded-full bg-emerald-400 px-5 py-4 font-black text-zinc-950 shadow-2xl shadow-emerald-500/30 transition-all hover:scale-105 active:scale-95"
+          className="fixed bottom-24 right-4 z-30 flex items-center gap-2 rounded-full bg-yellow-400 text-black font-black px-5 py-4 font-black shadow-2xl shadow-yellow-500/40 transition-all hover:scale-105 active:scale-95"
           aria-label="Start today's workout"
         >
           <PlayCircle size={22} />
@@ -5343,11 +5343,11 @@ export default function Page() {
 
       {/* Migration Toast for upgraded users */}
       {showMigrationToast && migrationResult && (
-        <div className="fixed top-20 left-1/2 z-50 -translate-x-1/2 rounded-2xl border border-emerald-500/40 bg-zinc-950/95 px-4 py-3 shadow-2xl backdrop-blur-md max-w-sm animate-in fade-in slide-in-from-top duration-300">
+        <div className="fixed top-20 left-1/2 z-50 -translate-x-1/2 rounded-2xl border border-yellow-500/40 bg-zinc-950/95 px-4 py-3 shadow-2xl backdrop-blur-md max-w-sm animate-in fade-in slide-in-from-top duration-300">
           <div className="flex items-start gap-3">
             <span className="text-2xl">🎉</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-black text-emerald-300">นำเข้าข้อมูลเดิมสำเร็จ — Streak {migrationResult.weekStreak} สัปดาห์</p>
+              <p className="text-sm font-black text-yellow-300">นำเข้าข้อมูลเดิมสำเร็จ — Streak {migrationResult.weekStreak} สัปดาห์</p>
               <p className="mt-0.5 text-xs text-zinc-300">
                 ประเมินระดับ: {migrationResult.level === "advanced" ? "ขั้นสูง (Advanced)" : migrationResult.level === "intermediate" ? "ปานกลาง (Intermediate)" : "มือใหม่ (Beginner)"}
                 {migrationResult.estimatedBodyweightLbs ? ` · น้ำหนักตัว ~${migrationResult.estimatedBodyweightLbs} lbs` : ""}
@@ -5425,7 +5425,7 @@ export default function Page() {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-zinc-800/80 px-5 py-4">
               <div className="flex items-center gap-2">
-                <Trophy className="text-emerald-400" size={20} />
+                <Trophy className="text-yellow-400 font-bold" size={20} />
                 <h2 className="text-base sm:text-lg font-black text-white">Weekly Performance Breakdown</h2>
               </div>
               <button
@@ -5454,7 +5454,7 @@ export default function Page() {
 
                 <div className="space-y-2.5 text-xs">
                   <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
-                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <p className="font-bold text-yellow-400 font-bold flex items-center gap-1.5">
                       <span>🏋️ Strength (25%)</span>
                     </p>
                     <p className="mt-1 text-zinc-300 leading-relaxed">
@@ -5463,7 +5463,7 @@ export default function Page() {
                   </div>
 
                   <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
-                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <p className="font-bold text-yellow-400 font-bold flex items-center gap-1.5">
                       <span>📦 Volume (25%)</span>
                     </p>
                     <p className="mt-1 text-zinc-300 leading-relaxed">
@@ -5472,7 +5472,7 @@ export default function Page() {
                   </div>
 
                   <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
-                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <p className="font-bold text-yellow-400 font-bold flex items-center gap-1.5">
                       <span>📅 Consistency (20%)</span>
                     </p>
                     <p className="mt-1 text-zinc-300 leading-relaxed">
@@ -5481,7 +5481,7 @@ export default function Page() {
                   </div>
 
                   <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
-                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <p className="font-bold text-yellow-400 font-bold flex items-center gap-1.5">
                       <span>🎯 Completion (15%)</span>
                     </p>
                     <p className="mt-1 text-zinc-300 leading-relaxed">
@@ -5490,7 +5490,7 @@ export default function Page() {
                   </div>
 
                   <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
-                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <p className="font-bold text-yellow-400 font-bold flex items-center gap-1.5">
                       <span>😴 Recovery (10%)</span>
                     </p>
                     <p className="mt-1 text-zinc-300 leading-relaxed">
@@ -5499,7 +5499,7 @@ export default function Page() {
                   </div>
 
                   <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/70 p-3">
-                    <p className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <p className="font-bold text-yellow-400 font-bold flex items-center gap-1.5">
                       <span>🔥 Streak Bonus (5%)</span>
                     </p>
                     <p className="mt-1 text-zinc-300 leading-relaxed">
