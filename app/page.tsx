@@ -148,6 +148,20 @@ const WEEK_STREAK_KEY = "haitWeekStreak";
 const BODYWEIGHT_LOGS_KEY = "haitBodyweightLogsV1";
 const CURRENT_BODYWEIGHT_KEY = "haitCurrentBodyweightKg";
 const WEEKLY_SCORES_KEY = "haitWeeklyScoresV1";
+const CARDIO_LOGS_KEY = "haitCardioLogsV1";
+
+export type CardioLog = {
+  id: string;
+  date: string;
+  type: "treadmill" | "incline_walk" | "rower" | "bike" | "outdoor";
+  durationMin: number;
+  distanceKm?: number;
+  paceOrSpeed?: string; // e.g. "9.5 km/h" or "5:30 min/km"
+  inclinePercent?: number;
+  avgHr?: number;
+  rpe?: number;
+  notes?: string;
+};
 
 type BodyweightLog = {
   date: string;
@@ -2429,6 +2443,14 @@ export default function Page() {
   const [compactList, setCompactList] = useState(false);
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
   const [presetSetsMap, setPresetSetsMap] = useState<Record<string, number>>(() => readJson<Record<string, number>>(PRESET_SETS_KEY, {}));
+  const [cardioLogs, setCardioLogs] = useState<CardioLog[]>(() => readJson<CardioLog[]>(CARDIO_LOGS_KEY, []));
+
+  // Cardio Quick-Input State
+  const [cardioType, setCardioType] = useState<"treadmill" | "incline_walk" | "rower" | "bike" | "outdoor">("treadmill");
+  const [cardioDuration, setCardioDuration] = useState<string>("");
+  const [cardioDistance, setCardioDistance] = useState<string>("");
+  const [cardioPaceSpeed, setCardioPaceSpeed] = useState<string>("");
+  const [cardioSavedToast, setCardioSavedToast] = useState(false);
 
   // Stage 1 Unit Hierarchy State (haitMachineUnitsV1, haitExerciseUnitsV1, haitUserProfileV1)
   const [exerciseUnits, setExerciseUnits] = useState<Record<string, WeightUnit>>(() => getExerciseUnitsMap());
@@ -2681,10 +2703,42 @@ export default function Page() {
     if (bodyweightKg !== null) writeLocalJson(CURRENT_BODYWEIGHT_KEY, bodyweightKg);
   }, [bodyweightKg]);
   useEffect(() => writeLocalJson(BODYWEIGHT_LOGS_KEY, bodyweightLogs), [bodyweightLogs]);
+  useEffect(() => writeLocalJson(CARDIO_LOGS_KEY, cardioLogs), [cardioLogs]);
   useEffect(() => {
     const streak = getComputedStreak(logs);
     writeLocalJson(WEEK_STREAK_KEY, streak);
   }, [logs]);
+
+  function handleSaveCardio() {
+    const dur = parseFloat(cardioDuration);
+    if (!dur || dur <= 0) {
+      alert("กรุณากรอกเวลาอย่างน้อย 1 นาที");
+      return;
+    }
+
+    const dist = cardioDistance ? parseFloat(cardioDistance) : undefined;
+    const speedVal = cardioPaceSpeed.trim();
+
+    const newLog: CardioLog = {
+      id: makeId("cardio"),
+      date: new Date().toISOString(),
+      type: cardioType,
+      durationMin: dur,
+      distanceKm: dist && dist > 0 ? dist : undefined,
+      paceOrSpeed: speedVal ? speedVal : undefined,
+    };
+
+    setCardioLogs((prev) => [newLog, ...prev]);
+    setCardioDuration("");
+    setCardioDistance("");
+    setCardioPaceSpeed("");
+    setCardioSavedToast(true);
+    setTimeout(() => setCardioSavedToast(false), 3000);
+  }
+
+  function handleDeleteCardioLog(id: string) {
+    setCardioLogs((prev) => prev.filter((c) => c.id !== id));
+  }
 
   function updatePresetExerciseSets(exerciseId: string, newSets: number) {
     const safeSets = Math.max(1, Math.min(10, newSets));
@@ -3002,6 +3056,13 @@ export default function Page() {
 
   const activeMuscleSummary = loggedMuscleSummary.hasData ? loggedMuscleSummary : plannedMuscleSummary;
 
+  const filteredCardioLogs = useMemo(() => {
+    const sorted = [...cardioLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    if (historyRange === "14d") return sorted.filter((item) => isWithinLastDays(item.date, 14));
+    if (historyRange === "30d") return sorted.filter((item) => isWithinLastDays(item.date, 30));
+    return sorted;
+  }, [cardioLogs, historyRange]);
+
   const recentLogsByDate = useMemo(() => {
     return filteredHistoryLogs.reduce<Record<string, LogSet[]>>((acc, item) => {
       const key = new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric" }).format(new Date(item.date));
@@ -3010,6 +3071,23 @@ export default function Page() {
       return acc;
     }, {});
   }, [filteredHistoryLogs]);
+
+  const recentCardioLogsByDate = useMemo(() => {
+    return filteredCardioLogs.reduce<Record<string, CardioLog[]>>((acc, item) => {
+      const key = new Intl.DateTimeFormat("th-TH", { year: "numeric", month: "short", day: "numeric" }).format(new Date(item.date));
+      acc[key] = acc[key] ?? [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+  }, [filteredCardioLogs]);
+
+  // Combined sorted list of all unique dates with either lifting or cardio logs
+  const allHistoryDates = useMemo(() => {
+    const dateSet = new Set<string>();
+    Object.keys(recentLogsByDate).forEach((d) => dateSet.add(d));
+    Object.keys(recentCardioLogsByDate).forEach((d) => dateSet.add(d));
+    return Array.from(dateSet);
+  }, [recentLogsByDate, recentCardioLogsByDate]);
 
   const weeklyVolumeSummary = useMemo(() => getWeeklyVolumeSummary(activePlan), [activePlan]);
 
@@ -3822,54 +3900,118 @@ export default function Page() {
               </div>
             </div>
 
-            {filteredHistoryLogs.length === 0 ? (
+            {filteredHistoryLogs.length === 0 && filteredCardioLogs.length === 0 ? (
               <div className="rounded-2xl bg-zinc-950 p-4 text-sm text-zinc-400">
-                {logs.length === 0 ? "No workout log yet. Save working sets first." : "ไม่พบประวัติการฝึกในช่วงเวลาที่เลือก"}
+                {logs.length === 0 && cardioLogs.length === 0 ? "No workout log yet. Save working sets or cardio sessions first." : "ไม่พบประวัติการฝึกในช่วงเวลาที่เลือก"}
               </div>
             ) : (
               <div className="space-y-3 pr-1">
-                {Object.entries(recentLogsByDate).map(([date, items]) => (
-                  <div key={date} className="rounded-2xl bg-zinc-950 p-3">
-                    <h4 className="mb-3 text-sm font-black text-yellow-300">{date}</h4>
-                    <div className="space-y-2">
-                      {items.map((item, index) => (
-                        <div key={`${item.date}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-bold leading-tight flex items-center flex-wrap gap-1.5">
-                                <span>{item.exerciseName}</span>
-                                {item.machine && (
-                                  <span className="rounded-md bg-yellow-400/10 px-1.5 py-0.5 text-[10px] font-bold text-yellow-300 border border-yellow-500/20">
-                                    {item.machine}
-                                  </span>
-                                )}
-                              </p>
-                              <p className="mt-1 text-[11px] text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
+                {allHistoryDates.map((date) => {
+                  const liftItems = recentLogsByDate[date] || [];
+                  const cardioItems = recentCardioLogsByDate[date] || [];
+
+                  return (
+                    <div key={date} className="rounded-2xl bg-zinc-950 p-3">
+                      <h4 className="mb-3 text-sm font-black text-yellow-300">{date}</h4>
+                      <div className="space-y-2">
+                        {/* Cardio Sessions */}
+                        {cardioItems.map((c) => {
+                          const typeLabelMap: Record<string, string> = {
+                            treadmill: "Treadmill Run",
+                            incline_walk: "Incline Walk",
+                            rower: "Rower",
+                            bike: "Bike",
+                            outdoor: "Outdoor Run",
+                          };
+                          const label = typeLabelMap[c.type] || c.type;
+
+                          return (
+                            <div key={c.id} className="rounded-2xl border border-yellow-500/30 bg-zinc-900/90 p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="flex items-center flex-wrap gap-1.5">
+                                    <span className="rounded-md bg-yellow-400 text-black px-2 py-0.5 text-[10px] font-black uppercase tracking-wider shadow-sm">
+                                      ⚡ CARDIO
+                                    </span>
+                                    <span className="font-bold text-zinc-100">{label}</span>
+                                    {c.distanceKm !== undefined && (
+                                      <span className="rounded-md bg-yellow-400/10 px-1.5 py-0.5 text-[10px] font-bold text-yellow-300 border border-yellow-500/20 font-mono">
+                                        {c.distanceKm} km
+                                      </span>
+                                    )}
+                                    <span className="rounded-md bg-zinc-800 px-1.5 py-0.5 text-[10px] font-bold text-zinc-300 font-mono">
+                                      {c.durationMin} min
+                                    </span>
+                                  </div>
+                                  <p className="mt-1 text-[11px] text-zinc-500">
+                                    {formatShortDate(c.date)}
+                                    {c.paceOrSpeed ? ` · ${c.paceOrSpeed}` : ""}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="text-right">
+                                    <p className="whitespace-nowrap text-sm font-black text-yellow-300 font-mono">
+                                      {c.distanceKm ? `${c.distanceKm} km · ` : ""}{c.durationMin} min
+                                    </p>
+                                    {c.paceOrSpeed && (
+                                      <p className="text-[10px] text-zinc-400 font-mono">
+                                        {c.paceOrSpeed}
+                                      </p>
+                                    )}
+                                  </div>
+                                  <button
+                                    onClick={() => handleDeleteCardioLog(c.id)}
+                                    className="p-1 text-zinc-600 hover:text-red-400 transition"
+                                    title="Delete cardio log"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-right">
-                              <p className="whitespace-nowrap text-sm font-black text-yellow-300">
-                                {item.rawValue !== undefined && item.unit
-                                  ? `${item.rawValue} ${item.unit}`
-                                  : `${Math.round(item.weightLbs * 10) / 10} lbs`}
-                                {" × "}{item.reps}
-                              </p>
-                              {item.unit === "kg" && item.rawValue !== undefined && (
-                                <p className="text-[10px] text-zinc-500">
-                                  ≈ {Math.round(item.weightLbs * 10) / 10} lbs
+                          );
+                        })}
+
+                        {/* Lifting Sets */}
+                        {liftItems.map((item, index) => (
+                          <div key={`${item.date}-${index}`} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="font-bold leading-tight flex items-center flex-wrap gap-1.5">
+                                  <span>{item.exerciseName}</span>
+                                  {item.machine && (
+                                    <span className="rounded-md bg-yellow-400/10 px-1.5 py-0.5 text-[10px] font-bold text-yellow-300 border border-yellow-500/20">
+                                      {item.machine}
+                                    </span>
+                                  )}
                                 </p>
-                              )}
-                              {item.unit === "lbs" && item.rawValue !== undefined && (
-                                <p className="text-[10px] text-zinc-500">
-                                  ≈ {Math.round(item.weightLbs * 0.453592 * 10) / 10} kg
+                                <p className="mt-1 text-[11px] text-zinc-500">{formatShortDate(item.date)} · Set {item.setNumber}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="whitespace-nowrap text-sm font-black text-yellow-300">
+                                  {item.rawValue !== undefined && item.unit
+                                    ? `${item.rawValue} ${item.unit}`
+                                    : `${Math.round(item.weightLbs * 10) / 10} lbs`}
+                                  {" × "}{item.reps}
                                 </p>
-                              )}
+                                {item.unit === "kg" && item.rawValue !== undefined && (
+                                  <p className="text-[10px] text-zinc-500">
+                                    ≈ {Math.round(item.weightLbs * 10) / 10} lbs
+                                  </p>
+                                )}
+                                {item.unit === "lbs" && item.rawValue !== undefined && (
+                                  <p className="text-[10px] text-zinc-500">
+                                    ≈ {Math.round(item.weightLbs * 0.453592 * 10) / 10} kg
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -5061,6 +5203,106 @@ export default function Page() {
                   </article>
                 );
               })}
+            </div>
+
+            {/* Cardio & Conditioning Quick-Log Card (HYROX / Zone 2 Theme) */}
+            <div className="rounded-3xl bg-zinc-950 border border-zinc-800/80 p-4 shadow-2xl mt-4">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Activity size={18} className="text-yellow-400" />
+                  <h3 className="text-sm font-black uppercase tracking-wider text-yellow-400">
+                    ⚡ CARDIO & CONDITIONING (HYROX / ZONE 2)
+                  </h3>
+                </div>
+                {cardioSavedToast && (
+                  <span className="text-[11px] font-bold text-yellow-300 animate-pulse">
+                    ✓ บันทึกสำเร็จ!
+                  </span>
+                )}
+              </div>
+
+              {/* Activity Selector Pills */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {[
+                  { id: "treadmill", label: "Treadmill Run" },
+                  { id: "incline_walk", label: "Incline Walk" },
+                  { id: "rower", label: "Rower" },
+                  { id: "bike", label: "Bike" },
+                  { id: "outdoor", label: "Outdoor" },
+                ].map((act) => {
+                  const isActive = cardioType === act.id;
+                  return (
+                    <button
+                      key={act.id}
+                      type="button"
+                      onClick={() => setCardioType(act.id as typeof cardioType)}
+                      className={`text-xs px-3 py-1.5 rounded-lg transition ${
+                        isActive
+                          ? "bg-yellow-400 text-black font-black uppercase shadow-md shadow-yellow-500/20"
+                          : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 font-bold"
+                      }`}
+                    >
+                      {act.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 3 Metric Input Cells (Dark Carbon styling with tabular-nums) */}
+              <div className="grid grid-cols-3 gap-2 mb-2">
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-2.5">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
+                    เวลา (MIN)
+                  </span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="30"
+                    value={cardioDuration}
+                    onChange={(e) => setCardioDuration(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 text-center text-sm font-black text-yellow-300 tabular-nums font-mono focus:border-yellow-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-2.5">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
+                    ระยะทาง (KM)
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="4.50"
+                    value={cardioDistance}
+                    onChange={(e) => setCardioDistance(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 text-center text-sm font-black text-yellow-300 tabular-nums font-mono focus:border-yellow-400 focus:outline-none"
+                  />
+                </div>
+
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-2.5">
+                  <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
+                    KM/H / INC%
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="8.5"
+                    value={cardioPaceSpeed}
+                    onChange={(e) => setCardioPaceSpeed(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 text-center text-sm font-black text-yellow-300 tabular-nums font-mono focus:border-yellow-400 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <button
+                type="button"
+                onClick={handleSaveCardio}
+                className="bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase tracking-wider py-3 rounded-xl w-full mt-2 transition active:scale-95 shadow-md shadow-yellow-500/20 text-xs flex items-center justify-center gap-1.5"
+              >
+                <span>+ บันทึกเซสชันคาร์ดิโอ</span>
+              </button>
             </div>
           </>
         )}
