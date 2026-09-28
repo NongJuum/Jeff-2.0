@@ -4807,8 +4807,8 @@ export default function Page() {
                     <ExerciseMusclePreviewCard exercise={exercise} />
 
                     {/* [Order 3] Compact Machine Dropdown Selector */}
-                    <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0 w-full">
-                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+                    <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 space-y-2 w-full">
+                      <div className="flex items-center gap-2 min-w-0 w-full">
                         <Dumbbell className="text-yellow-400 shrink-0" size={14} />
                         <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">เครื่อง:</span>
 
@@ -4831,7 +4831,7 @@ export default function Page() {
                               <select
                                 value={currentMachine || ""}
                                 onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
-                                className="w-full min-w-0 appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
+                                className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-8 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
                               >
                                 <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[getLoadType(exercise)]})</option>
                                 {contextualMachineOptions.map((tag) => (
@@ -4845,17 +4845,17 @@ export default function Page() {
                               </select>
                             );
                           })()}
-                          <ChevronDown className="pointer-events-none absolute right-2 top-2.5 text-zinc-400" size={14} />
+                          <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 text-zinc-400" size={14} />
                         </div>
                       </div>
 
-                      {/* Actions: Favorite ⭐, Unit Toggle ⚙️, and Clear */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        {currentMachine && (
+                      {/* Auxiliary Controls (Star ⭐, Unit ⚙️, Reset) in clean compact sub-bar */}
+                      {currentMachine && (
+                        <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-zinc-900">
                           <button
                             type="button"
                             onClick={() => toggleFavoriteMachine(exercise.name, currentMachine)}
-                            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-bold transition border ${
+                            className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition border ${
                               isFavoriteMachine
                                 ? "border-amber-400/40 bg-amber-400/20 text-amber-300"
                                 : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200"
@@ -4863,11 +4863,9 @@ export default function Page() {
                             title={isFavoriteMachine ? "ลบเครื่องโปรด" : "ตั้งเป็นเครื่องประจำ"}
                           >
                             <Star size={11} className={isFavoriteMachine ? "fill-amber-400 text-amber-400" : ""} />
-                            <span className="hidden sm:inline">{isFavoriteMachine ? "โปรด" : "ตั้งโปรด"}</span>
+                            <span>{isFavoriteMachine ? "เครื่องโปรด ⭐" : "ตั้งเป็นเครื่องประจำ"}</span>
                           </button>
-                        )}
-                        
-                        {currentMachine && (
+
                           <button
                             type="button"
                             onClick={() => {
@@ -4876,24 +4874,22 @@ export default function Page() {
                               saveMachineUnit(currentMachine, nextU);
                               setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
                             }}
-                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-[10px] font-black text-yellow-300 hover:border-yellow-400 transition"
+                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-black text-yellow-300 hover:border-yellow-400 transition"
                             title="สลับหน่วยเฉพาะเครื่องนี้"
                           >
-                            ⚙️ <span className="hidden sm:inline">{machineUnits[currentMachine] || globalWeightUnit}</span>
+                            ⚙️ หน่วย: {machineUnits[currentMachine] || globalWeightUnit}
                           </button>
-                        )}
 
-                        {currentMachine && (
                           <button
                             type="button"
                             onClick={() => updateMachineTag(baseExercise.id, "")}
-                            className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1"
+                            className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 py-0.5"
                             title="รีเซ็ตเครื่องเป็นค่าเริ่มต้น"
                           >
                             รีเซ็ต
                           </button>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* [Order 4] SMART WARMUP STRIP */}
