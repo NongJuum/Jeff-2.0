@@ -4701,35 +4701,29 @@ export default function Page() {
                       onClick={() => toggleExerciseAccordion(baseExercise.id)}
                       className="cursor-pointer p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-[#161619] transition select-none"
                     >
-                      {/* Left: Movement Icon Badge + Exercise Name + Completed Sets Badge */}
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className="w-10 h-10 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center shrink-0 text-yellow-400 font-black text-sm">
-                          {exercise.group.slice(0, 2).toUpperCase()}
+                      {/* Left: Exercise Number + Name + Completed Sets Badge */}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[11px] font-mono font-bold text-zinc-500">#{index + 1}</span>
+                          <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white font-mono break-words leading-snug">
+                            {exercise.name}
+                          </h3>
                         </div>
-
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-mono font-bold text-zinc-500">#{index + 1}</span>
-                            <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white font-mono truncate">
-                              {exercise.name}
-                            </h3>
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold font-mono ${
-                              completedSetsCount === effectiveSets
-                                ? "bg-yellow-400 text-black font-black shadow-[0_0_8px_rgba(250,204,21,0.4)]"
-                                : completedSetsCount > 0
-                                ? "bg-yellow-400/20 text-yellow-300 border border-yellow-500/30"
-                                : "bg-zinc-800/80 text-zinc-400"
-                            }`}>
-                              <span>{effectiveSets} Sets</span>
-                              <span>·</span>
-                              <span>{completedSetsCount}/{effectiveSets}</span>
-                            </span>
-                            <span className="text-[11px] text-zinc-500 hidden sm:inline truncate">
-                              {LOAD_LABELS[getLoadType(exercise)]}
-                            </span>
-                          </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold font-mono ${
+                            completedSetsCount === effectiveSets
+                              ? "bg-yellow-400 text-black font-black shadow-[0_0_8px_rgba(250,204,21,0.4)]"
+                              : completedSetsCount > 0
+                              ? "bg-yellow-400/20 text-yellow-300 border border-yellow-500/30"
+                              : "bg-zinc-800/80 text-zinc-400"
+                          }`}>
+                            <span>{effectiveSets} Sets</span>
+                            <span>·</span>
+                            <span>{completedSetsCount}/{effectiveSets}</span>
+                          </span>
+                          <span className="text-[11px] text-zinc-500 hidden sm:inline">
+                            {LOAD_LABELS[getLoadType(exercise)]}
+                          </span>
                         </div>
                       </div>
 
@@ -4799,14 +4793,11 @@ export default function Page() {
                           </div>
 
                           {strengthTierInfo && (
-                            <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <div className="mt-2 flex items-center">
                               <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-xs font-black tabular-nums uppercase ${strengthTierInfo.badgeClass}`}>
                                 <span>{strengthTierInfo.label}</span>
                                 <span className="opacity-60">·</span>
                                 <span>{strengthTierInfo.ratio.toFixed(2)}× BW</span>
-                              </span>
-                              <span className="text-[11px] font-medium text-zinc-400 truncate">
-                                {strengthTierInfo.gapMessage}
                               </span>
                             </div>
                           )}
@@ -4816,7 +4807,7 @@ export default function Page() {
                     <ExerciseMusclePreviewCard exercise={exercise} />
 
                     {/* [Order 3] Compact Machine Dropdown Selector */}
-                    <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 flex items-center justify-between gap-1.5 sm:gap-2 min-w-0 w-full">
+                    <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0 w-full">
                       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
                         <Dumbbell className="text-yellow-400 shrink-0" size={14} />
                         <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">เครื่อง:</span>
@@ -4840,7 +4831,7 @@ export default function Page() {
                               <select
                                 value={currentMachine || ""}
                                 onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
-                                className="w-full min-w-0 truncate appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
+                                className="w-full min-w-0 appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-7 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
                               >
                                 <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[getLoadType(exercise)]})</option>
                                 {contextualMachineOptions.map((tag) => (
@@ -4908,26 +4899,21 @@ export default function Page() {
                     {/* [Order 4] SMART WARMUP STRIP */}
                     {warmupInfo && (
                       <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950 p-2.5 w-full">
-                        <div className="flex items-center justify-between text-xs mb-1.5">
-                          <span className="font-bold flex items-center gap-1.5 text-zinc-200">
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-bold flex items-center gap-1.5 text-zinc-300">
                             {warmupInfo.type === "full" && <span className="text-yellow-400">⚡</span>}
                             {warmupInfo.type === "acclimation" && <span className="text-yellow-400">🔥</span>}
                             {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
                             {warmupInfo.headline}
                           </span>
-                          <span className="text-[10px] text-zinc-400">{warmupInfo.note}</span>
                         </div>
 
                         {warmupInfo.steps.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-2 w-full">
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 w-full">
                             {warmupInfo.steps.map((st, sIdx) => (
                               <div
                                 key={sIdx}
-                                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold border ${
-                                  warmupInfo.type === "full"
-                                    ? "border-yellow-500/50 bg-yellow-950/40 text-yellow-200"
-                                    : "border-yellow-500/50 bg-yellow-950/40 text-yellow-200"
-                                }`}
+                                className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold border border-yellow-500/40 bg-yellow-950/30 text-yellow-300"
                               >
                                 <span>{st.label}:</span>
                                 <span className="font-black text-white">{st.weight} {effectiveUnit}</span>
@@ -4970,8 +4956,8 @@ export default function Page() {
                         </div>
                       </div>
 
-                      <div className="mb-2 grid grid-cols-[36px_1fr_1fr_44px] gap-2 items-center text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 px-1">
-                        <span className="text-center">SET</span>
+                      <div className="mb-2 grid grid-cols-[28px_1fr_1fr_40px] gap-1.5 sm:gap-2 items-center text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 px-1">
+                        <span className="w-7 text-center font-mono font-bold text-xs text-zinc-400">SET</span>
                         <div className="flex items-center justify-center gap-1">
                           <span>WEIGHT ({effectiveUnit.toUpperCase()})</span>
                           <button
@@ -5006,28 +4992,25 @@ export default function Page() {
 
                           return (
                             <div key={setIndex} className="rounded-2xl bg-[#141416] p-2 hover:bg-[#18181c] transition">
-                              {/* Benchmark Note */}
+                              {/* Compact Benchmark Note */}
                               {latestSet && (
-                                <div className="mb-1 flex items-center justify-between text-[10px] px-1">
-                                  <span className="text-zinc-500 font-mono">Set #{setIndex + 1}</span>
-                                  <span className="font-mono text-yellow-400/90 bg-yellow-950/30 px-1.5 py-0.5 rounded border border-yellow-800/30">
-                                    ครั้งก่อน: {latestSet.rawValue ?? latestSet.weightLbs} {latestSet.unit || "lbs"} × {latestSet.reps} reps
-                                  </span>
-                                </div>
+                                <p className="text-[10px] text-zinc-500 font-mono truncate px-1 mb-0.5">
+                                  ครั้งก่อน: <span className="text-yellow-400/90 font-bold">{latestSet.rawValue ?? latestSet.weightLbs} {latestSet.unit || "lbs"} × {latestSet.reps} reps</span>
+                                </p>
                               )}
 
-                              <div className="grid grid-cols-[36px_1fr_1fr_44px] gap-2 items-center">
+                              <div className="grid grid-cols-[28px_1fr_1fr_40px] gap-1.5 sm:gap-2 items-center">
                                 {/* Set Number */}
-                                <div className="flex items-center justify-center font-mono font-black text-sm text-zinc-400">
+                                <div className="w-7 text-center font-mono font-bold text-xs text-zinc-400">
                                   {String(setIndex + 1).padStart(2, '0')}
                                 </div>
 
                                 {/* Weight Input Box */}
-                                <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 py-1 focus-within:border-yellow-400 focus-within:ring-1 focus-within:ring-yellow-400 transition min-w-0 min-h-[44px]">
+                                <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="min-h-[44px] min-w-[40px] flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 font-black text-xl shrink-0 select-none"
+                                    className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
                                   >−</button>
                                   <input
                                     id={`weight-input-${baseExercise.id}-${setIndex}`}
@@ -5035,22 +5018,22 @@ export default function Page() {
                                     value={set.weightLbs}
                                     onChange={(e) => updateSet(baseExercise.id, setIndex, "weightLbs", e.target.value, effectiveSets)}
                                     onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs", currentMachine)}
-                                    className="w-full text-center font-mono font-black text-lg text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
+                                    className="w-full text-center font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
                                     placeholder={String(effectivePlaceholderWeight || 0)}
                                   />
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="min-h-[44px] min-w-[40px] flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 font-black text-xl shrink-0 select-none"
+                                    className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
                                   >+</button>
                                 </div>
 
                                 {/* Reps Input Box */}
-                                <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 py-1 focus-within:border-yellow-400 focus-within:ring-1 focus-within:ring-yellow-400 transition min-w-0 min-h-[44px]">
+                                <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
-                                    className="min-h-[44px] min-w-[40px] flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 font-black text-xl shrink-0 select-none"
+                                    className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
                                   >−</button>
                                   <input
                                     id={`rep-input-${baseExercise.id}-${setIndex}`}
@@ -5058,13 +5041,13 @@ export default function Page() {
                                     value={set.reps}
                                     onChange={(e) => updateSet(baseExercise.id, setIndex, "reps", e.target.value, effectiveSets)}
                                     onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps", currentMachine)}
-                                    className="w-full text-center font-mono font-black text-lg text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
+                                    className="w-full text-center font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
                                     placeholder={latestSet ? String(latestSet.reps) : "0"}
                                   />
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
-                                    className="min-h-[44px] min-w-[40px] flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 font-black text-xl shrink-0 select-none"
+                                    className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
                                   >+</button>
                                 </div>
 
@@ -5072,7 +5055,7 @@ export default function Page() {
                                 <button
                                   type="button"
                                   onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
-                                  className={`min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center transition active:scale-90 border ${
+                                  className={`w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center shrink-0 transition active:scale-90 border ${
                                     set.done
                                       ? "bg-yellow-400 border-yellow-300 text-black shadow-[0_0_12px_rgba(250,204,21,0.4)]"
                                       : "bg-zinc-900/60 border-zinc-800 text-zinc-500 hover:border-yellow-400 hover:text-yellow-400"
@@ -5088,9 +5071,9 @@ export default function Page() {
                       <button
                         onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
                         aria-label="Finish working sets and clear inputs"
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase tracking-widest py-3.5 shadow-lg shadow-yellow-500/20 active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-yellow-400 min-h-[44px]"
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase tracking-widest h-10 py-2 text-xs shadow-lg shadow-yellow-500/20 active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-yellow-400"
                       >
-                        <Save size={18} /> Finish & clear
+                        <Save size={16} /> Finish & clear
                       </button>
 
                       {/* RPE Quick Feedback Strip */}
@@ -5420,16 +5403,18 @@ export default function Page() {
                     {compactList && (
                       <div className="mt-3 grid grid-cols-2 gap-2">
                         <button
+                          type="button"
                           onClick={() => setActiveExerciseIndex(Math.max(0, activeExerciseIndex - 1))}
-                          className="rounded-xl bg-zinc-950 px-4 py-3 text-sm font-medium text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-yellow-400"
+                          className="rounded-xl bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-xs font-bold text-zinc-300 disabled:opacity-30 transition hover:bg-zinc-800 hover:text-white focus-visible:ring-2 focus-visible:ring-yellow-400 active:scale-95"
                           disabled={activeExerciseIndex === 0}
                           aria-label="Go to previous exercise"
                         >
                           Previous
                         </button>
                         <button
+                          type="button"
                           onClick={() => setActiveExerciseIndex(Math.min(day.exercises.length - 1, activeExerciseIndex + 1))}
-                          className="rounded-xl bg-zinc-50 px-4 py-3 text-sm font-medium text-zinc-950 disabled:opacity-40 transition hover:bg-zinc-200 focus-visible:ring-2 focus-visible:ring-yellow-400"
+                          className="rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-4 py-2.5 text-xs font-black uppercase tracking-wider disabled:opacity-30 transition shadow-md shadow-yellow-500/20 focus-visible:ring-2 focus-visible:ring-yellow-400 active:scale-95"
                           disabled={activeExerciseIndex >= day.exercises.length - 1}
                           aria-label="Go to next exercise"
                         >
