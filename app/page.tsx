@@ -3966,38 +3966,117 @@ export default function Page() {
           <h2 className="mt-1 text-lg font-black">{pageMeta.title}</h2>
 
           {["today", "preset", "custom"].includes(mode) && (
-            <div className="mt-2.5 flex items-center gap-1.5 rounded-xl bg-zinc-950 p-1">
-              {[
-                { id: "today", label: "Today Workout" },
-                { id: "preset", label: "Preset Plan" },
-                { id: "custom", label: "Custom Builder" },
-              ].map((tab) => (
+            <div className="mt-2.5 flex items-center justify-between gap-2 flex-wrap">
+              {/* Left: Compact Split / Plan Selector Pill & Mode Menu */}
+              <div className="flex items-center gap-1.5">
                 <button
-                  key={tab.id}
-                  onClick={() => setMode(tab.id as AppMode)}
-                  className={`flex-1 rounded-lg py-1.5 text-xs transition ${
-                    mode === tab.id
-                      ? "bg-yellow-400 text-black font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.3)]"
-                      : "text-zinc-400 hover:text-zinc-200 font-bold"
-                  }`}
+                  type="button"
+                  onClick={() => setShowSetupDrawer((prev) => !prev)}
+                  className="h-8 px-2.5 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-yellow-500/40 text-xs font-bold text-zinc-200 transition flex items-center gap-1.5 active:scale-95 shadow-sm"
+                  title="สลับโปรแกรมหรือปรับแต่งจำนวนวัน"
                 >
-                  {tab.label}
+                  <SlidersHorizontal size={13} className="text-yellow-400" />
+                  <span>
+                    {mode === "custom"
+                      ? `${selectedCustomPlan?.name || "Custom"} ▾`
+                      : `${days} Days Split ▾`}
+                  </span>
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => setShowSetupDrawer((prev) => !prev)}
-                className={`rounded-lg px-2.5 py-1.5 text-xs transition border flex items-center gap-1 shrink-0 ${
-                  showSetupDrawer
-                    ? "bg-zinc-800 text-yellow-400 border-yellow-500/40"
-                    : "bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200"
-                }`}
-                title="ตั้งค่าโปรแกรมและจำนวนวัน"
-                aria-label="Toggle setup controls"
-              >
-                <SlidersHorizontal size={13} />
-                <span className="hidden sm:inline font-bold">ตั้งค่า</span>
-              </button>
+
+                {/* Compact Mode Pill (Preset vs Custom) */}
+                <div className="flex items-center bg-zinc-950 p-0.5 rounded-xl border border-zinc-800 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setMode("today")}
+                    className={`h-7 px-2.5 rounded-lg transition ${
+                      mode === "today"
+                        ? "bg-yellow-400 text-black font-black shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("preset")}
+                    className={`h-7 px-2.5 rounded-lg transition ${
+                      mode === "preset"
+                        ? "bg-yellow-400 text-black font-black shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    Preset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("custom")}
+                    className={`h-7 px-2.5 rounded-lg transition ${
+                      mode === "custom"
+                        ? "bg-yellow-400 text-black font-black shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    Custom
+                  </button>
+                </div>
+              </div>
+
+              {/* Right: Sleek iOS-style Segmented Lifting vs Cardio Toggle Pill */}
+              {day && (
+                <div className="flex items-center h-8 p-0.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setSessionStage("lifting")}
+                    className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition ${
+                      sessionStage === "lifting"
+                        ? "bg-yellow-400 text-black font-black shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <Dumbbell size={13} />
+                    <span>เวท ({day.exercises.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSessionStage("cardio")}
+                    className={`h-7 px-3 rounded-lg flex items-center gap-1.5 transition ${
+                      sessionStage === "cardio"
+                        ? "bg-yellow-400 text-black font-black shadow-sm"
+                        : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    <Activity size={13} />
+                    <span>คาร์ดิโอ</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sleek Day Switcher Pill Strip */}
+          {["today", "preset", "custom"].includes(mode) && (
+            <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto py-1 no-scrollbar [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {activePlan.map((item, index) => {
+                const isActive = activeDayIndex === index;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      if (isPresetLike) setSelectedDay(index);
+                      else setSelectedCustomDay(index);
+                      setActiveExerciseIndex(0);
+                    }}
+                    className={`h-8 shrink-0 rounded-lg px-3.5 text-xs font-bold transition flex items-center gap-1.5 ${
+                      isActive
+                        ? "bg-yellow-400 text-black font-black shadow-sm"
+                        : "bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-zinc-200"
+                    }`}
+                  >
+                    <CalendarDays size={13} className={isActive ? "text-black" : "text-zinc-400"} />
+                    <span>{item.title}</span>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -4140,25 +4219,96 @@ export default function Page() {
                 <button
                   type="button"
                   onClick={() => setShowProfileModal(true)}
-                  className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-2 text-zinc-400 hover:text-yellow-400 transition shrink-0"
+                  className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-2.5 text-zinc-400 hover:text-yellow-400 transition shrink-0"
                   title="เปิดการตั้งค่าโปรไฟล์"
                 >
                   <User size={18} />
                 </button>
               </div>
-
-              {/* Primary Call to Action Button */}
-              <div className="mt-4 pt-3 border-t border-zinc-800/60">
-                <button
-                  type="button"
-                  onClick={() => setMode("today")}
-                  className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black py-3.5 px-4 font-black uppercase tracking-wider text-sm shadow-[0_0_25px_rgba(250,204,21,0.35)] transition active:scale-[0.98]"
-                >
-                  <Play size={16} className="fill-black" />
-                  <span>▶ เริ่มฝึกซ้อมวันนี้: {day ? day.title : "Day 1"} (Start Workout)</span>
-                </button>
-              </div>
             </div>
+
+            {/* B. "Today's Workout" Visual Hero Card with Integrated 3D Anatomy Figure */}
+            {day && (
+              <div className="rounded-3xl border border-yellow-500/30 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  {/* Left: Program focus, muscles, and estimated time */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-1 text-xs font-black text-yellow-300 uppercase tracking-wider">
+                        <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse shadow-[0_0_8px_#FFE500]" />
+                        <span>TODAY'S WORKOUT</span>
+                      </span>
+                      <span className="text-[11px] font-mono text-zinc-400 font-bold">
+                        {day.exercises.length} ท่า · ประมาณ 45-60 นาที
+                      </span>
+                    </div>
+
+                    <h3 className="mt-2 text-xl sm:text-2xl font-black text-white tracking-tight">
+                      วันนี้เล่น: <span className="text-yellow-300">{day.title}</span>
+                    </h3>
+                    <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{day.subtitle}</p>
+
+                    {/* Target Muscle Badges */}
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      {day.focus.map((focusGroup, idx) => (
+                        <span
+                          key={focusGroup}
+                          className="inline-flex items-center gap-1 rounded-lg border border-yellow-500/20 bg-zinc-900/90 px-2.5 py-1 text-xs font-bold text-yellow-300"
+                        >
+                          <span className={idx === 0 ? "text-yellow-400" : "text-purple-400"}>●</span>
+                          <span>{focusGroup}</span>
+                        </span>
+                      ))}
+                      {activeMuscleSummary.primary.slice(0, 3).map((r) => (
+                        <span
+                          key={r}
+                          className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-0.5 text-[11px] font-mono text-zinc-400"
+                        >
+                          {MUSCLE_REGION_LABELS[r]}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Direct CTA Button */}
+                    <div className="mt-4 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode("today");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black py-3 px-6 font-black uppercase tracking-wider text-sm shadow-[0_0_25px_rgba(250,204,21,0.4)] transition active:scale-[0.98]"
+                      >
+                        <Play size={16} className="fill-black stroke-[2.5]" />
+                        <span>▶ เริ่มเวิร์กเอาต์วันนี้</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right: Integrated 3D Anatomical Muscle Figure with Volt Yellow & Purple highlights */}
+                  <div className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/70 p-2.5 shrink-0 self-center sm:self-auto shadow-inner">
+                    <div className="text-center">
+                      <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-1">Front</p>
+                      <RealisticAnatomyFigure
+                        side="front"
+                        primary={activeMuscleSummary.primary}
+                        secondary={activeMuscleSummary.secondary}
+                        compact
+                      />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-1">Back</p>
+                      <RealisticAnatomyFigure
+                        side="back"
+                        primary={activeMuscleSummary.primary}
+                        secondary={activeMuscleSummary.secondary}
+                        compact
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* B. Performance Overview with Apple-Style Activity Ring */}
             <div>
@@ -4480,22 +4630,6 @@ export default function Page() {
           </details>
         )}
 
-        {(mode === "today" || mode === "preset" || mode === "custom") && (
-          <div className="mt-3 flex snap-x gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {activePlan.map((item, index) => (
-              <button key={item.id} onClick={() => {
-                if (isPresetLike) setSelectedDay(index);
-                else setSelectedCustomDay(index);
-                setActiveExerciseIndex(0);
-              }} className={`min-w-[136px] snap-start rounded-xl px-3 py-2.5 text-left transition ${activeDayIndex === index ? "bg-yellow-400 text-black font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.3)]" : "bg-zinc-900 text-zinc-300"}`}>
-                <CalendarDays size={16} />
-                <p className="mt-1 line-clamp-2 text-sm font-bold leading-5">{item.title}</p>
-                <p className="mt-1 hidden text-[11px] opacity-70 sm:block">{item.subtitle}</p>
-              </button>
-            ))}
-          </div>
-        )}
-
         {(mode === "today" || mode === "preset" || mode === "custom") && day && (
           <>
             <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
@@ -4574,34 +4708,6 @@ export default function Page() {
                   </button>
                 </div>
               </div>
-            </div>
-
-            {/* Progressive Session Flow Step Switcher: 1. Resistance Training vs 2. Cardio & Cooldown */}
-            <div className="mt-3 flex rounded-xl bg-zinc-950 p-1 border border-zinc-800/80">
-              <button
-                type="button"
-                onClick={() => setSessionStage("lifting")}
-                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-black uppercase tracking-wider transition ${
-                  sessionStage === "lifting"
-                    ? "bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.3)]"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                <Dumbbell size={15} />
-                <span>1. เวทเทรนนิ่ง ({day.exercises.length} ท่า)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setSessionStage("cardio")}
-                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-black uppercase tracking-wider transition ${
-                  sessionStage === "cardio"
-                    ? "bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.3)]"
-                    : "text-zinc-400 hover:text-zinc-200"
-                }`}
-              >
-                <Activity size={15} />
-                <span>2. คาร์ดิโอ & คูลดาวน์</span>
-              </button>
             </div>
 
             {/* Dynamic Exercise Queue & Reordering Carousel (Rendered when in lifting stage) */}
@@ -5926,8 +6032,8 @@ export default function Page() {
         />
       )}
 
-      {/* Floating Action Button - Start Today */}
-      {mode !== "today" && day && (
+      {/* Floating Action Button - Start Today (Hidden on dashboard & today to avoid duplicate actions) */}
+      {!["today", "dashboard"].includes(mode) && day && (
         <button
           type="button"
           onClick={() => {

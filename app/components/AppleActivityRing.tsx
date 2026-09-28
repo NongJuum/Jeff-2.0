@@ -98,10 +98,10 @@ export function AppleActivityRing({
 
               {/* Center Score Label */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="font-mono text-2xl font-black tracking-tight text-white leading-none">
+                <span className="font-mono text-3xl font-black tracking-tight text-white leading-none">
                   {score > 0 ? score : "—"}
                 </span>
-                <span className="text-[10px] font-mono font-bold text-zinc-500 leading-none mt-0.5">
+                <span className="text-[10px] font-mono font-bold text-zinc-500 leading-none mt-1">
                   /100
                 </span>
               </div>
@@ -120,9 +120,11 @@ export function AppleActivityRing({
                 )}
               </div>
 
-              <p className="mt-0.5 text-xs font-medium text-zinc-300">
-                Rank: <span className="font-bold text-white uppercase">{rank}</span>
-              </p>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="rounded-md bg-yellow-400/10 border border-yellow-500/30 px-2 py-0.5 text-xs font-black text-yellow-300">
+                  🏆 Rank: {rank}
+                </span>
+              </div>
 
               {/* Compact Delta Badge */}
               <div className="mt-1.5 flex items-center gap-1.5">
@@ -159,9 +161,9 @@ export function AppleActivityRing({
               <button
                 type="button"
                 onClick={onOpenScoreDetails}
-                className="text-[10px] text-yellow-400 hover:underline font-bold"
+                className="text-[11px] font-bold text-yellow-400 hover:text-yellow-300 hover:underline transition flex items-center gap-0.5"
               >
-                เกณฑ์คะแนน
+                <span>รายละเอียดเกณฑ์คะแนน ↗</span>
               </button>
             )}
           </div>
