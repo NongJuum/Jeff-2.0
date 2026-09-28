@@ -45,6 +45,7 @@ import { ProgressPhotos } from "./components/ProgressPhotos";
 import { runMigration, hasMigrated, getMigrationResult, type MigrationResult } from "./lib/migration";
 import { WeeklyTrendChart, type WeeklyScore } from "./components/WeeklyTrendChart";
 import { AppleActivityRing } from "./components/AppleActivityRing";
+import { CardioController } from "./components/CardioController";
 import { BodyweightManager, getCurrentBodyweight, type BodyweightEntry } from "./components/BodyweightManager";
 import { NotificationSettings } from "./components/NotificationSettings";
 import { startNotificationScheduler } from "./lib/notifications";
@@ -2795,31 +2796,28 @@ export default function Page() {
     writeLocalJson(WEEK_STREAK_KEY, streak);
   }, [logs]);
 
-  function handleSaveCardio() {
-    const dur = parseFloat(cardioDuration);
-    if (!dur || dur <= 0) {
-      alert("กรุณากรอกเวลาอย่างน้อย 1 นาที");
-      return;
-    }
-
-    const dist = cardioDistance ? parseFloat(cardioDistance) : undefined;
-    const speedVal = cardioPaceSpeed.trim();
-
+  function handleSaveCardioLog(data: {
+    type: "treadmill" | "incline_walk" | "rower" | "bike" | "outdoor";
+    durationMin: number;
+    distanceKm?: number;
+    paceOrSpeed?: string;
+    inclinePercent?: number;
+    notes?: string;
+  }) {
     const newLog: CardioLog = {
       id: makeId("cardio"),
       date: new Date().toISOString(),
-      type: cardioType,
-      durationMin: dur,
-      distanceKm: dist && dist > 0 ? dist : undefined,
-      paceOrSpeed: speedVal ? speedVal : undefined,
+      type: data.type,
+      durationMin: data.durationMin,
+      distanceKm: data.distanceKm,
+      paceOrSpeed: data.paceOrSpeed,
+      inclinePercent: data.inclinePercent,
+      notes: data.notes,
     };
 
     setCardioLogs((prev) => [newLog, ...prev]);
-    setCardioDuration("");
-    setCardioDistance("");
-    setCardioPaceSpeed("");
     setCardioSavedToast(true);
-    setTimeout(() => setCardioSavedToast(false), 3000);
+    setTimeout(() => setCardioSavedToast(false), 3500);
   }
 
   function handleDeleteCardioLog(id: string) {
@@ -5404,104 +5402,12 @@ export default function Page() {
               })}
             </div>
 
-            {/* Cardio & Conditioning Quick-Log Card (HYROX / Zone 2 Theme) */}
-            <div className="rounded-3xl bg-zinc-950 border border-zinc-800/80 p-4 shadow-2xl mt-4">
-              {/* Header */}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Activity size={18} className="text-yellow-400" />
-                  <h3 className="text-sm font-black uppercase tracking-wider text-yellow-400">
-                    ⚡ CARDIO & CONDITIONING (HYROX / ZONE 2)
-                  </h3>
-                </div>
-                {cardioSavedToast && (
-                  <span className="text-[11px] font-bold text-yellow-300 animate-pulse">
-                    ✓ บันทึกสำเร็จ!
-                  </span>
-                )}
-              </div>
-
-              {/* Activity Selector Pills */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {[
-                  { id: "treadmill", label: "Treadmill Run" },
-                  { id: "incline_walk", label: "Incline Walk" },
-                  { id: "rower", label: "Rower" },
-                  { id: "bike", label: "Bike" },
-                  { id: "outdoor", label: "Outdoor" },
-                ].map((act) => {
-                  const isActive = cardioType === act.id;
-                  return (
-                    <button
-                      key={act.id}
-                      type="button"
-                      onClick={() => setCardioType(act.id as typeof cardioType)}
-                      className={`text-xs px-3 py-1.5 rounded-lg transition ${
-                        isActive
-                          ? "bg-yellow-400 text-black font-black uppercase shadow-md shadow-yellow-500/20"
-                          : "bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 font-bold"
-                      }`}
-                    >
-                      {act.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* 3 Metric Input Cells (Dark Carbon styling with tabular-nums) */}
-              <div className="grid grid-cols-3 gap-2 mb-2">
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-2.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-                    เวลา (MIN)
-                  </span>
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    placeholder="30"
-                    value={cardioDuration}
-                    onChange={(e) => setCardioDuration(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 text-center text-sm font-black text-yellow-300 tabular-nums font-mono focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-2.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-                    ระยะทาง (KM)
-                  </span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="4.50"
-                    value={cardioDistance}
-                    onChange={(e) => setCardioDistance(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 text-center text-sm font-black text-yellow-300 tabular-nums font-mono focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-2.5">
-                  <span className="block text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-1">
-                    KM/H / INC%
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="8.5"
-                    value={cardioPaceSpeed}
-                    onChange={(e) => setCardioPaceSpeed(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 text-center text-sm font-black text-yellow-300 tabular-nums font-mono focus:border-yellow-400 focus:outline-none"
-                  />
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <button
-                type="button"
-                onClick={handleSaveCardio}
-                className="bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase tracking-wider py-3 rounded-xl w-full mt-2 transition active:scale-95 shadow-md shadow-yellow-500/20 text-xs flex items-center justify-center gap-1.5"
-              >
-                <span>+ บันทึกเซสชันคาร์ดิโอ</span>
-              </button>
+            {/* Cardio & Conditioning Quick-Log Controller */}
+            <div className="mt-4">
+              <CardioController
+                onSaveCardioLog={handleSaveCardioLog}
+                savedToast={cardioSavedToast}
+              />
             </div>
           </>
         )}
