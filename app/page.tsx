@@ -148,6 +148,8 @@ type PersistedUiState = {
   scrollY: number;
   selectedCustomPlanId: string | null;
   selectedCustomDay: number;
+  sessionStage?: "lifting" | "cardio";
+  activeExerciseIndex?: number;
 };
 
 const UI_STATE_KEY = "haitUiStateV5";
@@ -166,6 +168,7 @@ const BODYWEIGHT_LOGS_KEY = "haitBodyweightLogsV1";
 const CURRENT_BODYWEIGHT_KEY = "haitCurrentBodyweightKg";
 const WEEKLY_SCORES_KEY = "haitWeeklyScoresV1";
 const CARDIO_LOGS_KEY = "haitCardioLogsV1";
+const ACTIVE_SESSION_KEY = "haitActiveSessionV1";
 
 export type CardioLog = {
   id: string;
@@ -1537,6 +1540,8 @@ function sanitizeUiState(raw: PersistedUiState | null): PersistedUiState {
     scrollY: 0,
     selectedCustomPlanId: null,
     selectedCustomDay: 0,
+    sessionStage: "lifting",
+    activeExerciseIndex: 0,
   };
   if (!raw || typeof raw !== "object") return fallback;
   const modes: AppMode[] = ["dashboard", "today", "preset", "custom", "history", "library"];
@@ -1551,6 +1556,8 @@ function sanitizeUiState(raw: PersistedUiState | null): PersistedUiState {
     scrollY: Number.isFinite(raw.scrollY) ? raw.scrollY : 0,
     selectedCustomPlanId: typeof raw.selectedCustomPlanId === "string" ? raw.selectedCustomPlanId : null,
     selectedCustomDay: safeInt(raw.selectedCustomDay),
+    sessionStage: raw.sessionStage === "cardio" ? "cardio" : "lifting",
+    activeExerciseIndex: safeInt(raw.activeExerciseIndex),
   };
 }
 
@@ -2428,15 +2435,30 @@ export default function Page() {
   const [selectedCustomDay, setSelectedCustomDay] = useState(initialUiState.selectedCustomDay);
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exerciseGroupFilter, setExerciseGroupFilter] = useState<MuscleGroup | "All">("All");
-  const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
+  const [activeExerciseIndex, setActiveExerciseIndex] = useState(initialUiState.activeExerciseIndex ?? 0);
   const [compactList, setCompactList] = useState(true);
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
   const [presetSetsMap, setPresetSetsMap] = useState<Record<string, number>>(() => readJson<Record<string, number>>(PRESET_SETS_KEY, {}));
   const [cardioLogs, setCardioLogs] = useState<CardioLog[]>(() => readJson<CardioLog[]>(CARDIO_LOGS_KEY, []));
 
   // Active Session Engine & Accordion States (Hevy/Strong Style)
-  const [isSessionRunning, setIsSessionRunning] = useState<boolean>(false);
-  const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState<number>(0);
+  const savedActiveSession = useMemo(() => {
+    return readJson<{ isRunning: boolean; elapsedSeconds: number; lastSavedAt: number } | null>(ACTIVE_SESSION_KEY, null);
+  }, []);
+
+  const [isSessionRunning, setIsSessionRunning] = useState<boolean>(() => {
+    return savedActiveSession?.isRunning ?? false;
+  });
+
+  const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState<number>(() => {
+    if (!savedActiveSession) return 0;
+    if (savedActiveSession.isRunning && savedActiveSession.lastSavedAt) {
+      const additionalSec = Math.floor((Date.now() - savedActiveSession.lastSavedAt) / 1000);
+      return Math.max(0, (savedActiveSession.elapsedSeconds || 0) + additionalSec);
+    }
+    return savedActiveSession.elapsedSeconds || 0;
+  });
+
   const [expandedExercises, setExpandedExercises] = useState<Record<string, boolean>>({});
   const [showFinishCelebration, setShowFinishCelebration] = useState(false);
   const [finishedWorkoutStats, setFinishedWorkoutStats] = useState<{ durationStr: string; totalSets: number; totalVolumeKg: number } | null>(null);
@@ -2448,6 +2470,19 @@ export default function Page() {
     }, 1000);
     return () => clearInterval(timer);
   }, [isSessionRunning]);
+
+  // Persist active session state to localStorage
+  useEffect(() => {
+    if (isSessionRunning || sessionElapsedSeconds > 0) {
+      writeLocalJson(ACTIVE_SESSION_KEY, {
+        isRunning: isSessionRunning,
+        elapsedSeconds: sessionElapsedSeconds,
+        lastSavedAt: Date.now(),
+      });
+    } else {
+      writeLocalJson(ACTIVE_SESSION_KEY, null);
+    }
+  }, [isSessionRunning, sessionElapsedSeconds]);
 
   function formatStopwatch(totalSec: number): string {
     const m = Math.floor(totalSec / 60);
@@ -2675,7 +2710,7 @@ export default function Page() {
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   // Focus Mode & Progressive Session Flow State (Lifting vs Cardio)
-  const [sessionStage, setSessionStage] = useState<"lifting" | "cardio">("lifting");
+  const [sessionStage, setSessionStage] = useState<"lifting" | "cardio">(initialUiState.sessionStage ?? "lifting");
   const [showAnatomyModal, setShowAnatomyModal] = useState(false);
   const [showSetupDrawer, setShowSetupDrawer] = useState(false);
   // Session exercise custom order overrides (key: `${mode}_${activeDayIndex}`, value: list of exercise IDs)
@@ -2801,8 +2836,10 @@ export default function Page() {
       scrollY: typeof window !== "undefined" ? window.scrollY : 0,
       selectedCustomPlanId: selectedCustomPlan?.id ?? null,
       selectedCustomDay,
+      sessionStage,
+      activeExerciseIndex,
     });
-  }, [mode, days, selectedDay, fiveDayMode, showHistory, showLibrary, selectedCustomPlan?.id, selectedCustomDay]);
+  }, [mode, days, selectedDay, fiveDayMode, showHistory, showLibrary, selectedCustomPlan?.id, selectedCustomDay, sessionStage, activeExerciseIndex]);
 
   useEffect(() => writeLocalJson(SET_INPUTS_KEY, inputs), [inputs]);
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
@@ -6140,6 +6177,8 @@ export default function Page() {
                 setShowFinishCelebration(false);
                 setSessionElapsedSeconds(0);
                 setIsSessionRunning(false);
+                writeLocalJson(ACTIVE_SESSION_KEY, null);
+                setMode("dashboard");
               }}
               className="w-full flex items-center justify-center gap-2 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black py-4 text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(250,204,21,0.4)] transition active:scale-[0.98]"
             >
