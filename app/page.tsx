@@ -22,6 +22,8 @@ import {
   Library,
   MinusCircle,
   MoreVertical,
+  Pause,
+  Play,
   PlayCircle,
   Plus,
   RotateCcw,
@@ -2431,18 +2433,19 @@ export default function Page() {
   const [cardioLogs, setCardioLogs] = useState<CardioLog[]>(() => readJson<CardioLog[]>(CARDIO_LOGS_KEY, []));
 
   // Active Session Engine & Accordion States (Hevy/Strong Style)
-  const [sessionStartTime, setSessionStartTime] = useState<number>(() => Date.now());
+  const [isSessionRunning, setIsSessionRunning] = useState<boolean>(false);
   const [sessionElapsedSeconds, setSessionElapsedSeconds] = useState<number>(0);
   const [expandedExercises, setExpandedExercises] = useState<Record<string, boolean>>({});
   const [showFinishCelebration, setShowFinishCelebration] = useState(false);
   const [finishedWorkoutStats, setFinishedWorkoutStats] = useState<{ durationStr: string; totalSets: number; totalVolumeKg: number } | null>(null);
 
   useEffect(() => {
+    if (!isSessionRunning) return;
     const timer = setInterval(() => {
-      setSessionElapsedSeconds(Math.floor((Date.now() - sessionStartTime) / 1000));
+      setSessionElapsedSeconds((prev) => prev + 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [sessionStartTime]);
+  }, [isSessionRunning]);
 
   function formatStopwatch(totalSec: number): string {
     const m = Math.floor(totalSec / 60);
@@ -2485,6 +2488,7 @@ export default function Page() {
       totalSets: totalSetsDone,
       totalVolumeKg,
     });
+    setIsSessionRunning(false);
     setShowFinishCelebration(true);
   }
 
@@ -3837,12 +3841,47 @@ export default function Page() {
               </span>
             </div>
 
-            {/* Center: Large Digital Session Stopwatch */}
-            <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-xl shadow-inner">
-              <Activity size={14} className="text-yellow-400 animate-bounce" />
-              <span className="font-mono font-black text-base sm:text-lg tracking-tight text-white tabular-nums">
-                {formatStopwatch(sessionElapsedSeconds)}
-              </span>
+            {/* Center: Large Digital Session Stopwatch with Manual Start/Pause Controls */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-xl shadow-inner">
+                <Activity size={14} className={`text-yellow-400 ${isSessionRunning ? "animate-bounce" : "opacity-40"}`} />
+                <span className="font-mono font-black text-base sm:text-lg tracking-tight text-white tabular-nums">
+                  {formatStopwatch(sessionElapsedSeconds)}
+                </span>
+              </div>
+
+              {/* Start / Pause / Resume Button */}
+              {!isSessionRunning && sessionElapsedSeconds === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => setIsSessionRunning(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-3 py-1.5 text-xs font-black uppercase tracking-wider shadow-[0_0_12px_rgba(250,204,21,0.3)] transition active:scale-95"
+                  title="เริ่มจับเวลาเวิร์กเอาต์"
+                >
+                  <Play size={13} className="fill-black stroke-[2.5]" />
+                  <span>START</span>
+                </button>
+              ) : isSessionRunning ? (
+                <button
+                  type="button"
+                  onClick={() => setIsSessionRunning(false)}
+                  className="flex items-center gap-1 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider transition active:scale-95"
+                  title="หยุดชั่วคราว"
+                >
+                  <Pause size={13} className="fill-amber-300" />
+                  <span className="hidden sm:inline">PAUSE</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsSessionRunning(true)}
+                  className="flex items-center gap-1 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-yellow-300 border border-yellow-500/40 px-2.5 py-1.5 text-xs font-bold uppercase tracking-wider transition active:scale-95"
+                  title="จับเวลาต่อ"
+                >
+                  <Play size={13} className="fill-yellow-300" />
+                  <span className="hidden sm:inline">RESUME</span>
+                </button>
+              )}
             </div>
 
             {/* Right: Prominent Volt Yellow Finish Button */}
@@ -4493,22 +4532,25 @@ export default function Page() {
                 </div>
               </div>
             )}
-            <details className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-              <summary className="cursor-pointer text-xs font-bold text-zinc-300">Volume</summary>
-              <p className="mt-2 text-xs text-zinc-400">Direct weekly sets</p>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {weeklyVolumeSummary.map(([muscle, sets]) => (
-                  <div key={muscle} className="rounded-2xl bg-zinc-950 p-3">
-                    <p className="text-xs text-zinc-500">{muscle}</p>
-                    <p className="mt-1 text-lg font-black">{sets} sets / week</p>
-                  </div>
-                ))}
-              </div>
-            </details>
 
-            {mode === "custom" && selectedCustomPlan && (
+            {sessionStage === "lifting" && (
               <>
-                <div className="mt-4">
+                <details className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                  <summary className="cursor-pointer text-xs font-bold text-zinc-300">Volume</summary>
+                  <p className="mt-2 text-xs text-zinc-400">Direct weekly sets</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {weeklyVolumeSummary.map(([muscle, sets]) => (
+                      <div key={muscle} className="rounded-2xl bg-zinc-950 p-3">
+                        <p className="text-xs text-zinc-500">{muscle}</p>
+                        <p className="mt-1 text-lg font-black">{sets} sets / week</p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+
+                {mode === "custom" && selectedCustomPlan && (
+                  <>
+                    <div className="mt-4">
                   <MuscleTapBuilder
                     exercises={exerciseLibrary}
                     onPick={(name) => addExerciseToCurrentDay(name)}
@@ -5401,14 +5443,18 @@ export default function Page() {
                 );
               })}
             </div>
+            </>
+          )}
 
-            {/* Cardio & Conditioning Quick-Log Controller */}
-            <div className="mt-4">
-              <CardioController
-                onSaveCardioLog={handleSaveCardioLog}
-                savedToast={cardioSavedToast}
-              />
-            </div>
+            {/* Render Cardio Controller ONLY when sessionStage is 'cardio' */}
+            {sessionStage === "cardio" && (
+              <div className="mt-4">
+                <CardioController
+                  onSaveCardioLog={handleSaveCardioLog}
+                  savedToast={cardioSavedToast}
+                />
+              </div>
+            )}
           </>
         )}
       </section>
@@ -5953,7 +5999,7 @@ export default function Page() {
               onClick={() => {
                 setShowFinishCelebration(false);
                 setSessionElapsedSeconds(0);
-                setSessionStartTime(Date.now());
+                setIsSessionRunning(false);
               }}
               className="w-full flex items-center justify-center gap-2 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black py-4 text-sm font-black uppercase tracking-widest shadow-[0_0_20px_rgba(250,204,21,0.4)] transition active:scale-[0.98]"
             >
