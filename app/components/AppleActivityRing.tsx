@@ -20,9 +20,9 @@ export function AppleActivityRing({
 }: AppleActivityRingProps) {
   const [showWeeklySheet, setShowWeeklySheet] = useState(false);
 
-  // Ring geometry
-  const size = 100;
-  const strokeWidth = 9;
+  // Ring geometry - Enlarged & Striking
+  const size = 130;
+  const strokeWidth = 11;
   const center = size / 2;
   const radius = center - strokeWidth;
   const circumference = 2 * Math.PI * radius;
@@ -56,18 +56,18 @@ export function AppleActivityRing({
 
   return (
     <>
-      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950 p-3.5 shadow-xl transition-all">
-        <div className="flex items-center justify-between gap-3">
+      <div className="rounded-2xl border border-zinc-800/80 bg-zinc-950 p-4 shadow-xl transition-all">
+        <div className="flex items-center justify-between gap-4">
           {/* Left: Apple Fitness Ring & Centered Score */}
-          <div className="flex items-center gap-3.5">
-            <div className="relative flex items-center justify-center shrink-0 w-[100px] h-[100px]">
+          <div className="flex items-center gap-4">
+            <div className="relative flex items-center justify-center shrink-0 w-[130px] h-[130px]">
               <svg width={size} height={size} className="-rotate-90">
                 {/* Gradient Definition */}
                 <defs>
                   <linearGradient id="appleRingGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                     <stop offset="0%" stopColor="#F59E0B" />
-                    <stop offset="50%" stopColor="#10B981" />
-                    <stop offset="100%" stopColor="#22C55E" />
+                    <stop offset="50%" stopColor="#EAB308" />
+                    <stop offset="100%" stopColor="#FACC15" />
                   </linearGradient>
                 </defs>
 
@@ -98,10 +98,10 @@ export function AppleActivityRing({
 
               {/* Center Score Label */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="font-mono text-3xl font-black tracking-tight text-white leading-none">
+                <span className="font-mono text-4xl font-black tracking-tight text-white leading-none">
                   {score > 0 ? score : "—"}
                 </span>
-                <span className="text-[10px] font-mono font-bold text-zinc-500 leading-none mt-1">
+                <span className="text-[11px] font-mono font-bold text-zinc-500 leading-none mt-1.5">
                   /100
                 </span>
               </div>
@@ -120,14 +120,14 @@ export function AppleActivityRing({
                 )}
               </div>
 
-              <div className="mt-1 flex items-center gap-1.5">
-                <span className="rounded-md bg-yellow-400/10 border border-yellow-500/30 px-2 py-0.5 text-xs font-black text-yellow-300">
+              <div className="mt-1.5 flex items-center gap-1.5">
+                <span className="rounded-md bg-yellow-400/10 border border-yellow-500/30 px-2.5 py-0.5 text-xs font-black text-yellow-300">
                   🏆 Rank: {rank}
                 </span>
               </div>
 
               {/* Compact Delta Badge */}
-              <div className="mt-1.5 flex items-center gap-1.5">
+              <div className="mt-2 flex items-center gap-1.5">
                 <span
                   className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-mono font-bold ${
                     isPositive
@@ -144,26 +144,31 @@ export function AppleActivityRing({
             </div>
           </div>
 
-          {/* Right: Expandable breakdown sheet trigger */}
-          <div className="flex flex-col items-end gap-1.5 shrink-0">
-            {weeklyScores.length >= 2 && (
-              <button
-                type="button"
-                onClick={() => setShowWeeklySheet(true)}
-                className="flex items-center gap-1 rounded-xl bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 text-[11px] font-bold text-zinc-300 hover:text-white hover:border-yellow-400/50 transition active:scale-95"
-                title="ดูแนวโน้มรายสัปดาห์"
-              >
-                <span>ประวัติ</span>
-                <ChevronRight size={13} className="text-zinc-500" />
-              </button>
-            )}
+          {/* Right: Subtle (i) button and History */}
+          <div className="flex flex-col items-end justify-between h-full gap-2 shrink-0">
             {onOpenScoreDetails && (
               <button
                 type="button"
                 onClick={onOpenScoreDetails}
-                className="text-[11px] font-bold text-yellow-400 hover:text-yellow-300 hover:underline transition flex items-center gap-0.5"
+                className="flex items-center gap-1 rounded-full p-1.5 text-zinc-400 hover:text-yellow-400 hover:bg-zinc-900 border border-zinc-800/80 transition active:scale-90"
+                title="ดูรายละเอียดเกณฑ์คะแนน"
+                aria-label="ดูรายละเอียดเกณฑ์คะแนน"
               >
-                <span>รายละเอียดเกณฑ์คะแนน ↗</span>
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-xs font-serif italic font-bold border border-zinc-700 text-zinc-300 hover:border-yellow-400 hover:text-yellow-300">
+                  i
+                </span>
+              </button>
+            )}
+
+            {weeklyScores.length >= 2 && (
+              <button
+                type="button"
+                onClick={() => setShowWeeklySheet(true)}
+                className="flex items-center gap-1 rounded-xl bg-zinc-900 border border-zinc-800 px-2.5 py-1 text-[10px] font-bold text-zinc-400 hover:text-white hover:border-yellow-400/50 transition active:scale-95"
+                title="ดูแนวโน้มรายสัปดาห์"
+              >
+                <span>ประวัติ</span>
+                <ChevronRight size={12} className="text-zinc-500" />
               </button>
             )}
           </div>

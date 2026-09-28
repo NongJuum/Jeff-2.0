@@ -2804,7 +2804,7 @@ export default function Page() {
   }, [customPlans, selectedCustomPlanId]);
 
   const activePresetPlan = days === 5 && fiveDayMode === "oneLegDay" ? fiveDayLegOncePlan : presetPlans[days];
-  const isPresetLike = mode === "today" || mode === "preset";
+  const isPresetLike = mode === "today" || mode === "preset" || mode === "dashboard";
   const activePlan = isPresetLike ? activePresetPlan : selectedCustomPlan?.days ?? [];
   const activeDayIndex = isPresetLike ? selectedDay : selectedCustomDay;
   const rawDay = activePlan[activeDayIndex] ?? activePlan[0];
@@ -2832,6 +2832,22 @@ export default function Page() {
     const daysArr: (keyof WeeklySchedule)[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
     return daysArr[new Date().getDay()];
   }, []);
+
+  // Dashboard Workout Resolver: ALWAYS bind to active preset plan if current day is Custom or empty
+  const dashboardDay = useMemo(() => {
+    // If day exists, has exercises, and is not an empty or unconfigured custom day
+    if (day && Array.isArray(day.exercises) && day.exercises.length > 0 && !day.title.startsWith("Custom Day")) {
+      return day;
+    }
+    // Fallback to current scheduled split day from presetPlans
+    const presetList = days === 5 && fiveDayMode === "oneLegDay" ? fiveDayLegOncePlan : presetPlans[days];
+    const safePresetIndex = selectedDay < presetList.length ? selectedDay : 0;
+    return presetList[safePresetIndex] || presetList[0];
+  }, [day, days, fiveDayMode, fiveDayLegOncePlan, presetPlans, selectedDay]);
+
+  const dashboardMuscleSummary = useMemo(() => {
+    return buildPlannedMuscleSummary(dashboardDay?.exercises ?? []);
+  }, [dashboardDay]);
 
   const isTodayScheduledRest = useMemo(() => {
     return !weeklySchedule[todayDayOfWeek];
@@ -4367,7 +4383,7 @@ export default function Page() {
                   </div>
                 </div>
               </div>
-            ) : day ? (
+            ) : dashboardDay ? (
               <div className="rounded-3xl border border-yellow-500/30 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-4 sm:p-5 shadow-2xl relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   {/* Left: Program focus, muscles, and estimated time */}
@@ -4378,18 +4394,18 @@ export default function Page() {
                         <span>TODAY'S WORKOUT</span>
                       </span>
                       <span className="text-[11px] font-mono text-zinc-400 font-bold">
-                        {day.exercises.length} ท่า · ประมาณ 45-60 นาที
+                        {dashboardDay.exercises.length} ท่า · ประมาณ 45-60 นาที
                       </span>
                     </div>
 
                     <h3 className="mt-2 text-xl sm:text-2xl font-black text-white tracking-tight">
-                      วันนี้เล่น: <span className="text-yellow-300">{day.title}</span>
+                      วันนี้เล่น: <span className="text-yellow-300">{dashboardDay.title}</span>
                     </h3>
-                    <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{day.subtitle}</p>
+                    <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{dashboardDay.subtitle}</p>
 
                     {/* Target Muscle Badges */}
                     <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      {day.focus.map((focusGroup, idx) => (
+                      {dashboardDay.focus.map((focusGroup, idx) => (
                         <span
                           key={focusGroup}
                           className="inline-flex items-center gap-1 rounded-lg border border-yellow-500/20 bg-zinc-900/90 px-2.5 py-1 text-xs font-bold text-yellow-300"
@@ -4398,7 +4414,7 @@ export default function Page() {
                           <span>{focusGroup}</span>
                         </span>
                       ))}
-                      {activeMuscleSummary.primary.slice(0, 3).map((r) => (
+                      {dashboardMuscleSummary.primary.slice(0, 3).map((r) => (
                         <span
                           key={r}
                           className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-0.5 text-[11px] font-mono text-zinc-400"
@@ -4430,8 +4446,8 @@ export default function Page() {
                       <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-1">Front</p>
                       <RealisticAnatomyFigure
                         side="front"
-                        primary={activeMuscleSummary.primary}
-                        secondary={activeMuscleSummary.secondary}
+                        primary={dashboardMuscleSummary.primary}
+                        secondary={dashboardMuscleSummary.secondary}
                         compact
                       />
                     </div>
@@ -4439,8 +4455,8 @@ export default function Page() {
                       <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-1">Back</p>
                       <RealisticAnatomyFigure
                         side="back"
-                        primary={activeMuscleSummary.primary}
-                        secondary={activeMuscleSummary.secondary}
+                        primary={dashboardMuscleSummary.primary}
+                        secondary={dashboardMuscleSummary.secondary}
                         compact
                       />
                     </div>
