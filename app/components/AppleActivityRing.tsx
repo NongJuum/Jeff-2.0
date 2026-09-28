@@ -214,7 +214,7 @@ export function AppleActivityRing({
                       </span>
                       <div className="flex items-center gap-2">
                         <span className="text-[11px] font-bold text-zinc-500 uppercase">{w.rank}</span>
-                        <span className="font-black text-emerald-400">{w.score} / 100</span>
+                        <span className="font-black text-yellow-300 font-mono">{w.score} / 100</span>
                       </div>
                     </div>
                   ))}

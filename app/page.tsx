@@ -70,6 +70,7 @@ import {
 import { TrainerAssessment } from "./components/TrainerAssessment";
 import {
   type UserProfile,
+  type Gender,
   getUserProfile,
   saveUserProfile,
   USER_PROFILE_KEY,
@@ -169,6 +170,27 @@ const CURRENT_BODYWEIGHT_KEY = "haitCurrentBodyweightKg";
 const WEEKLY_SCORES_KEY = "haitWeeklyScoresV1";
 const CARDIO_LOGS_KEY = "haitCardioLogsV1";
 const ACTIVE_SESSION_KEY = "haitActiveSessionV1";
+const WEEKLY_SCHEDULE_KEY = "haitWeeklyScheduleV1";
+
+export type WeeklySchedule = {
+  mon: boolean;
+  tue: boolean;
+  wed: boolean;
+  thu: boolean;
+  fri: boolean;
+  sat: boolean;
+  sun: boolean;
+};
+
+const DEFAULT_WEEKLY_SCHEDULE: WeeklySchedule = {
+  mon: true,
+  tue: true,
+  wed: false,
+  thu: true,
+  fri: true,
+  sat: true,
+  sun: false,
+};
 
 export type CardioLog = {
   id: string;
@@ -1894,17 +1916,17 @@ function WeeklyPerformanceMiniChart({ trends }: { trends: WeeklyTrendPoint[] }) 
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-16 overflow-visible">
           <defs>
             <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+              <stop offset="0%" stopColor="#facc15" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#facc15" stopOpacity="0.0" />
             </linearGradient>
           </defs>
 
           <path d={fillD} fill="url(#trendGrad)" />
-          <path d={pathD} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={pathD} fill="none" stroke="#facc15" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
 
           {points.map((p, i) => (
             <g key={i}>
-              <circle cx={p.x} cy={p.y} r={p.score > 0 ? 3.5 : 2} fill="#10b981" stroke="#09090b" strokeWidth="2" />
+              <circle cx={p.x} cy={p.y} r={p.score > 0 ? 3.5 : 2} fill="#facc15" stroke="#09090b" strokeWidth="2" />
               {p.score > 0 && (
                 <text x={p.x} y={p.y - 6} textAnchor="middle" fill="#a1a1aa" fontSize="9" fontWeight="bold">
                   {p.score}
@@ -2603,6 +2625,29 @@ export default function Page() {
     }
   }
 
+  function handleSetGender(newGender: Gender) {
+    if (userProfile) {
+      const updated: UserProfile = { ...userProfile, gender: newGender, updatedAt: new Date().toISOString() };
+      saveUserProfile(updated);
+      setUserProfile(updated);
+    } else {
+      const fresh: UserProfile = {
+        gender: newGender,
+        age: 25,
+        heightCm: 175,
+        weightKg: 70,
+        expMonths: 12,
+        daysPerWeek: days,
+        goal: "hypertrophy",
+        injuries: [],
+        preferredWeightUnit: globalWeightUnit,
+        updatedAt: new Date().toISOString(),
+      };
+      saveUserProfile(fresh);
+      setUserProfile(fresh);
+    }
+  }
+
   // Stage 2 Trainer Assessment Modal state
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
@@ -2706,6 +2751,19 @@ export default function Page() {
   // Notification Settings (N3)
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
 
+  // Weekly Schedule & Rest Day Planner
+  const [weeklySchedule, setWeeklySchedule] = useState<WeeklySchedule>(() => {
+    return readJson<WeeklySchedule>(WEEKLY_SCHEDULE_KEY, DEFAULT_WEEKLY_SCHEDULE);
+  });
+
+  function handleToggleScheduleDay(dayKey: keyof WeeklySchedule) {
+    setWeeklySchedule((prev) => {
+      const next = { ...prev, [dayKey]: !prev[dayKey] };
+      writeLocalJson(WEEKLY_SCHEDULE_KEY, next);
+      return next;
+    });
+  }
+
   // Profile & Settings Modal (U1)
   const [showProfileModal, setShowProfileModal] = useState(false);
 
@@ -2768,6 +2826,16 @@ export default function Page() {
     });
     return { ...rawDay, exercises: sorted };
   }, [rawDay, sessionExerciseOrders, currentDayKey]);
+
+  // Smart Weekly Schedule Resolver
+  const todayDayOfWeek = useMemo(() => {
+    const daysArr: (keyof WeeklySchedule)[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+    return daysArr[new Date().getDay()];
+  }, []);
+
+  const isTodayScheduledRest = useMemo(() => {
+    return !weeklySchedule[todayDayOfWeek];
+  }, [weeklySchedule, todayDayOfWeek]);
 
   function moveSessionExercise(currentIndex: number, direction: -1 | 1) {
     if (!day || !day.exercises) return;
@@ -4136,6 +4204,44 @@ export default function Page() {
                   </div>
                 </div>
               )}
+
+              {/* Weekly Training Schedule (Mon-Sun) */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold uppercase text-zinc-400">📅 ตารางวันฝึกประจำสัปดาห์ (Weekly Schedule)</p>
+                  <span className="text-[10px] text-zinc-500">เลือกวันที่ซ้อม vs พัก</span>
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {(
+                    [
+                      { key: "mon", label: "จ." },
+                      { key: "tue", label: "อ." },
+                      { key: "wed", label: "พ." },
+                      { key: "thu", label: "พฤ." },
+                      { key: "fri", label: "ศ." },
+                      { key: "sat", label: "ส." },
+                      { key: "sun", label: "อา." },
+                    ] as const
+                  ).map((d) => {
+                    const active = weeklySchedule[d.key];
+                    return (
+                      <button
+                        key={d.key}
+                        type="button"
+                        onClick={() => handleToggleScheduleDay(d.key)}
+                        className={`py-2 rounded-lg text-xs font-bold transition flex flex-col items-center gap-0.5 ${
+                          active
+                            ? "bg-yellow-400 text-black font-black shadow-sm"
+                            : "bg-zinc-900 text-zinc-500 border border-zinc-800 hover:text-zinc-300"
+                        }`}
+                      >
+                        <span>{d.label}</span>
+                        <span className="text-[9px] font-mono">{active ? "ซ้อม" : "พัก"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -4227,8 +4333,41 @@ export default function Page() {
               </div>
             </div>
 
-            {/* B. "Today's Workout" Visual Hero Card with Integrated 3D Anatomy Figure */}
-            {day && (
+            {/* B. "Today's Workout" Visual Hero Card or Rest Day Card */}
+            {isTodayScheduledRest ? (
+              <div className="rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-5 shadow-2xl relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-xs font-black text-yellow-300 uppercase tracking-wider">
+                      <span>😴 REST & RECOVERY DAY</span>
+                    </span>
+                    <h3 className="mt-2 text-xl sm:text-2xl font-black text-white tracking-tight">
+                      วันนี้เป็นวันพักผ่อน (Rest Day) 😴
+                    </h3>
+                    <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
+                      ร่างกายกำลังซ่อมแซมและสร้างกล้ามเนื้อ (Hypertrophy เกิดขึ้นขณะพักผ่อน) ดื่มน้ำ ทานโปรตีนให้เพียงพอ และนอนหลับให้เต็มอิ่ม 💙
+                    </p>
+
+                    <div className="mt-4 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode("today");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-2.5 text-xs font-black text-yellow-300 hover:bg-yellow-400/20 transition active:scale-95"
+                      >
+                        ⚡ ซ้อมต่อ / เลือกวันเอง
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900/60 text-4xl shrink-0 self-center sm:self-auto">
+                    🛋️
+                  </div>
+                </div>
+              </div>
+            ) : day ? (
               <div className="rounded-3xl border border-yellow-500/30 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-4 sm:p-5 shadow-2xl relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   {/* Left: Program focus, muscles, and estimated time */}
@@ -4308,10 +4447,10 @@ export default function Page() {
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {/* B. Performance Overview with Apple-Style Activity Ring */}
-            <div>
+            {/* C. Performance Overview with Apple-Style Activity Ring & Embedded 6-Component Breakdown */}
+            <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4 sm:p-5 shadow-2xl space-y-4">
               <AppleActivityRing
                 score={performanceReport.hasData ? performanceReport.score : 0}
                 rank={performanceReport.rank}
@@ -4319,6 +4458,28 @@ export default function Page() {
                 streakWeeks={performanceReport.currentStreak}
                 onOpenScoreDetails={() => setShowScoreModal(true)}
               />
+
+              {/* Directly Embedded 6 Component Score Breakdown */}
+              <div className="pt-2 border-t border-zinc-800/80">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-yellow-300">
+                    📊 การคำนวณคะแนน 6 องค์ประกอบ (Scoring Breakdown)
+                  </p>
+                  <span className="text-[10px] text-zinc-500 font-mono">100% Total Weight</span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                  <ScoreBar label="Strength (25%)" value={performanceReport.progress} />
+                  <ScoreBar label="Volume (25%)" value={performanceReport.volume} />
+                  <ScoreBar label="Consistency (20%)" value={performanceReport.consistency} />
+                  <ScoreBar label="Completion (15%)" value={performanceReport.completion} />
+                  <ScoreBar label="Recovery 😴 (10%)" value={performanceReport.recovery} />
+                  <ScoreBar label="Streak 🔥 (5%)" value={performanceReport.streakBonus} />
+                </div>
+
+                {/* 4-Week Mini Trend Chart */}
+                <WeeklyPerformanceMiniChart trends={performanceReport.weeklyTrends} />
+              </div>
             </div>
 
             {/* Quick Status Summary Cards */}
@@ -6117,6 +6278,8 @@ export default function Page() {
         onUnitChange={handleSetGlobalUnit}
         onExportLogs={exportLogsToCsv}
         onOpenAssessment={() => setShowAssessmentModal(true)}
+        currentGender={userProfile?.gender || "male"}
+        onGenderChange={handleSetGender}
       />
 
       {/* Trainer Assessment Modal (Stage 2) */}

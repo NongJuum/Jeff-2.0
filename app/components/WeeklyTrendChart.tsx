@@ -49,14 +49,14 @@ export function WeeklyTrendChart({ scores }: Props) {
   const lastScore = scores[scores.length - 1].score;
   const diff = lastScore - firstScore;
   const trend = diff > 5 ? "up" : diff < -5 ? "down" : "flat";
-  const trendColor = trend === "up" ? "#10b981" : trend === "down" ? "#ef4444" : "#a1a1aa";
+  const trendColor = trend === "up" ? "#facc15" : trend === "down" ? "#ef4444" : "#a1a1aa";
   const TrendIcon = trend === "up" ? TrendingUp : trend === "down" ? TrendingDown : Minus;
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-300">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-yellow-300">
             {scores.length}-Week Trend (Score History)
           </p>
           <p className="mt-0.5 flex items-center gap-1.5 text-sm font-black" style={{ color: trendColor }}>
@@ -66,15 +66,15 @@ export function WeeklyTrendChart({ scores }: Props) {
         </div>
         <div className="text-right">
           <p className="text-[10px] text-zinc-500">สัปดาห์ล่าสุด</p>
-          <p className="text-lg font-black text-emerald-300">{lastScore}/100</p>
+          <p className="text-lg font-black text-yellow-300">{lastScore}/100</p>
         </div>
       </div>
 
       <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
         <defs>
           <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
+            <stop offset="0%" stopColor="#facc15" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="#facc15" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -85,7 +85,7 @@ export function WeeklyTrendChart({ scores }: Props) {
         <path
           d={linePath}
           fill="none"
-          stroke="#10b981"
+          stroke="#facc15"
           strokeWidth="2.5"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -98,8 +98,8 @@ export function WeeklyTrendChart({ scores }: Props) {
               cx={p.x}
               cy={p.y}
               r="4"
-              fill={i === points.length - 1 ? "#10b981" : "#09090b"}
-              stroke="#10b981"
+              fill={i === points.length - 1 ? "#facc15" : "#09090b"}
+              stroke="#facc15"
               strokeWidth="2"
             />
             {/* Label เฉพาะจุดแรกและสุดท้าย */}
