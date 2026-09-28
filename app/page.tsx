@@ -17,7 +17,9 @@ import {
   Cog,
   Download,
   Dumbbell,
+  Edit3,
   Flame,
+  Home,
   Info,
   Library,
   MinusCircle,
@@ -79,7 +81,7 @@ import {
 } from "./lib/assessment";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
-type AppMode = "today" | "preset" | "custom" | "history" | "library";
+type AppMode = "dashboard" | "today" | "preset" | "custom" | "history" | "library";
 
 type LoadType = "barbell" | "dumbbell" | "selectorized" | "plate-loaded" | "smith" | "cable" | "bodyweight" | "specialty";
 
@@ -1526,7 +1528,7 @@ function safeCsvCell(value: string | number) {
 
 function sanitizeUiState(raw: PersistedUiState | null): PersistedUiState {
   const fallback: PersistedUiState = {
-    mode: "today",
+    mode: "dashboard",
     days: 4,
     selectedDay: 0,
     fiveDayMode: "twoLegDays",
@@ -1537,7 +1539,7 @@ function sanitizeUiState(raw: PersistedUiState | null): PersistedUiState {
     selectedCustomDay: 0,
   };
   if (!raw || typeof raw !== "object") return fallback;
-  const modes: AppMode[] = ["today", "preset", "custom", "history", "library"];
+  const modes: AppMode[] = ["dashboard", "today", "preset", "custom", "history", "library"];
   const safeInt = (v: unknown) => (typeof v === "number" && Number.isInteger(v) && v >= 0 ? v : 0);
   return {
     mode: modes.includes(raw.mode) ? raw.mode : fallback.mode,
@@ -2679,6 +2681,23 @@ export default function Page() {
   // Session exercise custom order overrides (key: `${mode}_${activeDayIndex}`, value: list of exercise IDs)
   const [sessionExerciseOrders, setSessionExerciseOrders] = useState<Record<string, string[]>>({});
 
+  // Editable Profile Display Name for Home Dashboard
+  const [userName, setUserName] = useState<string>(() => {
+    if (typeof window === "undefined") return "Athlete";
+    return window.localStorage.getItem("haitUserName") || "Athlete";
+  });
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [tempName, setTempName] = useState("");
+
+  function handleSaveUserName() {
+    const trimmed = tempName.trim() || "Athlete";
+    setUserName(trimmed);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("haitUserName", trimmed);
+    }
+    setIsEditingName(false);
+  }
+
   useEffect(() => {
     if (!hasCompletedOnboarding()) setShowOnboarding(true);
   }, []);
@@ -3732,6 +3751,11 @@ export default function Page() {
 
 
   const pageMeta = {
+    dashboard: {
+      eyebrow: "Home",
+      title: "Dashboard",
+      description: "ภาพรวมกิจกรรมและสถิติการฝึก",
+    },
     today: {
       eyebrow: "Workout",
       title: "Today",
@@ -3773,58 +3797,60 @@ export default function Page() {
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => setShowAssessmentModal(true)}
-              className="flex items-center gap-1 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-1.5 text-xs font-black text-yellow-300 transition hover:bg-yellow-500/20 active:scale-95"
-              aria-label="Trainer Assessment"
-              title="แบบประเมินตนเองและเป้าหมาย"
-            >
-              <Activity size={14} className="text-yellow-400" />
-              <span>{userProfile ? "ผลประเมิน" : "ประเมินตัวเอง"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowBodyweightModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
-              aria-label="Manage bodyweight"
-              title="จัดการน้ำหนักตัว"
-            >
-              <Scale size={14} className="text-yellow-400" />
-              <span>
-                {bodyweightEntry
-                  ? globalWeightUnit === "kg"
-                    ? `${Math.round(bodyweightEntry.lbs * 0.453592 * 10) / 10} kg`
-                    : `${Math.round(bodyweightEntry.lbs)} lbs`
-                  : "—"}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowNotificationSettings(true)}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
-              aria-label="Notification settings"
-              title="ตั้งค่าการแจ้งเตือน"
-            >
-              <Bell size={15} className="text-yellow-400" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowProfileModal(true)}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
-              aria-label="Profile and Settings"
-              title="โปรไฟล์และการตั้งค่า"
-            >
-              <Cog size={15} className="text-yellow-400" />
-            </button>
-            {performanceReport.currentStreak > 0 && (
-              <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-black text-amber-300">
-                <span>🔥</span>
-                <span>{performanceReport.currentStreak}w</span>
-              </span>
-            )}
-          </div>
+          {mode === "dashboard" && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowAssessmentModal(true)}
+                className="flex items-center gap-1 rounded-xl border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-1.5 text-xs font-black text-yellow-300 transition hover:bg-yellow-500/20 active:scale-95"
+                aria-label="Trainer Assessment"
+                title="แบบประเมินตนเองและเป้าหมาย"
+              >
+                <Activity size={14} className="text-yellow-400" />
+                <span>{userProfile ? "ผลประเมิน" : "ประเมินตัวเอง"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowBodyweightModal(true)}
+                className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-2.5 py-1.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+                aria-label="Manage bodyweight"
+                title="จัดการน้ำหนักตัว"
+              >
+                <Scale size={14} className="text-yellow-400" />
+                <span>
+                  {bodyweightEntry
+                    ? globalWeightUnit === "kg"
+                      ? `${Math.round(bodyweightEntry.lbs * 0.453592 * 10) / 10} kg`
+                      : `${Math.round(bodyweightEntry.lbs)} lbs`
+                    : "—"}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowNotificationSettings(true)}
+                className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+                aria-label="Notification settings"
+                title="ตั้งค่าการแจ้งเตือน"
+              >
+                <Bell size={15} className="text-yellow-400" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowProfileModal(true)}
+                className="rounded-xl border border-zinc-800 bg-zinc-900 p-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800"
+                aria-label="Profile and Settings"
+                title="โปรไฟล์และการตั้งค่า"
+              >
+                <Cog size={15} className="text-yellow-400" />
+              </button>
+              {performanceReport.currentStreak > 0 && (
+                <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-xs font-black text-amber-300">
+                  <span>🔥</span>
+                  <span>{performanceReport.currentStreak}w</span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 1. Sticky Active Session Topbar (Hevy/Strong Style) */}
@@ -3998,16 +4024,149 @@ export default function Page() {
           )}
         </div>
 
-        {/* 1. Apple-Style Activity Ring (Score & Weekly Progress) */}
-        {["today", "preset", "custom"].includes(mode) && (
-          <div className="mt-3">
-            <AppleActivityRing
-              score={performanceReport.hasData ? performanceReport.score : 0}
-              rank={performanceReport.rank}
-              weeklyScores={weeklyScores}
-              streakWeeks={performanceReport.currentStreak}
-              onOpenScoreDetails={() => setShowScoreModal(true)}
-            />
+        {/* ========================================================================= */}
+        {/* DEDICATED HOME DASHBOARD (mode === "dashboard")                           */}
+        {/* ========================================================================= */}
+        {mode === "dashboard" && (
+          <div className="mt-3 space-y-4">
+            {/* A. Personalized Profile Card with Inline Editable Name */}
+            <div className="rounded-3xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-4 sm:p-5 shadow-2xl">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-14 w-14 rounded-2xl bg-yellow-400 text-black flex items-center justify-center font-black text-xl shadow-[0_0_20px_rgba(250,204,21,0.35)] shrink-0">
+                    {userName.slice(0, 2).toUpperCase()}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    {isEditingName ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={tempName}
+                          onChange={(e) => setTempName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleSaveUserName();
+                            if (e.key === "Escape") setIsEditingName(false);
+                          }}
+                          autoFocus
+                          placeholder="ชื่อของคุณ"
+                          className="rounded-lg bg-zinc-900 border border-yellow-400 px-2.5 py-1 text-sm font-black text-white outline-none w-36 sm:w-48"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSaveUserName}
+                          className="rounded-lg bg-yellow-400 px-2.5 py-1 text-xs font-black text-black"
+                        >
+                          บันทึก
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingName(false)}
+                          className="text-xs text-zinc-400 px-1 hover:text-white"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg sm:text-xl font-black text-white font-mono truncate">
+                          {userName}
+                        </h3>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTempName(userName);
+                            setIsEditingName(true);
+                          }}
+                          className="text-zinc-500 hover:text-yellow-400 transition"
+                          title="แก้ไขชื่อผู้ใช้"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                      </div>
+                    )}
+
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="rounded-md bg-yellow-400/10 border border-yellow-500/30 px-2 py-0.5 font-bold text-yellow-300">
+                        {userProfile ? `Exp ${userProfile.expMonths}m` : "Intermediate"}
+                      </span>
+                      <span className="rounded-md bg-zinc-800 px-2 py-0.5 font-mono text-zinc-300">
+                        {bodyweightEntry ? `${Math.round(bodyweightEntry.lbs * 0.453592)} kg` : userProfile?.weightKg ? `${userProfile.weightKg} kg` : "70 kg"}
+                      </span>
+                      <span className="rounded-md bg-zinc-800 px-2 py-0.5 font-mono text-zinc-400">
+                        {days} Days Split
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowProfileModal(true)}
+                  className="rounded-xl border border-zinc-800 bg-zinc-900/80 p-2 text-zinc-400 hover:text-yellow-400 transition shrink-0"
+                  title="เปิดการตั้งค่าโปรไฟล์"
+                >
+                  <User size={18} />
+                </button>
+              </div>
+
+              {/* Primary Call to Action Button */}
+              <div className="mt-4 pt-3 border-t border-zinc-800/60">
+                <button
+                  type="button"
+                  onClick={() => setMode("today")}
+                  className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black py-3.5 px-4 font-black uppercase tracking-wider text-sm shadow-[0_0_25px_rgba(250,204,21,0.35)] transition active:scale-[0.98]"
+                >
+                  <Play size={16} className="fill-black" />
+                  <span>▶ เริ่มฝึกซ้อมวันนี้: {day ? day.title : "Day 1"} (Start Workout)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* B. Performance Overview with Apple-Style Activity Ring */}
+            <div>
+              <AppleActivityRing
+                score={performanceReport.hasData ? performanceReport.score : 0}
+                rank={performanceReport.rank}
+                weeklyScores={weeklyScores}
+                streakWeeks={performanceReport.currentStreak}
+                onOpenScoreDetails={() => setShowScoreModal(true)}
+              />
+            </div>
+
+            {/* Quick Status Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Current Streak</p>
+                <p className="mt-1 text-lg font-black text-amber-300 font-mono flex items-center gap-1">
+                  <span>🔥</span>
+                  <span>{performanceReport.currentStreak} Weeks</span>
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Weekly Target</p>
+                <p className="mt-1 text-lg font-black text-yellow-300 font-mono">
+                  {days} Days / Week
+                </p>
+              </div>
+
+              <div className="col-span-2 sm:col-span-1 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Bodyweight</p>
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-lg font-black text-white font-mono">
+                    {bodyweightEntry ? `${Math.round(bodyweightEntry.lbs * 0.453592 * 10) / 10} kg` : "70 kg"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowBodyweightModal(true)}
+                    className="text-[11px] font-bold text-yellow-400 hover:underline"
+                  >
+                    อัปเดต
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -6042,14 +6201,16 @@ export default function Page() {
       )}
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
-        <div className="mx-auto grid max-w-5xl grid-cols-4 gap-1.5">
+        <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1">
           {[
+            ["dashboard", "Home", Home],
             ["workout", "Workout", Dumbbell],
             ["stats", "Stats", Trophy],
             ["library", "Library", Library],
             ["profile", "Profile", User],
           ].map(([key, label, Icon]) => {
             const isTabActive =
+              (key === "dashboard" && mode === "dashboard") ||
               (key === "workout" && ["today", "preset", "custom"].includes(mode)) ||
               (key === "stats" && mode === "history") ||
               (key === "library" && mode === "library");
@@ -6059,12 +6220,13 @@ export default function Page() {
                 key={key as string}
                 type="button"
                 onClick={() => {
-                  if (key === "workout") setMode("today");
+                  if (key === "dashboard") setMode("dashboard");
+                  else if (key === "workout") setMode("today");
                   else if (key === "stats") setMode("history");
                   else if (key === "library") setMode("library");
                   else setShowProfileModal(true);
                 }}
-                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[11px] transition active:scale-95 ${
+                className={`flex flex-col items-center gap-1 rounded-xl py-2 text-[10px] sm:text-[11px] transition active:scale-95 ${
                   isTabActive
                     ? "bg-yellow-400 text-black font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.3)]"
                     : "bg-zinc-900 text-zinc-300 hover:bg-zinc-800 font-medium"
