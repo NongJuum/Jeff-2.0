@@ -668,3 +668,125 @@ export const INJURY_RULES: Record<string, { label: string; warns: string[]; subs
     },
   },
 };
+
+export type WarmupRecommendation = {
+  type: "full" | "acclimation" | "skip";
+  headline: string;
+  note: string;
+  steps: { label: string; weight: number; reps: string; note: string }[];
+};
+
+export function getIntelligentWarmup(
+  currentExercise: { id: string; name: string; group: string; movement: string; muscles: string[]; warmup: boolean; load?: string },
+  exerciseIndex: number,
+  allDayExercises: { id: string; name: string; group: string; movement: string; muscles: string[]; warmup: boolean; load?: string }[],
+  workingWeight: number,
+  effectiveUnit: WeightUnit,
+  effectiveLoad: string
+): WarmupRecommendation {
+  const movement = currentExercise.movement.toLowerCase();
+  const isIsolation =
+    currentExercise.group === "Arms" ||
+    currentExercise.group === "Abs & Calves" ||
+    movement.includes("isolation") ||
+    movement.includes("raise") ||
+    movement.includes("curl") ||
+    movement.includes("flye") ||
+    movement.includes("pressdown") ||
+    movement.includes("ext");
+
+  if (!currentExercise.warmup || isIsolation || workingWeight <= 0) {
+    return {
+      type: "skip",
+      headline: "พร้อมเริ่มเซตจริงได้ทันที",
+      note: "ท่า Isolation / มัดเล็ก ไม่จำเป็นต้องวอร์มซ้ำ",
+      steps: [],
+    };
+  }
+
+  const currentMuscles = currentExercise.muscles.map((m) => m.toLowerCase());
+  const hasPriorCompoundSameMuscle = allDayExercises.slice(0, exerciseIndex).some((prev) => {
+    const prevMovement = prev.movement.toLowerCase();
+    const prevIsCompound =
+      prevMovement.includes("press") ||
+      prevMovement.includes("row") ||
+      prevMovement.includes("pull") ||
+      prevMovement.includes("squat") ||
+      prevMovement.includes("hinge");
+    return prevIsCompound && prev.muscles.some((m) => currentMuscles.includes(m.toLowerCase()));
+  });
+
+  const step = effectiveUnit === "kg" ? 2.5 : 5;
+  const snap = (w: number) => Math.max(step, Math.round(w / step) * step);
+
+  if (hasPriorCompoundSameMuscle) {
+    return {
+      type: "acclimation",
+      headline: "🔥 กล้ามเนื้ออุ่นแล้ว (Acclimation Set)",
+      note: "เพิ่งผ่านท่าก่อนหน้ามา แนะนำ 1 เซตสั้นๆ เพื่อจับจังหวะมุมเครื่อง",
+      steps: [
+        {
+          label: "Acclimation",
+          weight: Math.min(snap(workingWeight * 0.65), snap(workingWeight * 0.75)),
+          reps: "2–3",
+          note: "จับจังหวะ ไม่ล้า",
+        },
+      ],
+    };
+  }
+
+  const isBarbell = effectiveLoad === "barbell";
+  const barWeight = effectiveUnit === "kg" ? 20 : 45;
+  const steps: { label: string; weight: number; reps: string; note: string }[] = [];
+
+  // For Machine/Selectorized/Dumbbells, strictly generate maximum 2 warmup sets (never exceed 75%)
+  const isMachineOrDumbbell =
+    effectiveLoad === "selectorized" ||
+    effectiveLoad === "plate-loaded" ||
+    effectiveLoad === "cable" ||
+    effectiveLoad === "dumbbell" ||
+    effectiveLoad === "smith" ||
+    !isBarbell;
+
+  if (isMachineOrDumbbell) {
+    steps.push({
+      label: "W1",
+      weight: Math.min(snap(workingWeight * 0.45), snap(workingWeight * 0.75)),
+      reps: "8",
+      note: "หมุนเวียนเลือดและจับจังหวะ",
+    });
+    steps.push({
+      label: "W2",
+      weight: Math.min(snap(workingWeight * 0.65), snap(workingWeight * 0.75)),
+      reps: "3",
+      note: "เตรียมกล้ามเนื้อก่อนยกจริง",
+    });
+
+    return {
+      type: "full",
+      headline: "⚡ ลำดับ Warmup แนะนำ (เครื่อง/ดัมเบล 1-2 เซต)",
+      note: "เตรียมข้อต่อและมุมการเคลื่อนไหว ไม่ให้กล้ามเนื้อล้าก่อนเซตจริง",
+      steps,
+    };
+  }
+
+  // Barbell compound warmups
+  if (isBarbell && workingWeight > barWeight * 1.3) {
+    steps.push({ label: "W1 (คานเปล่า)", weight: barWeight, reps: "8–10", note: "เปิดข้อต่อ" });
+  } else {
+    steps.push({ label: "W1", weight: snap(workingWeight * 0.4), reps: "8–10", note: "หมุนเวียนเลือด" });
+  }
+  steps.push({ label: "W2", weight: snap(workingWeight * 0.6), reps: "5–6", note: "ปรับฟอร์ม" });
+  steps.push({ label: "W3", weight: snap(workingWeight * 0.8), reps: "2–3", note: "กระตุ้น CNS" });
+
+  if (workingWeight >= (effectiveUnit === "kg" ? 75 : 165)) {
+    steps.push({ label: "W4", weight: snap(workingWeight * 0.9), reps: "1", note: "จับแรงต้านจริง" });
+  }
+
+  return {
+    type: "full",
+    headline: "⚡ ลำดับ Warmup แนะนำ (ท่าหลักแรก)",
+    note: "เตรียมข้อต่อและระบบประสาทสั่งการก่อนยกเซตจริง",
+    steps,
+  };
+}

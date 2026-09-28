@@ -3,16 +3,22 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Activity,
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowUp,
   Bell,
   CalendarDays,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   ClipboardList,
   Cog,
   Download,
   Dumbbell,
   Flame,
+  Info,
   Library,
   MinusCircle,
   MoreVertical,
@@ -22,6 +28,7 @@ import {
   Save,
   Scale,
   Search,
+  SlidersHorizontal,
   Sparkles,
   Star,
   Trash2,
@@ -37,6 +44,7 @@ import { ProfileModal } from "./components/ProfileModal";
 import { ProgressPhotos } from "./components/ProgressPhotos";
 import { runMigration, hasMigrated, getMigrationResult, type MigrationResult } from "./lib/migration";
 import { WeeklyTrendChart, type WeeklyScore } from "./components/WeeklyTrendChart";
+import { AppleActivityRing } from "./components/AppleActivityRing";
 import { BodyweightManager, getCurrentBodyweight, type BodyweightEntry } from "./components/BodyweightManager";
 import { NotificationSettings } from "./components/NotificationSettings";
 import { startNotificationScheduler } from "./lib/notifications";
@@ -63,6 +71,8 @@ import {
   calculatePrescriptionWeight,
   INJURY_RULES,
   evaluateMuscleMass,
+  getIntelligentWarmup,
+  type WarmupRecommendation,
 } from "./lib/assessment";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
@@ -2233,94 +2243,125 @@ function BodyweightModal({
   );
 }
 
-export type WarmupRecommendation = {
-  type: "full" | "acclimation" | "skip";
-  headline: string;
-  note: string;
-  steps: { label: string; weight: number; reps: string; note: string }[];
-};
+export type StrengthTier = "Beginner" | "Intermediate" | "Advanced" | "Elite";
 
-function getIntelligentWarmup(
-  currentExercise: PlanExercise,
-  exerciseIndex: number,
-  allDayExercises: PlanExercise[],
-  workingWeight: number,
-  effectiveUnit: WeightUnit,
-  effectiveLoad: LoadType
-): WarmupRecommendation {
-  const movement = currentExercise.movement.toLowerCase();
-  const isIsolation =
-    currentExercise.group === "Arms" ||
-    currentExercise.group === "Abs & Calves" ||
-    movement.includes("isolation") ||
-    movement.includes("raise") ||
-    movement.includes("curl") ||
-    movement.includes("flye") ||
-    movement.includes("pressdown") ||
-    movement.includes("ext");
+export function evaluateRelativeStrength(
+  exerciseName: string,
+  loadType: LoadType,
+  e1RMLbs: number,
+  userBwLbs: number,
+  gender: "male" | "female" = "male",
+  unit: "kg" | "lbs" = "lbs"
+) {
+  const name = exerciseName.toLowerCase();
+  const femaleFactor = gender === "female" ? 0.68 : 1.0;
+  const ratio = userBwLbs > 0 ? e1RMLbs / userBwLbs : 0;
 
-  if (!currentExercise.warmup || isIsolation || workingWeight <= 0) {
-    return {
-      type: "skip",
-      headline: "พร้อมเริ่มเซตจริงได้ทันที",
-      note: "ท่า Isolation / มัดเล็ก ไม่จำเป็นต้องวอร์มซ้ำ",
-      steps: [],
-    };
+  // STRICT SCIENTIFIC BENCHMARKS (e1RM / BW)
+  let baseThresholds: [number, number, number]; // [Novice->Inter, Inter->Adv, Adv->Elite]
+
+  // 1. DELTS & LATERAL RAISES (Single cable / DB isolation)
+  if (name.includes("lat raise") || name.includes("lateral raise") || name.includes("y raise")) {
+    baseThresholds = [0.10, 0.18, 0.26];
+  }
+  // 2. REAR DELTS & FLYES
+  else if (name.includes("rear delt") || name.includes("face pull") || name.includes("flye") || name.includes("pec deck") || name.includes("crossover")) {
+    baseThresholds = [0.18, 0.28, 0.38];
+  }
+  // 3. ARMS (BICEPS / TRICEPS ISOLATION)
+  else if (name.includes("curl") || name.includes("tricep") || name.includes("skullcrusher") || name.includes("extension") || name.includes("pressdown") || name.includes("katana")) {
+    baseThresholds = [0.22, 0.35, 0.48];
+  }
+  // 4. OVERHEAD PRESS
+  else if (name.includes("shoulder press") || name.includes("overhead press") || name.includes("military")) {
+    baseThresholds = name.includes("db") ? [0.25, 0.38, 0.50] : [0.45, 0.65, 0.85];
+  }
+  // 5. BACK ROWS & PULLDOWNS
+  else if (name.includes("pulldown") || name.includes("pull up") || name.includes("chin")) {
+    baseThresholds = [0.55, 0.80, 1.05];
+  }
+  else if (name.includes("chest supported row") || name.includes("seal row") || name.includes("t-bar")) {
+    baseThresholds = [0.50, 0.75, 0.98];
+  }
+  else if (name.includes("row")) {
+    baseThresholds = name.includes("one arm") || name.includes("db") ? [0.25, 0.40, 0.55] : [0.45, 0.68, 0.90];
+  }
+  // 6. CHEST PRESS (FLAT, INCLINE, DECLINE)
+  else if (name.includes("incline")) {
+    baseThresholds = name.includes("db") ? [0.32, 0.48, 0.65] : [0.55, 0.80, 1.05];
+  }
+  else if (name.includes("decline")) {
+    baseThresholds = [0.70, 0.98, 1.25];
+  }
+  else if (name.includes("bench") || name.includes("chest press")) {
+    baseThresholds = name.includes("db") ? [0.35, 0.52, 0.70] : [0.65, 0.95, 1.25];
+  }
+  // 7. LEGS
+  else if (name.includes("leg press")) {
+    baseThresholds = [1.50, 2.30, 3.10];
+  }
+  else if (name.includes("hack") || name.includes("pendulum") || name.includes("v-squat")) {
+    baseThresholds = [1.00, 1.50, 2.00];
+  }
+  else if (name.includes("squat")) {
+    baseThresholds = [0.85, 1.25, 1.65];
+  }
+  else if (name.includes("deadlift") || name.includes("rdl")) {
+    baseThresholds = [1.05, 1.55, 2.05];
+  }
+  else if (name.includes("curl") && (name.includes("leg") || name.includes("hamstring"))) {
+    baseThresholds = [0.35, 0.52, 0.70];
+  }
+  else if (name.includes("extension") && name.includes("leg")) {
+    baseThresholds = [0.40, 0.60, 0.80];
+  }
+  else {
+    baseThresholds = [0.30, 0.50, 0.70];
   }
 
-  const currentMuscles = currentExercise.muscles.map((m) => m.toLowerCase());
-  const hasPriorCompoundSameMuscle = allDayExercises.slice(0, exerciseIndex).some((prev) => {
-    const prevMovement = prev.movement.toLowerCase();
-    const prevIsCompound =
-      prevMovement.includes("press") ||
-      prevMovement.includes("row") ||
-      prevMovement.includes("pull") ||
-      prevMovement.includes("squat") ||
-      prevMovement.includes("hinge");
-    return prevIsCompound && prev.muscles.some((m) => currentMuscles.includes(m.toLowerCase()));
-  });
+  const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
 
-  const step = effectiveUnit === "kg" ? 2.5 : 5;
-  const snap = (w: number) => Math.max(step, Math.round(w / step) * step);
+  let tier: "Beginner" | "Intermediate" | "Advanced" | "Elite" = "Beginner";
+  let label = "🌱 NOVICE";
+  let badgeClass = "border-zinc-800 bg-zinc-950 text-zinc-400 font-mono tracking-wider";
+  let targetRatio = thresholds[0];
+  let nextTierLabel = "Intermediate";
 
-  if (hasPriorCompoundSameMuscle) {
-    return {
-      type: "acclimation",
-      headline: "🔥 กล้ามเนื้ออุ่นแล้ว (Acclimation Set)",
-      note: "เพิ่งผ่านท่าก่อนหน้ามา แนะนำ 1 เซตสั้นๆ เพื่อจับจังหวะมุมเครื่อง",
-      steps: [
-        {
-          label: "Acclimation",
-          weight: snap(workingWeight * 0.65),
-          reps: "2–3",
-          note: "จับจังหวะ ไม่ล้า",
-        },
-      ],
-    };
-  }
-
-  const isBarbell = effectiveLoad === "barbell";
-  const barWeight = effectiveUnit === "kg" ? 20 : 45;
-  const steps = [];
-
-  if (isBarbell && workingWeight > barWeight * 1.3) {
-    steps.push({ label: "W1 (คานเปล่า)", weight: barWeight, reps: "8–10", note: "เปิดข้อต่อ" });
+  if (ratio >= thresholds[2]) {
+    tier = "Elite";
+    label = "🏆 ELITE";
+    badgeClass = "border-yellow-400 bg-yellow-400/20 text-yellow-300 font-mono tracking-wider shadow-[0_0_10px_rgba(250,204,21,0.25)]";
+    targetRatio = thresholds[2];
+    nextTierLabel = "ระดับสูงสุด";
+  } else if (ratio >= thresholds[1]) {
+    tier = "Advanced";
+    label = "🔥 ADVANCED";
+    badgeClass = "border-zinc-500 bg-zinc-800 text-zinc-100 font-mono tracking-wider";
+    targetRatio = thresholds[2];
+    nextTierLabel = "Elite";
+  } else if (ratio >= thresholds[0]) {
+    tier = "Intermediate";
+    label = "💪 INTERMEDIATE";
+    badgeClass = "border-yellow-500/40 bg-zinc-900 text-yellow-400 font-mono tracking-wider";
+    targetRatio = thresholds[1];
+    nextTierLabel = "Advanced";
   } else {
-    steps.push({ label: "W1", weight: snap(workingWeight * 0.4), reps: "8–10", note: "หมุนเวียนเลือด" });
-  }
-  steps.push({ label: "W2", weight: snap(workingWeight * 0.6), reps: "5–6", note: "ปรับฟอร์ม" });
-  steps.push({ label: "W3", weight: snap(workingWeight * 0.8), reps: "2–3", note: "กระตุ้น CNS" });
-
-  if (workingWeight >= (effectiveUnit === "kg" ? 75 : 165)) {
-    steps.push({ label: "W4", weight: snap(workingWeight * 0.9), reps: "1", note: "จับแรงต้านจริง" });
+    tier = "Beginner";
+    label = "🌱 NOVICE";
+    badgeClass = "border-zinc-800 bg-zinc-950 text-zinc-400 font-mono tracking-wider";
+    targetRatio = thresholds[0];
+    nextTierLabel = "Intermediate";
   }
 
-  return {
-    type: "full",
-    headline: "⚡ ลำดับ Warmup แนะนำ (ท่าหลักแรก)",
-    note: "เตรียมข้อต่อและระบบประสาทสั่งการก่อนยกเซตจริง",
-    steps,
-  };
+  const targetWeightLbs = targetRatio * userBwLbs;
+  const diffLbs = Math.max(0, targetWeightLbs - e1RMLbs);
+  const diffConverted = unit === "kg" ? Math.round(diffLbs * 0.453592 * 10) / 10 : Math.round(diffLbs * 10) / 10;
+
+  const gapMessage = tier === "Elite"
+    ? "คุณอยู่ในระดับมาตรฐานสูงสุดแล้ว!"
+    : `ขาดอีก ~${diffConverted} ${unit} (หรืออีก 1–2 Reps) เพื่อขึ้นสู่ระดับ ${nextTierLabel}`;
+
+  return { tier, label, badgeClass, gapMessage, ratio };
 }
 
 function playCountdownBeep(freq = 660) {
@@ -2342,78 +2383,6 @@ function playCountdownBeep(freq = 660) {
     osc.start(now);
     osc.stop(now + 0.15);
   } catch {}
-}
-
-export type StrengthTier = "Beginner" | "Intermediate" | "Advanced" | "Elite";
-
-export function evaluateRelativeStrength(
-  exerciseName: string,
-  loadType: LoadType,
-  ratio: number,
-  gender: "male" | "female" = "male",
-  userBw?: number | null,
-  currentWeight?: number | null,
-  unit: WeightUnit = "kg"
-) {
-  const name = exerciseName.toLowerCase();
-  const femaleFactor = gender === "female" ? 0.68 : 1.0;
-  const isHammerIso = name.includes("iso-lateral") || name.includes("iso lateral") || name.includes("hammer") || name.includes("mts");
-
-  let baseThresholds = [0.85, 1.15, 1.45]; // Horizontal Press default
-
-  if (isHammerIso) {
-    if (name.includes("incline")) baseThresholds = [0.75, 1.05, 1.35];
-    else if (name.includes("decline")) baseThresholds = [0.95, 1.30, 1.65];
-    else if (name.includes("shoulder") || name.includes("overhead")) baseThresholds = [0.60, 0.85, 1.10];
-    else if (name.includes("pulldown")) baseThresholds = [0.80, 1.10, 1.35];
-    else if (name.includes("row")) baseThresholds = [0.85, 1.15, 1.45];
-    else if (name.includes("leg press")) baseThresholds = [1.90, 2.80, 3.60];
-    else baseThresholds = [0.90, 1.25, 1.55];
-  } else if (name.includes("leg press")) {
-    baseThresholds = [1.80, 2.60, 3.40];
-  } else if (name.includes("hack") || name.includes("pendulum") || name.includes("v-squat")) {
-    baseThresholds = [1.30, 1.80, 2.30];
-  } else if (name.includes("hip thrust")) {
-    baseThresholds = [1.20, 1.70, 2.30];
-  } else if ((name.includes("deadlift") && !name.includes("romanian") && !name.includes("rdl")) || name.includes("trap bar")) {
-    baseThresholds = [1.40, 1.85, 2.35];
-  } else if (name.includes("squat") || name.includes("rdl") || name.includes("romanian")) {
-    baseThresholds = [1.15, 1.55, 1.95];
-  } else if (name.includes("incline")) {
-    baseThresholds = name.includes("db") ? [0.55, 0.80, 1.05] : [0.70, 0.95, 1.25];
-  } else if (name.includes("shoulder") || name.includes("overhead")) {
-    baseThresholds = name.includes("db") ? [0.45, 0.65, 0.85] : [0.55, 0.75, 0.95];
-  } else if (name.includes("pulldown") || name.includes("pull up")) {
-    baseThresholds = [0.75, 1.00, 1.25];
-  } else if (name.includes("row") || name.includes("seal")) {
-    baseThresholds = name.includes("one arm") ? [0.35, 0.50, 0.65] : [0.75, 1.05, 1.35];
-  } else if (name.includes("curl") && (name.includes("leg") || name.includes("hamstring"))) {
-    baseThresholds = [0.50, 0.75, 1.00];
-  } else if (name.includes("flat db") || (name.includes("db") && name.includes("press"))) {
-    baseThresholds = [0.65, 0.90, 1.15];
-  }
-
-  const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
-
-  function getDeficitInstruction(targetRatio: number, nextTierLabel: string): string {
-    if (userBw && userBw > 0 && currentWeight !== undefined && currentWeight !== null && currentWeight > 0) {
-      const targetWeight = targetRatio * userBw;
-      const diffWeight = Math.max(0, targetWeight - currentWeight);
-      return `ขาดอีก ${diffWeight.toFixed(1)} ${unit} (หรืออีก ~2 Reps ในน้ำหนักเดิม) เพื่อขึ้นสู่ระดับ ${nextTierLabel}`;
-    }
-    const diffRatio = Math.max(0, targetRatio - ratio);
-    return `เป้าหมาย ${nextTierLabel}: ${targetRatio}× BW (ขาดอีก ${diffRatio.toFixed(2)}×)`;
-  }
-
-  if (ratio >= thresholds[2]) {
-    return { tier: "Elite" as StrengthTier, label: "🏆 ELITE", badgeClass: "border-yellow-400 bg-yellow-400/20 text-yellow-300 font-mono tracking-wider", nextTarget: "ระดับมาตรฐานสูงสุดแล้ว!" };
-  } else if (ratio >= thresholds[1]) {
-    return { tier: "Advanced" as StrengthTier, label: "🔥 ADVANCED", badgeClass: "border-zinc-500 bg-zinc-800 text-zinc-100 font-mono tracking-wider", nextTarget: getDeficitInstruction(thresholds[2], "Elite") };
-  } else if (ratio >= thresholds[0]) {
-    return { tier: "Intermediate" as StrengthTier, label: "💪 INTERMEDIATE", badgeClass: "border-yellow-500/40 bg-zinc-900 text-yellow-400 font-mono tracking-wider", nextTarget: getDeficitInstruction(thresholds[1], "Advanced") };
-  } else {
-    return { tier: "Beginner" as StrengthTier, label: "🌱 NOVICE", badgeClass: "border-zinc-800 bg-zinc-950 text-zinc-400 font-mono tracking-wider", nextTarget: getDeficitInstruction(thresholds[0], "Intermediate") };
-  }
 }
 
 export default function Page() {
@@ -2455,7 +2424,7 @@ export default function Page() {
   const [exerciseSearch, setExerciseSearch] = useState("");
   const [exerciseGroupFilter, setExerciseGroupFilter] = useState<MuscleGroup | "All">("All");
   const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
-  const [compactList, setCompactList] = useState(false);
+  const [compactList, setCompactList] = useState(true);
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
   const [presetSetsMap, setPresetSetsMap] = useState<Record<string, number>>(() => readJson<Record<string, number>>(PRESET_SETS_KEY, {}));
   const [cardioLogs, setCardioLogs] = useState<CardioLog[]>(() => readJson<CardioLog[]>(CARDIO_LOGS_KEY, []));
@@ -2698,6 +2667,13 @@ export default function Page() {
   // Profile & Settings Modal (U1)
   const [showProfileModal, setShowProfileModal] = useState(false);
 
+  // Focus Mode & Progressive Session Flow State (Lifting vs Cardio)
+  const [sessionStage, setSessionStage] = useState<"lifting" | "cardio">("lifting");
+  const [showAnatomyModal, setShowAnatomyModal] = useState(false);
+  const [showSetupDrawer, setShowSetupDrawer] = useState(false);
+  // Session exercise custom order overrides (key: `${mode}_${activeDayIndex}`, value: list of exercise IDs)
+  const [sessionExerciseOrders, setSessionExerciseOrders] = useState<Record<string, string[]>>({});
+
   useEffect(() => {
     if (!hasCompletedOnboarding()) setShowOnboarding(true);
   }, []);
@@ -2714,7 +2690,44 @@ export default function Page() {
   const isPresetLike = mode === "today" || mode === "preset";
   const activePlan = isPresetLike ? activePresetPlan : selectedCustomPlan?.days ?? [];
   const activeDayIndex = isPresetLike ? selectedDay : selectedCustomDay;
-  const day = activePlan[activeDayIndex] ?? activePlan[0];
+  const rawDay = activePlan[activeDayIndex] ?? activePlan[0];
+
+  const currentDayKey = `${mode}_${activeDayIndex}`;
+  const day = useMemo(() => {
+    if (!rawDay) return rawDay;
+    const customOrder = sessionExerciseOrders[currentDayKey];
+    if (!customOrder || customOrder.length === 0) return rawDay;
+    
+    // Sort rawDay.exercises according to customOrder
+    const sorted = [...rawDay.exercises].sort((a, b) => {
+      const idxA = customOrder.indexOf(a.id);
+      const idxB = customOrder.indexOf(b.id);
+      if (idxA === -1 && idxB === -1) return 0;
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+    return { ...rawDay, exercises: sorted };
+  }, [rawDay, sessionExerciseOrders, currentDayKey]);
+
+  function moveSessionExercise(currentIndex: number, direction: -1 | 1) {
+    if (!day || !day.exercises) return;
+    const targetIndex = currentIndex + direction;
+    if (targetIndex < 0 || targetIndex >= day.exercises.length) return;
+
+    if (mode === "custom") {
+      reorderCustomExercises(currentIndex, targetIndex);
+      return;
+    }
+
+    const currentIds = day.exercises.map((e) => e.id);
+    const [movedId] = currentIds.splice(currentIndex, 1);
+    currentIds.splice(targetIndex, 0, movedId);
+    setSessionExerciseOrders((prev) => ({
+      ...prev,
+      [currentDayKey]: currentIds,
+    }));
+  }
 
   useEffect(() => {
     const parsed = readJson<LogSet[]>(LATEST_LOGS_KEY, []);
@@ -3290,7 +3303,8 @@ export default function Page() {
     exercise: PlanExercise,
     baseExerciseId: string,
     setIndex: number,
-    field: "weightLbs" | "reps"
+    field: "weightLbs" | "reps",
+    machineTag?: string
   ) => {
     if (e.key === "Enter") {
       e.preventDefault();
@@ -3298,7 +3312,7 @@ export default function Page() {
         const repsInput = document.getElementById(`rep-input-${baseExerciseId}-${setIndex}`);
         repsInput?.focus();
       } else if (field === "reps") {
-        saveSingleSet(exercise, setIndex);
+        saveSingleSet(exercise, setIndex, machineTag);
         const nextWeightInput = document.getElementById(`weight-input-${baseExerciseId}-${setIndex + 1}`);
         if (nextWeightInput) {
           nextWeightInput.focus();
@@ -3852,9 +3866,9 @@ export default function Page() {
           <h2 className="mt-1 text-lg font-black">{pageMeta.title}</h2>
 
           {["today", "preset", "custom"].includes(mode) && (
-            <div className="mt-2.5 flex gap-1 rounded-xl bg-zinc-950 p-1">
+            <div className="mt-2.5 flex items-center gap-1.5 rounded-xl bg-zinc-950 p-1">
               {[
-                { id: "today", label: "Today" },
+                { id: "today", label: "Today Workout" },
                 { id: "preset", label: "Preset Plan" },
                 { id: "custom", label: "Custom Builder" },
               ].map((tab) => (
@@ -3870,90 +3884,93 @@ export default function Page() {
                   {tab.label}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setShowSetupDrawer((prev) => !prev)}
+                className={`rounded-lg px-2.5 py-1.5 text-xs transition border flex items-center gap-1 shrink-0 ${
+                  showSetupDrawer
+                    ? "bg-zinc-800 text-yellow-400 border-yellow-500/40"
+                    : "bg-zinc-900/80 text-zinc-400 border-zinc-800 hover:text-zinc-200"
+                }`}
+                title="ตั้งค่าโปรแกรมและจำนวนวัน"
+                aria-label="Toggle setup controls"
+              >
+                <SlidersHorizontal size={13} />
+                <span className="hidden sm:inline font-bold">ตั้งค่า</span>
+              </button>
             </div>
           )}
 
-          {(mode === "today" || mode === "preset") && (
-            <div className="mt-3 rounded-xl bg-zinc-950 p-3">
-              <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Training days</label>
-              <div className="relative">
-                <select
-                  value={days}
-                  onChange={(event) => {
-                    setDays(Number(event.target.value) as 3 | 4 | 5);
-                    setSelectedDay(0);
-                    setActiveExerciseIndex(0);
-                  }}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm font-bold outline-none"
-                >
-                  <option value={3}>3 days Full Body</option>
-                  <option value={4}>4 days Upper / Lower</option>
-                  <option value={5}>5 days Split</option>
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-3.5 text-zinc-400" size={20} />
-              </div>
-            </div>
-          )}
+          {/* Setup drawer: Extracted out of active lifting view into collapsible controls */}
+          {(showSetupDrawer || mode === "preset" || mode === "custom") && (
+            <div className="mt-3 space-y-2.5 pt-2 border-t border-zinc-800/80 animate-in fade-in duration-150">
+              {(mode === "today" || mode === "preset") && (
+                <div className="rounded-xl bg-zinc-950 p-3">
+                  <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Training days</label>
+                  <div className="relative">
+                    <select
+                      value={days}
+                      onChange={(event) => {
+                        setDays(Number(event.target.value) as 3 | 4 | 5);
+                        setSelectedDay(0);
+                        setActiveExerciseIndex(0);
+                      }}
+                      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm font-bold outline-none"
+                    >
+                      <option value={3}>3 days Full Body</option>
+                      <option value={4}>4 days Upper / Lower</option>
+                      <option value={5}>5 days Split</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-4 top-3 text-zinc-400" size={18} />
+                  </div>
+                </div>
+              )}
 
-          {mode === "custom" && selectedCustomPlan && (
-            <div className="mt-3 rounded-xl bg-zinc-950 p-3">
-              <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Custom plan</label>
-              <div className="relative">
-                <select
-                  value={selectedCustomPlan?.id ?? ""}
-                  onChange={(event) => {
-                    setSelectedCustomPlanId(event.target.value);
-                    setSelectedCustomDay(0);
-                    setActiveExerciseIndex(0);
-                  }}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-sm font-bold outline-none"
-                >
-                  {customPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>{plan.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-4 top-3.5 text-zinc-400" size={20} />
-              </div>
+              {mode === "custom" && selectedCustomPlan && (
+                <div className="rounded-xl bg-zinc-950 p-3">
+                  <label className="mb-2 block text-xs font-bold uppercase text-zinc-500">Custom plan</label>
+                  <div className="relative">
+                    <select
+                      value={selectedCustomPlan?.id ?? ""}
+                      onChange={(event) => {
+                        setSelectedCustomPlanId(event.target.value);
+                        setSelectedCustomDay(0);
+                        setActiveExerciseIndex(0);
+                      }}
+                      className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm font-bold outline-none"
+                    >
+                      {customPlans.map((plan) => (
+                        <option key={plan.id} value={plan.id}>{plan.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-4 top-3 text-zinc-400" size={18} />
+                  </div>
+                </div>
+              )}
+
+              {(mode === "today" || mode === "preset") && days === 5 && (
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
+                  <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => { setFiveDayMode("twoLegDays"); setSelectedDay(0); }} className={`rounded-xl px-3 py-2.5 text-xs font-black ${fiveDayMode === "twoLegDays" ? "bg-yellow-400 text-black font-black" : "bg-zinc-900 text-zinc-300"}`}>2 Leg Days</button>
+                    <button onClick={() => { setFiveDayMode("oneLegDay"); setSelectedDay(0); }} className={`rounded-xl px-3 py-2.5 text-xs font-black ${fiveDayMode === "oneLegDay" ? "bg-yellow-400 text-black font-black" : "bg-zinc-900 text-zinc-300"}`}>1 Leg Day</button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {(mode === "today" || mode === "preset" || mode === "custom") && (
-          <>
-            <div 
-              role="button" 
-              tabIndex={0}
-              onClick={() => setShowScoreModal(true)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  setShowScoreModal(true);
-                }
-              }}
-              className="flex cursor-pointer items-center justify-between rounded-xl bg-zinc-900 px-3 py-2.5 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800/90 active:scale-[0.99] border border-zinc-800 hover:border-yellow-500/30"
-            >
-              <span className="flex items-center gap-1.5">
-                <Trophy className="text-yellow-400 font-bold" size={14} />
-                Weekly Score: {performanceReport.hasData ? `${performanceReport.score}/100 (${performanceReport.rank})` : "—/100"}
-                {performanceReport.currentStreak > 0 && ` · 🔥 ${performanceReport.currentStreak}w streak`}
-              </span>
-              <span className="text-[11px] text-yellow-400 font-bold font-medium underline underline-offset-2">แตะเพื่อดูรายละเอียด</span>
-            </div>
-            {weeklyScores.length >= 2 && (
-              <div className="mt-3">
-                <WeeklyTrendChart scores={weeklyScores.slice(-8)} />
-              </div>
-            )}
-          </>
-        )}
-
-        {(mode === "today" || mode === "preset") && days === 5 && (
-          <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-            <p className="mb-2 text-xs font-bold uppercase text-zinc-500">5 day split type</p>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { setFiveDayMode("twoLegDays"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "twoLegDays" ? "bg-yellow-400 text-black font-black" : "bg-zinc-950 text-zinc-300"}`}>2 Leg Days</button>
-              <button onClick={() => { setFiveDayMode("oneLegDay"); setSelectedDay(0); }} className={`rounded-2xl px-3 py-3 text-sm font-black ${fiveDayMode === "oneLegDay" ? "bg-yellow-400 text-black font-black" : "bg-zinc-950 text-zinc-300"}`}>1 Leg Day</button>
-            </div>
+        {/* 1. Apple-Style Activity Ring (Score & Weekly Progress) */}
+        {["today", "preset", "custom"].includes(mode) && (
+          <div className="mt-3">
+            <AppleActivityRing
+              score={performanceReport.hasData ? performanceReport.score : 0}
+              rank={performanceReport.rank}
+              weeklyScores={weeklyScores}
+              streakWeeks={performanceReport.currentStreak}
+              onOpenScoreDetails={() => setShowScoreModal(true)}
+            />
           </div>
         )}
 
@@ -4303,47 +4320,181 @@ export default function Page() {
                 </>
               )}
 
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {day.focus.map((focus) => (
-                  <span key={focus} className="rounded-full bg-zinc-800 px-2.5 py-1 text-[11px] font-medium text-zinc-300">{focus}</span>
-                ))}
-              </div>
-
-              <DayMuscleOverviewCard summary={activeMuscleSummary} />
-            </div>
-
-            <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold">Exercises</h3>
-                  
-                </div>
-                <button
-                  onClick={() => setCompactList((value) => !value)}
-                  className="rounded-xl bg-zinc-950 px-3 py-2 text-xs font-medium text-zinc-300"
-                >
-                  {compactList ? "All" : "Focus"}
-                </button>
-              </div>
-
-              <div className="flex snap-x gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {day.exercises.map((item, index) => (
+              <div className="mt-2.5 flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-bold text-zinc-400">Target:</span>
+                  {day.focus.map((focus) => (
+                    <span key={focus} className="rounded-lg bg-zinc-800/90 border border-zinc-700/60 px-2.5 py-1 text-xs font-bold text-yellow-300">
+                      {focus}
+                    </span>
+                  ))}
+                  {/* Compact Anatomy Pill (i) button */}
                   <button
-                    key={item.id}
-                    onClick={() => {
-                      setActiveExerciseIndex(index);
-                      setCompactList(true);
-                    }}
-                    className={`min-w-[96px] snap-start rounded-xl px-3 py-2.5 text-left text-xs ${
-                      activeExerciseIndex === index ? "bg-yellow-400 text-black font-black uppercase shadow-[0_0_12px_rgba(250,204,21,0.3)]" : "bg-zinc-950 text-zinc-300"
-                    }`}
+                    type="button"
+                    onClick={() => setShowAnatomyModal(true)}
+                    className="flex items-center gap-1 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-2 py-1 text-xs font-bold text-yellow-300 hover:bg-yellow-500/20 transition active:scale-95"
+                    title="เปิดแผนภาพกายวิภาค 3D"
+                    aria-label="View anatomical muscle diagram"
                   >
-                    <span className="block text-[11px] font-bold">#{index + 1}</span>
-                    <span className="mt-1 line-clamp-3 block text-sm font-semibold leading-5">{item.name}</span>
+                    <Info size={13} />
+                    <span>3D Anatomy</span>
                   </button>
-                ))}
+                </div>
               </div>
             </div>
+
+            {/* Progressive Session Flow Step Switcher: 1. Resistance Training vs 2. Cardio & Cooldown */}
+            <div className="mt-3 flex rounded-xl bg-zinc-950 p-1 border border-zinc-800/80">
+              <button
+                type="button"
+                onClick={() => setSessionStage("lifting")}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-black uppercase tracking-wider transition ${
+                  sessionStage === "lifting"
+                    ? "bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.3)]"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Dumbbell size={15} />
+                <span>1. เวทเทรนนิ่ง ({day.exercises.length} ท่า)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setSessionStage("cardio")}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-black uppercase tracking-wider transition ${
+                  sessionStage === "cardio"
+                    ? "bg-yellow-400 text-black shadow-[0_0_15px_rgba(250,204,21,0.3)]"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                <Activity size={15} />
+                <span>2. คาร์ดิโอ & คูลดาวน์</span>
+              </button>
+            </div>
+
+            {/* Dynamic Exercise Queue & Reordering Carousel (Rendered when in lifting stage) */}
+            {sessionStage === "lifting" && (
+              <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-black uppercase tracking-tight text-white">คิวลำดับท่าฝึก</h3>
+                    <span className="text-[11px] text-zinc-500 font-bold">
+                      {activeExerciseIndex + 1}/{day.exercises.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setCompactList((value) => !value)}
+                      className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs font-bold text-zinc-300 hover:border-yellow-500/30 transition"
+                    >
+                      {compactList ? "แสดงท่าเดียว (Focus)" : "แสดงทุกท่า (All)"}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Queue Carousel with Reorder (←/→) and Quick Substitute button */}
+                <div className="flex snap-x gap-2 overflow-x-auto pb-1.5 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  {day.exercises.map((item, index) => {
+                    const isSelected = activeExerciseIndex === index;
+                    return (
+                      <div
+                        key={item.id}
+                        className={`min-w-[130px] max-w-[150px] shrink-0 snap-start rounded-xl p-2.5 flex flex-col justify-between transition border ${
+                          isSelected
+                            ? "bg-zinc-900 border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.25)]"
+                            : "bg-zinc-950/80 border-zinc-800/80 hover:border-zinc-700"
+                        }`}
+                      >
+                        {/* Top: Set # + Move buttons */}
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveExerciseIndex(index);
+                              setCompactList(true);
+                            }}
+                            className={`text-[10px] font-mono font-black uppercase px-1.5 py-0.5 rounded ${
+                              isSelected ? "bg-yellow-400 text-black font-black" : "bg-zinc-800 text-zinc-400"
+                            }`}
+                          >
+                            #{index + 1}
+                          </button>
+
+                          <div className="flex items-center gap-0.5">
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveSessionExercise(index, -1);
+                                if (activeExerciseIndex === index) setActiveExerciseIndex(index - 1);
+                                else if (activeExerciseIndex === index - 1) setActiveExerciseIndex(index);
+                              }}
+                              className="h-6 w-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-20 transition"
+                              title="ย้ายไปก่อนหน้า"
+                              aria-label="Move exercise earlier"
+                            >
+                              <ChevronLeft size={13} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === day.exercises.length - 1}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                moveSessionExercise(index, 1);
+                                if (activeExerciseIndex === index) setActiveExerciseIndex(index + 1);
+                                else if (activeExerciseIndex === index + 1) setActiveExerciseIndex(index);
+                              }}
+                              className="h-6 w-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white disabled:opacity-20 transition"
+                              title="ย้ายไปถัดไป"
+                              aria-label="Move exercise later"
+                            >
+                              <ChevronRight size={13} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Title button */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveExerciseIndex(index);
+                            setCompactList(true);
+                          }}
+                          className="text-left w-full my-1 group"
+                        >
+                          <span className={`line-clamp-2 text-xs font-bold leading-4 transition ${
+                            isSelected ? "text-yellow-300 font-black" : "text-zinc-300 group-hover:text-white"
+                          }`}>
+                            {item.name}
+                          </span>
+                        </button>
+
+                        {/* Bottom: Quick Swap equipment/variant button */}
+                        <div className="mt-1.5 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between">
+                          <span className="text-[10px] text-zinc-500 font-mono">{item.sets} Sets</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveExerciseIndex(index);
+                              setSubstituteModalExercise(item);
+                              setSubstituteSearch("");
+                              setSubstituteFilter("movement");
+                            }}
+                            className="flex items-center gap-1 text-[10px] font-bold text-yellow-400 hover:text-yellow-300 transition py-0.5 px-1.5 rounded bg-zinc-900 border border-zinc-800 hover:border-yellow-500/40"
+                            title="สลับท่าหรือเครื่องเล่นนี้"
+                          >
+                            <ArrowLeftRight size={11} />
+                            <span>สลับ</span>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <details className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
               <summary className="cursor-pointer text-xs font-bold text-zinc-300">Volume</summary>
               <p className="mt-2 text-xs text-zinc-400">Direct weekly sets</p>
@@ -4435,8 +4586,8 @@ export default function Page() {
                 const isFavoriteMachine = !!currentMachine && favoriteMachines[exercise.name] === currentMachine;
                 const effectiveLoad = mapMachineVariantToLoad(currentMachine, getLoadType(exercise));
                 const effectiveKey = getEffectiveExerciseKey(exercise.name, currentMachine);
-                const records = recordsMap[effectiveKey] ?? (currentMachine ? recordsMap[exercise.name] : {}) ?? {};
-                const pr = records.maxWeight ?? prMap[effectiveKey] ?? prMap[exercise.name];
+                const records = recordsMap[effectiveKey] ?? (currentMachine ? {} : recordsMap[exercise.name]) ?? {};
+                const pr = records.maxWeight ?? prMap[effectiveKey] ?? (currentMachine ? undefined : prMap[exercise.name]);
                 const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
                 const restMode = restModeMap[baseExercise.id] ?? "normal";
                 const selectedRestSeconds = customRestMap[baseExercise.id] ?? getRestSecondsByMode({ ...exercise, id: baseExercise.id }, restMode);
@@ -4459,7 +4610,9 @@ export default function Page() {
 
     // Check set #1 from inputs or logs (Set numbers start at 1, not 0)
     const inputWeightSet1 = parseFloat(setInputs[0]?.weightLbs);
-    const loggedWeightSet1 = lastSetMap[effectiveKey]?.[1]?.rawValue ?? lastSetMap[effectiveKey]?.[1]?.weightLbs ?? lastSetMap[exercise.name]?.[1]?.rawValue;
+    const inputRepsSet1 = parseFloat(setInputs[0]?.reps);
+    const loggedWeightSet1 = lastSetMap[effectiveKey]?.[1]?.rawValue ?? lastSetMap[effectiveKey]?.[1]?.weightLbs ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.rawValue : undefined);
+    const loggedRepsSet1 = lastSetMap[effectiveKey]?.[1]?.reps ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.reps : undefined);
     const prWeight = pr?.weightLbs ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs) : 0;
 
     const baselineWorkingWeight = 
@@ -4478,25 +4631,22 @@ export default function Page() {
       effectiveLoad
     );
 
-    const userBwLbs = bodyweightEntry?.lbs ?? (userProfile?.weightKg ? userProfile.weightKg * 2.20462 : null);
-    const userBwActiveUnit = effectiveUnit === "kg"
-      ? (bodyweightEntry ? bodyweightEntry.lbs * 0.453592 : (userProfile?.weightKg ?? null))
-      : userBwLbs;
-    const currentWeightActiveUnit = pr?.weightLbs && pr.weightLbs > 0
-      ? (effectiveUnit === "kg" ? pr.weightLbs * 0.453592 : pr.weightLbs)
-      : baselineWorkingWeight;
-    const relativeWeightLbs = pr?.weightLbs && pr.weightLbs > 0
-      ? pr.weightLbs
-      : (effectiveUnit === "kg" ? baselineWorkingWeight * 2.20462 : baselineWorkingWeight);
-    const relativeRatio = userBwLbs && userBwLbs > 0 && relativeWeightLbs > 0 ? relativeWeightLbs / userBwLbs : null;
-    const strengthTierInfo = relativeRatio
+    const userBwLbs = bodyweightEntry?.lbs ?? (userProfile?.weightKg ? userProfile.weightKg * 2.20462 : 0);
+    const e1RMLbs = pr?.weightLbs && pr.weightLbs > 0
+      ? epley1RM(pr.weightLbs, pr.reps || 1)
+      : (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0)
+      ? epley1RM(effectiveUnit === "kg" ? inputWeightSet1 * 2.20462 : inputWeightSet1, inputRepsSet1 > 0 ? inputRepsSet1 : 8)
+      : (loggedWeightSet1 && loggedWeightSet1 > 0)
+      ? epley1RM(effectiveUnit === "kg" ? loggedWeightSet1 * 2.20462 : loggedWeightSet1, loggedRepsSet1 ? Number(loggedRepsSet1) : 8)
+      : epley1RM(effectiveUnit === "kg" ? baselineWorkingWeight * 2.20462 : baselineWorkingWeight, 8);
+
+    const strengthTierInfo = userBwLbs > 0 && e1RMLbs > 0
       ? evaluateRelativeStrength(
           exercise.name,
           getLoadType(exercise),
-          relativeRatio,
+          e1RMLbs,
+          userBwLbs,
           userProfile?.gender ?? "male",
-          userBwActiveUnit,
-          currentWeightActiveUnit,
           effectiveUnit
         )
       : null;
@@ -4543,17 +4693,30 @@ export default function Page() {
                         </div>
                       </div>
 
-                      {/* Right: Actions (YouTube / Delete) + Options & Chevron Indicator */}
+                      {/* Right: Actions (Substitute / YouTube / Delete) + Chevron Indicator */}
                       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSubstituteModalExercise(baseExercise);
+                            setSubstituteSearch("");
+                            setSubstituteFilter("movement");
+                          }}
+                          className="flex items-center gap-1 rounded-xl bg-zinc-900 border border-zinc-800 px-2.5 py-2 text-xs font-bold text-yellow-400 hover:border-yellow-400 transition active:scale-95"
+                          title="เปลี่ยนท่าสำรอง หรือสลับเครื่องเล่น"
+                        >
+                          <RotateCcw size={14} />
+                          <span className="hidden sm:inline">สลับท่า/เครื่อง</span>
+                        </button>
                         <a
                           href={youtubeSearch(`${exercise.name} proper form`)}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-xl bg-zinc-900 border border-zinc-800 p-2 text-zinc-400 hover:text-white transition"
+                          className="rounded-xl bg-zinc-900 border border-zinc-800 p-2 text-zinc-300 hover:text-white transition"
                           aria-label="Watch demo"
-                          title="ดูคลิปสอนท่าทางที่ถูกต้อง"
+                          title="ดูคลิปสอนฟอร์ม"
                         >
-                          <PlayCircle size={16} />
+                          <PlayCircle size={18} />
                         </a>
                         {mode === "custom" && (
                           <button
@@ -4595,15 +4758,15 @@ export default function Page() {
                             ) : null}
                           </div>
 
-                          {strengthTierInfo && relativeRatio && (
+                          {strengthTierInfo && (
                             <div className="mt-2 flex flex-wrap items-center gap-2">
                               <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-xs font-black tabular-nums uppercase ${strengthTierInfo.badgeClass}`}>
                                 <span>{strengthTierInfo.label}</span>
                                 <span className="opacity-60">·</span>
-                                <span>{relativeRatio.toFixed(2)}× BW</span>
+                                <span>{strengthTierInfo.ratio.toFixed(2)}× BW</span>
                               </span>
                               <span className="text-[11px] font-medium text-zinc-400 truncate">
-                                {strengthTierInfo.nextTarget}
+                                {strengthTierInfo.gapMessage}
                               </span>
                             </div>
                           )}
@@ -4767,26 +4930,23 @@ export default function Page() {
                         </div>
                       </div>
 
-                      <div className="mb-2.5 flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-zinc-500 px-1 border-b border-zinc-900 pb-1.5">
-                        <span className="w-8 text-center font-mono">SET</span>
-                        <div className="flex-1 text-center flex items-center justify-center gap-1.5">
+                      <div className="mb-2 grid grid-cols-[36px_1fr_1fr_44px] gap-2 items-center text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 px-1">
+                        <span className="text-center">SET</span>
+                        <div className="flex items-center justify-center gap-1">
                           <span>WEIGHT ({effectiveUnit.toUpperCase()})</span>
                           <button
                             type="button"
                             onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
-                            className="rounded bg-zinc-900 border border-zinc-800 px-1.5 py-0.5 text-[9px] font-bold text-yellow-400 hover:border-yellow-400/50 transition"
-                            title="สลับหน่วย kg / lbs สำหรับท่านี้"
-                          >
-                            ⇄ {effectiveUnit === "kg" ? "LBS" : "KG"}
-                          </button>
+                            className="text-yellow-400 hover:underline text-[9px]"
+                          >⇄</button>
                         </div>
-                        <span className="flex-1 text-center">REPS</span>
-                        <span className="w-11 text-center">DONE</span>
+                        <span className="text-center">REPS</span>
+                        <span className="text-center">DONE</span>
                       </div>
 
                       <div className="space-y-2">
                         {setInputs.map((set, setIndex) => {
-                          const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1] ?? (!currentMachine ? lastSetMap[exercise.name]?.[setIndex + 1] : undefined);
+                          const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1];
                           const fallbackRepVal = latestSet ? Number(latestSet.reps) : 10;
                           const fallbackWeightVal = latestSet
                             ? latestSet.unit === effectiveUnit
@@ -4816,91 +4976,69 @@ export default function Page() {
                                 </div>
                               )}
 
-                              <div className="flex items-center gap-1.5 sm:gap-2">
+                              <div className="grid grid-cols-[36px_1fr_1fr_44px] gap-2 items-center">
                                 {/* Set Number */}
-                                <div className="w-8 shrink-0 text-center font-mono font-black text-sm text-zinc-400">
-                                  {setIndex + 1 < 10 ? `0${setIndex + 1}` : setIndex + 1}
+                                <div className="flex items-center justify-center font-mono font-black text-sm text-zinc-400">
+                                  {String(setIndex + 1).padStart(2, '0')}
                                 </div>
 
-                                {/* Weight Input Box (Zepp Digital Stepper Cell) */}
-                                <div className="flex flex-1 items-center justify-between bg-[#1a1a1e] rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-yellow-400 transition min-w-0">
+                                {/* Weight Input Box */}
+                                <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 py-1 focus-within:border-yellow-400 focus-within:ring-1 focus-within:ring-yellow-400 transition min-w-0 min-h-[44px]">
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="w-7 h-8 shrink-0 flex items-center justify-center text-zinc-400 hover:text-yellow-400 font-black text-lg select-none"
-                                    aria-label={`Decrease weight for set ${setIndex + 1}`}
-                                  >
-                                    −
-                                  </button>
-                                  <div className="flex items-baseline gap-1 justify-center flex-1 min-w-0">
-                                    <input
-                                      id={`weight-input-${baseExercise.id}-${setIndex}`}
-                                      inputMode="decimal"
-                                      value={set.weightLbs}
-                                      onChange={(event) => updateSet(baseExercise.id, setIndex, "weightLbs", event.target.value, effectiveSets)}
-                                      onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs")}
-                                      aria-label={`Weight in ${effectiveUnit} for set ${setIndex + 1}`}
-                                      className="w-14 min-w-0 text-xl font-mono font-black text-white tabular-nums text-center bg-transparent outline-none"
-                                      placeholder={String(effectivePlaceholderWeight || 0)}
-                                    />
-                                    <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-widest select-none">{effectiveUnit}</span>
-                                  </div>
+                                    className="min-h-[44px] min-w-[40px] flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 font-black text-xl shrink-0 select-none"
+                                  >−</button>
+                                  <input
+                                    id={`weight-input-${baseExercise.id}-${setIndex}`}
+                                    inputMode="decimal"
+                                    value={set.weightLbs}
+                                    onChange={(e) => updateSet(baseExercise.id, setIndex, "weightLbs", e.target.value, effectiveSets)}
+                                    onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs", currentMachine)}
+                                    className="w-full text-center font-mono font-black text-lg text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
+                                    placeholder={String(effectivePlaceholderWeight || 0)}
+                                  />
                                   <button
                                     type="button"
                                     onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="w-7 h-8 shrink-0 flex items-center justify-center text-zinc-400 hover:text-yellow-400 font-black text-lg select-none"
-                                    aria-label={`Increase weight for set ${setIndex + 1}`}
-                                  >
-                                    +
-                                  </button>
+                                    className="min-h-[44px] min-w-[40px] flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 font-black text-xl shrink-0 select-none"
+                                  >+</button>
                                 </div>
 
-                                {/* Reps Input Box (Zepp Digital Stepper Cell) */}
-                                <div className="flex flex-1 items-center justify-between bg-[#1a1a1e] rounded-xl px-2 py-1.5 focus-within:ring-2 focus-within:ring-yellow-400 transition min-w-0">
+                                {/* Reps Input Box */}
+                                <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 py-1 focus-within:border-yellow-400 focus-within:ring-1 focus-within:ring-yellow-400 transition min-w-0 min-h-[44px]">
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
-                                    className="w-7 h-8 shrink-0 flex items-center justify-center text-zinc-400 hover:text-yellow-400 font-black text-lg select-none"
-                                    aria-label={`Decrease reps for set ${setIndex + 1}`}
-                                  >
-                                    −
-                                  </button>
-                                  <div className="flex items-baseline gap-1 justify-center flex-1 min-w-0">
-                                    <input
-                                      id={`rep-input-${baseExercise.id}-${setIndex}`}
-                                      inputMode="numeric"
-                                      value={set.reps}
-                                      onChange={(event) => updateSet(baseExercise.id, setIndex, "reps", event.target.value, effectiveSets)}
-                                      onKeyDown={(event) => handleSetInputKeyDown(event, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps")}
-                                      aria-label={`Reps for set ${setIndex + 1}`}
-                                      className="w-12 min-w-0 text-xl font-mono font-black text-white tabular-nums text-center bg-transparent outline-none"
-                                      placeholder={latestSet ? String(latestSet.reps) : "0"}
-                                    />
-                                    <span className="text-[10px] font-bold text-yellow-400 uppercase tracking-widest select-none">REPS</span>
-                                  </div>
+                                    className="min-h-[44px] min-w-[40px] flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 font-black text-xl shrink-0 select-none"
+                                  >−</button>
+                                  <input
+                                    id={`rep-input-${baseExercise.id}-${setIndex}`}
+                                    inputMode="numeric"
+                                    value={set.reps}
+                                    onChange={(e) => updateSet(baseExercise.id, setIndex, "reps", e.target.value, effectiveSets)}
+                                    onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps", currentMachine)}
+                                    className="w-full text-center font-mono font-black text-lg text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
+                                    placeholder={latestSet ? String(latestSet.reps) : "0"}
+                                  />
                                   <button
                                     type="button"
                                     onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
-                                    className="w-7 h-8 shrink-0 flex items-center justify-center text-zinc-400 hover:text-yellow-400 font-black text-lg select-none"
-                                    aria-label={`Increase reps for set ${setIndex + 1}`}
-                                  >
-                                    +
-                                  </button>
+                                    className="min-h-[44px] min-w-[40px] flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 font-black text-xl shrink-0 select-none"
+                                  >+</button>
                                 </div>
 
-                                {/* Checkmark Button */}
+                                {/* Done Checkmark */}
                                 <button
                                   type="button"
                                   onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
-                                  aria-label={`Save set ${setIndex + 1}`}
-                                  title={set.done ? "เซ็ตนี้บันทึกแล้ว (แตะเพื่อบันทึกซ้ำ)" : "บันทึกเซ็ตนี้"}
-                                  className={`w-11 h-11 shrink-0 rounded-xl flex items-center justify-center transition active:scale-90 ${
+                                  className={`min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center transition active:scale-90 border ${
                                     set.done
-                                      ? "bg-yellow-400 text-black shadow-[0_0_14px_rgba(255,229,0,0.5)] font-black"
-                                      : "bg-[#1a1a1e] text-zinc-500 hover:text-yellow-400"
+                                      ? "bg-yellow-400 border-yellow-300 text-black shadow-[0_0_12px_rgba(250,204,21,0.4)]"
+                                      : "bg-zinc-900/60 border-zinc-800 text-zinc-500 hover:border-yellow-400 hover:text-yellow-400"
                                   }`}
                                 >
-                                  <Check className={set.done ? "stroke-[3]" : "stroke-[2] opacity-40"} size={18} />
+                                  <Check className={set.done ? "stroke-[3]" : "stroke-[1.5] opacity-40"} size={18} />
                                 </button>
                               </div>
                             </div>
@@ -4910,7 +5048,7 @@ export default function Page() {
                       <button
                         onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
                         aria-label="Finish working sets and clear inputs"
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase tracking-widest py-3.5 shadow-lg shadow-yellow-500/20 active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-yellow-400"
+                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase tracking-widest py-3.5 shadow-lg shadow-yellow-500/20 active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-yellow-400 min-h-[44px]"
                       >
                         <Save size={18} /> Finish & clear
                       </button>
@@ -4935,82 +5073,6 @@ export default function Page() {
                           </button>
                         ))}
                       </div>
-                    </div>
-
-                    {/* [Order 5] Rest Timer Controls */}
-                    <div className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-bold uppercase text-zinc-500">Rest Timer</p>
-                          <p className="mt-1 text-2xl font-black text-yellow-300 tabular-nums tracking-tight font-mono">
-                            {restTimer.exerciseId === baseExercise.id && restTimer.secondsLeft > 0
-                              ? formatRestTime(restTimer.secondsLeft)
-                              : formatRestTime(selectedRestSeconds)}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => setRestTimerEnabled((value) => !value)}
-                            className={`rounded-xl px-3 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-yellow-400 ${
-                              restTimerEnabled ? "bg-yellow-400 text-black font-black" : "bg-zinc-900 text-zinc-400"
-                            }`}
-                            aria-label={restTimerEnabled ? "Disable rest timer" : "Enable rest timer"}
-                            type="button"
-                          >
-                            {restTimerEnabled ? "On" : "Off"}
-                          </button>
-                          <button
-                            onClick={() =>
-                              restTimer.exerciseId === baseExercise.id && restTimer.running
-                                ? stopRestTimer()
-                                : startRestTimer({ ...exercise, id: baseExercise.id })
-                            }
-                            className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400"
-                            aria-label={restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop rest timer" : "Start rest timer"}
-                            type="button"
-                          >
-                            {restTimer.exerciseId === baseExercise.id && restTimer.running ? "Stop" : "Start"}
-                          </button>
-                        </div>
-                      </div>
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        {[["short", "Short"], ["normal", "Normal"], ["heavy", "Heavy"]].map(([mode, label]) => (
-                          <button
-                            key={mode}
-                            onClick={() => setRestMode({ ...exercise, id: baseExercise.id }, mode as RestMode)}
-                            className={`rounded-xl px-2 py-2 text-xs font-bold transition focus-visible:ring-2 focus-visible:ring-yellow-400 ${
-                              restMode === mode ? "bg-yellow-400 text-black font-black" : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
-                            }`}
-                            aria-label={`Set rest preset ${label}`}
-                            type="button"
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, -30)}
-                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 tabular-nums font-mono"
-                          aria-label="Decrease rest by 30 seconds"
-                          type="button"
-                        >
-                          −30s
-                        </button>
-                        <button
-                          onClick={() => adjustRestSeconds({ ...exercise, id: baseExercise.id }, 30)}
-                          className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 tabular-nums font-mono"
-                          aria-label="Increase rest by 30 seconds"
-                          type="button"
-                        >
-                          +30s
-                        </button>
-                      </div>
-                      {restTimer.exerciseId === baseExercise.id && restTimer.totalSeconds > 0 && (
-                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-zinc-900">
-                          <div className="h-full rounded-full bg-yellow-400 transition-all shadow-[0_0_8px_rgba(250,204,21,0.5)]" style={{ width: `${restProgress}%` }} />
-                        </div>
-                      )}
                     </div>
 
                     {/* [Order 6] Secondary Tools Accordion (Progressive Disclosure) */}
@@ -5467,7 +5529,28 @@ export default function Page() {
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  const ex = day?.exercises.find((e) => e.id === restTimer.exerciseId) ?? {
+                    id: restTimer.exerciseId ?? "",
+                    name: restTimer.exerciseName ?? "",
+                    group: "Chest" as MuscleGroup,
+                    sets: 3,
+                    reps: "8-12",
+                    warmup: false,
+                    muscles: [] as string[],
+                    movement: "",
+                    load: "bodyweight" as LoadType,
+                  };
+                  adjustRestSeconds(ex, -30);
+                }}
+                className="min-h-[44px] px-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold text-zinc-300 hover:text-white transition active:scale-95 font-mono"
+                aria-label="Subtract 30 seconds from rest timer"
+              >
+                −30s
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -5484,7 +5567,7 @@ export default function Page() {
                   };
                   adjustRestSeconds(ex, 30);
                 }}
-                className="rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400"
+                className="min-h-[44px] px-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs font-bold text-yellow-400 hover:text-yellow-300 transition active:scale-95 font-mono"
                 aria-label="Add 30 seconds to rest timer"
               >
                 +30s
@@ -5492,10 +5575,10 @@ export default function Page() {
               <button
                 type="button"
                 onClick={stopRestTimer}
-                className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/20 active:scale-95 focus-visible:ring-2 focus-visible:ring-red-400"
-                aria-label="Stop rest timer"
+                className="min-h-[44px] px-3 rounded-xl border border-red-500/30 bg-red-500/10 text-xs font-black text-red-300 transition hover:bg-red-500/20 active:scale-95"
+                aria-label="Skip / Stop rest timer"
               >
-                Stop
+                Skip
               </button>
             </div>
           </div>
@@ -5970,6 +6053,56 @@ export default function Page() {
             >
               <Check size={18} className="stroke-[3]" />
               <span>Done / บันทึกผล</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 3D Anatomy Figure Modal Sheet (De-emphasized from main scroll area) */}
+      {showAnatomyModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md p-0 sm:p-4 animate-in fade-in duration-200"
+        >
+          <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-t-3xl sm:rounded-3xl border border-zinc-800 bg-zinc-950 p-5 shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-wider text-yellow-400">Anatomical Overview</p>
+                <h3 className="text-base font-black text-white">{day ? day.title : "Daily Muscle Map"}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAnatomyModal(false)}
+                className="rounded-xl bg-zinc-900 p-2 text-zinc-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between text-xs text-zinc-400 mb-3">
+                <span className="font-bold">{activeMuscleSummary.summaryText}</span>
+                <span className="text-[11px] text-zinc-500">{activeMuscleSummary.sourceLabel}</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900 to-zinc-950 p-3 text-center">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Anterior (Front)</p>
+                  <RealisticAnatomyFigure side="front" primary={activeMuscleSummary.primary} secondary={activeMuscleSummary.secondary} />
+                </div>
+                <div className="rounded-2xl border border-zinc-800/80 bg-gradient-to-b from-zinc-900 to-zinc-950 p-3 text-center">
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400">Posterior (Back)</p>
+                  <RealisticAnatomyFigure side="back" primary={activeMuscleSummary.primary} secondary={activeMuscleSummary.secondary} />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowAnatomyModal(false)}
+              className="mt-5 w-full py-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-xs font-bold text-zinc-200 transition"
+            >
+              ปิดหน้าต่าง
             </button>
           </div>
         </div>
