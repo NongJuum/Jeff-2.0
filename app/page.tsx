@@ -2569,6 +2569,7 @@ export default function Page() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getUserProfile());
 
   const globalWeightUnit: WeightUnit = userProfile?.preferredWeightUnit || "kg";
+  const currentGender: Gender = userProfile?.gender || "male";
 
   function getEffectiveUnitForExercise(exerciseName: string, machineTag?: string): WeightUnit {
     return resolveEffectiveUnit(exerciseName, machineTag, globalWeightUnit, exerciseUnits, machineUnits);
@@ -3626,71 +3627,74 @@ export default function Page() {
     const trimmedTag = (machineTag ?? "").trim();
     const effectiveUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
     const exerciseInputs = normalizeSetInputs(inputs[exercise.id], exercise.sets);
+
     const validSets: LogSet[] = exerciseInputs
       .map((item, index) => {
         const entered = Number(item.weightLbs);
+        const reps = Number(item.reps);
         return {
           exerciseId: exercise.id,
           exerciseName: exercise.name,
           weightLbs: effectiveUnit === "kg" ? convertWeight(entered, "kg", "lbs") : entered,
-          reps: Number(item.reps),
+          reps: reps,
           setNumber: index + 1,
           date: new Date().toISOString(),
           machine: trimmedTag || undefined,
           unit: effectiveUnit,
           rawValue: entered,
-          alreadySaved: item.done,
         };
       })
-      .filter((item) => Number.isFinite(item.weightLbs) && Number.isFinite(item.reps) && item.weightLbs > 0 && item.reps > 0 && !item.alreadySaved)
-      .map(({ alreadySaved, ...item }) => item);
+      .filter((item) => Number.isFinite(item.weightLbs) && Number.isFinite(item.reps) && item.weightLbs > 0 && item.reps > 0);
 
-    if (validSets.length > 0) {
-      for (const s of validSets) {
-        const prCheck = checkIsPr(recordsMap, s);
-        if (prCheck) {
-          setPrCelebration({
-            exerciseName: s.exerciseName,
-            machine: trimmedTag || undefined,
-            recordType: prCheck.type,
-            oldVal: prCheck.oldVal,
-            newVal: prCheck.newVal,
-          });
-          break;
-        }
+    if (validSets.length === 0) return;
+
+    for (const s of validSets) {
+      const prCheck = checkIsPr(recordsMap, s);
+      if (prCheck) {
+        setPrCelebration({
+          exerciseName: s.exerciseName,
+          machine: trimmedTag || undefined,
+          recordType: prCheck.type,
+          oldVal: prCheck.oldVal,
+          newVal: prCheck.newVal,
+        });
+        break;
       }
-
-      const todayKey = getLocalDateKey(new Date());
-      setLogs((old) => {
-        const without = old.filter(
-          (l) =>
-            !(
-              l.exerciseName === exercise.name &&
-              (l.machine || "") === trimmedTag &&
-              getLocalDateKey(l.date) === todayKey &&
-              validSets.some((v) => v.setNumber === l.setNumber)
-            )
-        );
-        return [...without, ...validSets];
-      });
-
-      setRecordsMap((old) => {
-        let updated = old;
-        for (const s of validSets) {
-          updated = updateRecordsWithSet(updated, s);
-        }
-        return updated;
-      });
-
-      startRestTimer(exercise);
     }
+
+    const todayKey = getLocalDateKey(new Date());
+    setLogs((old) => {
+      const without = old.filter(
+        (l) =>
+          !(
+            l.exerciseName === exercise.name &&
+            (l.machine || "") === trimmedTag &&
+            getLocalDateKey(l.date) === todayKey &&
+            validSets.some((v) => v.setNumber === l.setNumber)
+          )
+      );
+      const updated = [...without, ...validSets];
+      writeLocalJson(LATEST_LOGS_KEY, updated);
+      return updated;
+    });
+
+    setRecordsMap((old) => {
+      let updated = { ...old };
+      for (const s of validSets) {
+        updated = updateRecordsWithSet(updated, s);
+      }
+      writeLocalJson(PERMANENT_RECORDS_KEY, updated);
+      writeLocalJson(LEGACY_STATS_KEY, updated);
+      return updated;
+    });
+
+    startRestTimer(exercise);
 
     setInputs((old) => {
       const nextInputs = {
         ...old,
         [exercise.id]: createDefaultSetInputs(exercise.sets),
       };
-
       writeLocalJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
     });
@@ -5089,6 +5093,8 @@ export default function Page() {
               </details>
             </>
           )}
+          </>
+        )}
 
             <div className="mt-4 grid gap-4">
               {visibleExercises.map((baseExercise) => {
@@ -5120,7 +5126,7 @@ export default function Page() {
     const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
 
     const aiWeightSuggestion = userProfile ? (() => {
-      const muscleInfo = evaluateMuscleMass(userProfile.gender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
+      const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
       const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier, currentMachine);
       return effectiveUnit === "lbs"
         ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
@@ -5165,7 +5171,7 @@ export default function Page() {
           getLoadType(exercise),
           e1RMLbs,
           userBwLbs,
-          userProfile?.gender ?? "male",
+          currentGender,
           effectiveUnit
         )
       : null;
@@ -5456,7 +5462,7 @@ export default function Page() {
                             : 0;
 
                           const aiWeightSuggestion = userProfile ? (() => {
-                            const muscleInfo = evaluateMuscleMass(userProfile.gender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
+                            const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
                             const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier, currentMachine);
                             return effectiveUnit === "lbs"
                               ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
@@ -5903,10 +5909,7 @@ export default function Page() {
                 );
               })}
             </div>
-            </>
-          )}
-
-            {/* Render Cardio Controller ONLY when sessionStage is 'cardio' */}
+            {/* Render Cardio Controller ONLY when sessionStage is "cardio" */}
             {sessionStage === "cardio" && (
               <div className="mt-4">
                 <CardioController
@@ -6209,22 +6212,7 @@ export default function Page() {
         />
       )}
 
-      {/* Floating Action Button - Start Today (Hidden on dashboard & today to avoid duplicate actions) */}
-      {!["today", "dashboard"].includes(mode) && day && (
-        <button
-          type="button"
-          onClick={() => {
-            setMode("today");
-            window.scrollTo({ top: 0, behavior: "smooth" });
-          }}
-          className="fixed bottom-24 right-4 z-30 flex items-center gap-2 rounded-full bg-yellow-400 text-black font-black px-5 py-4 font-black shadow-2xl shadow-yellow-500/40 transition-all hover:scale-105 active:scale-95"
-          aria-label="Start today's workout"
-        >
-          <PlayCircle size={22} />
-          <span className="hidden sm:inline">เริ่มฝึกวันนี้</span>
-          <span className="sm:hidden">เริ่ม</span>
-        </button>
-      )}
+
 
       {/* Migration Toast for upgraded users */}
       {showMigrationToast && migrationResult && (
