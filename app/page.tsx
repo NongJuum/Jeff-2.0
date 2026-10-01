@@ -644,11 +644,11 @@ function mapMachineVariantToLoad(machineVariant?: string, fallbackLoad: LoadType
   if (!machineVariant) return fallbackLoad;
   const m = machineVariant.toLowerCase();
   if (m.includes("plate-loaded") || m.includes("plate loaded") || m.includes("iso-lateral") || m.includes("t-bar")) return "plate-loaded";
-  if (m.includes("pin-selectorized") || m.includes("selectorized") || m.includes("pin-loaded") || m.includes("chest-supported machine") || m.includes("machine")) return "selectorized";
   if (m.includes("cable") || m.includes("pulldown")) return "cable";
   if (m.includes("smith")) return "smith";
   if (m.includes("dumbbell") || m.includes("db")) return "dumbbell";
   if (m.includes("barbell") || m.includes("bb")) return "barbell";
+  if (m.includes("machine") || m.includes("selectorized") || m.includes("pin")) return "selectorized";
   return fallbackLoad;
 }
 
@@ -1055,6 +1055,7 @@ function applyExerciseIdentity(base: PlanExercise, exerciseName: string): PlanEx
     sets: next.sets,
     reps: next.reps,
     warmup: next.warmup,
+    load: next.load,
   };
 }
 
@@ -5067,7 +5068,7 @@ export default function Page() {
                           <span className={`line-clamp-2 text-xs font-bold leading-4 transition ${
                             isSelected ? "text-yellow-300 font-black" : "text-zinc-300 group-hover:text-white"
                           }`}>
-                            {item.name}
+                            {substituteMap[item.id] || item.name}
                           </span>
                         </button>
 
@@ -5462,18 +5463,21 @@ export default function Page() {
                           <button
                             type="button"
                             onClick={() => {
-                              const currentU = machineUnits[currentMachine] || globalWeightUnit;
-                              const nextU: WeightUnit = currentU === "kg" ? "lbs" : "kg";
-                              saveMachineUnit(currentMachine, nextU);
-                              setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
+                              const nextU: WeightUnit = effectiveUnit === "kg" ? "lbs" : "kg";
+                              if (currentMachine) {
+                                saveMachineUnit(currentMachine, nextU);
+                                setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
+                              }
+                              saveExerciseUnit(exercise.name, nextU);
+                              setExerciseUnits((prev) => ({ ...prev, [exercise.name]: nextU }));
 
-                              // Re-snap existing input numbers cleanly to the new unit
+                              // Convert existing inputs cleanly to the new unit
                               setInputs((old: Record<string, SetInput[]>) => {
                                 const curInputs = normalizeSetInputs(old[baseExercise.id], effectiveSets);
                                 const converted = curInputs.map((s) => {
                                   const val = parseFloat(s.weightLbs);
                                   if (!Number.isFinite(val) || val <= 0) return s;
-                                  const newWeight = convertAndSnapWeight(val, currentU, nextU, isIso);
+                                  const newWeight = convertAndSnapWeight(val, effectiveUnit, nextU, isIso);
                                   return { ...s, weightLbs: String(newWeight) };
                                 });
                                 const nextInputs = { ...old, [baseExercise.id]: converted };
@@ -5482,9 +5486,9 @@ export default function Page() {
                               });
                             }}
                             className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-black text-yellow-300 hover:border-yellow-400 transition"
-                            title="สลับหน่วยเฉพาะเครื่องนี้"
+                            title="สลับหน่วยน้ำหนัก"
                           >
-                            ⚙️ หน่วย: {machineUnits[currentMachine] || globalWeightUnit}
+                            ⚙️ หน่วย: {effectiveUnit}
                           </button>
 
                           <button
