@@ -2309,80 +2309,80 @@ export function evaluateRelativeStrength(
   
   const isWeightedBodyweight = n.includes("weighted dip") || n.includes("weighted pull up");
   const isChestSupported = n.includes("chest supported") || n.includes("seal row") || n.includes("t-bar");
+  const isBarbell = loadType === "barbell" && !isChestSupported;
 
-  // 2. Continuous Allometric Scaling (Fair curve across 45kg to 130kg+)
+  // 2. Continuous Allometric Bodyweight Scaling (Smooth curve across all weights: 45kg to 130kg+)
   const baseWeightLbs = gender === "female" ? 132.28 : 165.35;
   const safeUserBw = userBwLbs > 0 ? userBwLbs : baseWeightLbs;
   const effectiveBwLbs = baseWeightLbs * Math.pow(safeUserBw / baseWeightLbs, 0.67);
 
-  // 3. Realistic Working Thresholds [Novice->Inter, Inter->Adv, Adv->Elite]
+  // 3. Ergonomically Calibrated Thresholds [Novice->Inter, Inter->Adv, Adv->Elite]
   let baseThresholds: [number, number, number];
 
-  // A. DELTS & REAR DELTS
+  // A. DELTS & REAR DELT ISOLATION
   if (n.includes("lat raise") || n.includes("lateral raise") || n.includes("y raise")) {
-    baseThresholds = [0.06, 0.10, 0.14];
+    baseThresholds = [0.08, 0.14, 0.20]; // DB: ~15-25 lbs per hand for Adv/Elite
   } else if (n.includes("rear delt") || n.includes("face pull") || n.includes("cable crossover") || n.includes("cable flye") || n.includes("pec deck") || n.includes("db flye")) {
-    baseThresholds = [0.12, 0.19, 0.26];
+    baseThresholds = [0.15, 0.24, 0.34];
 
   // B. ARMS & PULLOVERS
   } else if (n.includes("straight arm") || n.includes("lat prayers") || n.includes("pullover")) {
-    baseThresholds = [0.16, 0.25, 0.34];
-  } else if (n.includes("curl") || n.includes("tricep") || n.includes("extension") || n.includes("pushdown") || n.includes("pressdown") || n.includes("skullcrusher") || n.includes("katana")) {
     baseThresholds = [0.18, 0.28, 0.38];
+  } else if (n.includes("curl") || n.includes("tricep") || n.includes("extension") || n.includes("pushdown") || n.includes("pressdown") || n.includes("skullcrusher") || n.includes("katana")) {
+    baseThresholds = [0.22, 0.32, 0.44];
 
-  // C. WEIGHTED BODYWEIGHT (Added Plate Load Only)
+  // C. WEIGHTED BODYWEIGHT (Added Plate Weight Only)
   } else if (isWeightedBodyweight) {
-    baseThresholds = [0.08, 0.20, 0.32];
+    baseThresholds = [0.10, 0.25, 0.40];
 
   // D. SHOULDER PRESS
   } else if (n.includes("shoulder press") || n.includes("overhead press") || n.includes("military")) {
-    baseThresholds = isDumbbell ? [0.26, 0.40, 0.54] : [0.36, 0.54, 0.70];
+    baseThresholds = isDumbbell ? [0.32, 0.48, 0.64] : [0.45, 0.65, 0.85];
 
-  // E. CHEST PRESS (Supported / Free DB vs Barbell)
+  // E. CHEST PRESS
   } else if (n.includes("converging cable") || (n.includes("cable") && n.includes("press"))) {
-    baseThresholds = [0.28, 0.42, 0.56];
+    baseThresholds = [0.32, 0.48, 0.64];
   } else if (isDumbbell && (n.includes("press") || n.includes("bench"))) {
-    baseThresholds = [0.36, 0.54, 0.72];
+    baseThresholds = [0.42, 0.64, 0.86]; // Realistic dumbbell bench targets (35-45kg per hand Elite)
   } else if (n.includes("incline") && (n.includes("press") || n.includes("bench"))) {
-    baseThresholds = [0.45, 0.65, 0.85];
+    baseThresholds = isBarbell ? [0.60, 0.85, 1.10] : [0.50, 0.72, 0.94];
   } else if (n.includes("bench") || n.includes("chest press") || n.includes("dip")) {
-    baseThresholds = [0.55, 0.80, 1.05];
+    baseThresholds = isBarbell ? [0.70, 1.00, 1.30] : [0.60, 0.88, 1.15];
 
-  // F. ROWS & PULLDOWNS (Zero-Momentum Prone Rows separated from Barbell)
+  // F. ROWS & PULLDOWNS
   } else if (isChestSupported) {
-    baseThresholds = [0.26, 0.40, 0.54]; // Prone Chest-Supported / T-Bar realistic working loads
+    baseThresholds = [0.28, 0.42, 0.56]; // Zero-momentum prone rows & T-bar
   } else if (n.includes("shrug")) {
-    baseThresholds = [0.55, 0.85, 1.15];
+    baseThresholds = [0.70, 1.05, 1.40];
   } else if (n.includes("pulldown") || n.includes("pull up") || n.includes("chin")) {
-    baseThresholds = [0.45, 0.66, 0.86];
+    baseThresholds = [0.55, 0.78, 1.02];
   } else if (n.includes("row")) {
-    baseThresholds = [0.38, 0.56, 0.75];
+    baseThresholds = isBarbell ? [0.55, 0.80, 1.05] : [0.44, 0.66, 0.88];
 
-  // G. LEGS
+  // G. LEGS & LOWER BODY
   } else if (n.includes("hip thrust")) {
-    baseThresholds = [0.90, 1.35, 1.75];
+    baseThresholds = [1.00, 1.50, 2.00];
   } else if (n.includes("calf raise")) {
-    baseThresholds = [0.75, 1.10, 1.45];
+    baseThresholds = [0.85, 1.25, 1.65];
   } else if (n.includes("leg press")) {
-    baseThresholds = [1.30, 1.90, 2.50];
+    baseThresholds = [1.50, 2.25, 3.00];
   } else if (n.includes("hack") || n.includes("pendulum") || n.includes("v-squat")) {
-    baseThresholds = [0.80, 1.20, 1.55];
+    baseThresholds = [0.95, 1.40, 1.85];
   } else if (n.includes("bulgarian") || n.includes("lunge") || n.includes("step up")) {
-    baseThresholds = [0.22, 0.35, 0.48];
+    baseThresholds = [0.26, 0.40, 0.55]; // Controlled single-leg dumbbell loads
   } else if (n.includes("squat")) {
-    baseThresholds = [0.75, 1.08, 1.40];
+    baseThresholds = isBarbell ? [0.85, 1.25, 1.65] : [0.75, 1.10, 1.45];
   } else if (n.includes("deadlift") || n.includes("rdl")) {
-    baseThresholds = [0.90, 1.30, 1.70];
+    baseThresholds = isBarbell ? [1.05, 1.55, 2.05] : [0.90, 1.35, 1.80];
   } else if (n.includes("leg curl") || n.includes("hamstring curl")) {
-    baseThresholds = [0.26, 0.40, 0.54];
+    baseThresholds = [0.32, 0.48, 0.65];
   } else if (n.includes("leg extension")) {
-    baseThresholds = [0.30, 0.46, 0.62];
+    baseThresholds = [0.36, 0.54, 0.72];
   } else {
-    baseThresholds = [0.25, 0.40, 0.55];
+    baseThresholds = [0.30, 0.46, 0.62];
   }
 
-  const repMatch = prescriptionReps.match(/\d+/g);
-  const targetWorkingReps = repMatch ? parseInt(repMatch[0], 10) : 8;
+  // 4. Target Working Reps from prescription
 
   const femaleFactor = gender === "female" ? 0.70 : 1.0;
   const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
@@ -2710,11 +2710,12 @@ export default function Page() {
         return updated;
       });
 
-      // 4. Reset inputs for completed exercises
+      // 4. Reset inputs for completed exercises respecting custom set counts
       setInputs((old) => {
         const nextInputs = { ...old };
         currentDayExercises.forEach((ex) => {
-          nextInputs[ex.id] = createDefaultSetInputs(ex.sets);
+          const assignedSets = presetSetsMap[ex.id] || ex.sets;
+          nextInputs[ex.id] = createDefaultSetInputs(assignedSets);
         });
         writeLocalJson(SET_INPUTS_KEY, nextInputs);
         return nextInputs;
@@ -5369,22 +5370,6 @@ export default function Page() {
     const loggedRepsSet1 = lastSet1?.reps;
     const prWeight = pr?.weightLbs ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs) : 0;
 
-    const baselineWorkingWeight = 
-      (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0) ? inputWeightSet1 :
-      (loggedWeightSet1 !== undefined && loggedWeightSet1 > 0) ? loggedWeightSet1 :
-      (aiWeightSuggestion > 0) ? aiWeightSuggestion :
-      (prWeight > 0) ? prWeight :
-      (effectiveUnit === "kg" ? 40 : 90);
-
-    const warmupInfo = getIntelligentWarmup(
-      exercise,
-      index,
-      day.exercises,
-      baselineWorkingWeight,
-      effectiveUnit,
-      effectiveLoad
-    );
-
     const userBwLbs = bodyweightEntry?.lbs ?? (userProfile?.weightKg ? userProfile.weightKg * 2.20462 : 0);
 
     // Only calculate e1RM if real history exists; otherwise keep as 0 to trigger !hasHistory
@@ -5410,6 +5395,24 @@ export default function Page() {
           forcedTier
         )
       : null;
+
+    // Cleanly synchronize baseline working weight: use logged/input weight first, then tier target weight
+    const fallbackStartingWeight = strengthTierInfo?.targetDisplayWeight ?? (effectiveUnit === "kg" ? 20 : 45);
+
+    const baselineWorkingWeight = 
+      (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0) ? inputWeightSet1 :
+      (loggedWeightSet1 !== undefined && loggedWeightSet1 > 0) ? loggedWeightSet1 :
+      (prWeight > 0) ? prWeight :
+      fallbackStartingWeight;
+
+    const warmupInfo = getIntelligentWarmup(
+      exercise,
+      index,
+      day.exercises,
+      baselineWorkingWeight,
+      effectiveUnit,
+      effectiveLoad
+    );
 
                 const isExpanded = expandedExercises[baseExercise.id] ?? true;
                 const completedSetsCount = currentSetInputs.filter((s) => s.done).length;
