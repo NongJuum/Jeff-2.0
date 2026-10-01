@@ -2294,55 +2294,58 @@ export function evaluateRelativeStrength(
 
   // 1. Identify Movement Ergonomics
   const isDumbbell = loadType === "dumbbell" || n.includes("db ") || n.includes("dumbbell");
-  const isSingleArmLeg = n.includes("1 arm") || n.includes("one arm") || n.includes("single leg") || n.includes("bulgarian");
+  const isSingleArmLeg = n.includes("1 arm") || n.includes("one arm") || n.includes("single leg") || n.includes("bulgarian") || n.includes("step up") || n.includes("lunge");
+  const isWeightedBodyweight = n.includes("weighted dip") || n.includes("weighted pull up");
 
   // 2. Strict Biomechanical Ratio Thresholds (Total Load / BW)
   let baseThresholds: [number, number, number]; // [Novice->Inter, Inter->Adv, Adv->Elite]
 
   if (n.includes("lat raise") || n.includes("lateral raise") || n.includes("y raise")) {
-    baseThresholds = [0.10, 0.18, 0.26];
-  }
-  else if (n.includes("rear delt") || n.includes("face pull") || n.includes("flye") || n.includes("pec deck") || n.includes("crossover")) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  }
-  else if (n.includes("curl") || n.includes("tricep") || n.includes("extension") || n.includes("pushdown") || n.includes("pressdown") || n.includes("skullcrusher") || n.includes("katana")) {
+    baseThresholds = [0.08, 0.13, 0.18];
+  } else if (n.includes("rear delt") || n.includes("face pull") || n.includes("cable crossover") || n.includes("cable flye") || n.includes("pec deck") || n.includes("db flye")) {
+    baseThresholds = [0.15, 0.24, 0.32];
+  } else if (n.includes("straight arm pulldown") || n.includes("lat prayers") || n.includes("pullover")) {
+    baseThresholds = [0.20, 0.32, 0.44];
+  } else if (n.includes("curl") || n.includes("tricep") || n.includes("extension") || n.includes("pushdown") || n.includes("pressdown") || n.includes("skullcrusher") || n.includes("katana")) {
     baseThresholds = [0.22, 0.34, 0.46];
-  }
-  else if (n.includes("shoulder press") || n.includes("overhead press") || n.includes("military")) {
-    baseThresholds = [0.45, 0.65, 0.85];
-  }
-  else if (n.includes("pulldown") || n.includes("pull up") || n.includes("chin")) {
-    baseThresholds = [0.55, 0.80, 1.05];
-  }
-  else if (n.includes("row")) {
-    baseThresholds = [0.48, 0.72, 0.95];
-  }
-  else if (n.includes("incline") && (n.includes("press") || n.includes("bench"))) {
-    baseThresholds = [0.55, 0.80, 1.05];
-  }
-  else if (n.includes("bench") || n.includes("chest press")) {
-    baseThresholds = [0.65, 0.95, 1.25];
-  }
-  else if (n.includes("leg press")) {
-    baseThresholds = [1.50, 2.30, 3.10];
-  }
-  else if (n.includes("hack") || n.includes("pendulum") || n.includes("v-squat")) {
-    baseThresholds = [1.00, 1.50, 2.00];
-  }
-  else if (n.includes("squat")) {
-    baseThresholds = [0.85, 1.25, 1.65];
-  }
-  else if (n.includes("deadlift") || n.includes("rdl")) {
-    baseThresholds = [1.05, 1.55, 2.05];
-  }
-  else if (n.includes("leg curl") || n.includes("hamstring curl")) {
+  } else if (isWeightedBodyweight) {
+    baseThresholds = [0.10, 0.25, 0.40];
+  } else if (n.includes("shoulder press") || n.includes("overhead press") || n.includes("military")) {
+    baseThresholds = [0.42, 0.60, 0.80];
+  } else if (n.includes("converging cable") || (n.includes("cable") && n.includes("press"))) {
     baseThresholds = [0.35, 0.52, 0.70];
-  }
-  else if (n.includes("leg extension")) {
-    baseThresholds = [0.40, 0.60, 0.80];
-  }
-  else {
-    baseThresholds = [0.30, 0.50, 0.70];
+  } else if (n.includes("incline") && (n.includes("press") || n.includes("bench"))) {
+    baseThresholds = [0.52, 0.75, 0.98];
+  } else if (n.includes("bench") || n.includes("chest press") || n.includes("dip")) {
+    baseThresholds = [0.65, 0.92, 1.20];
+  } else if (n.includes("shrug")) {
+    baseThresholds = [0.70, 1.05, 1.40];
+  } else if (n.includes("pulldown") || n.includes("pull up") || n.includes("chin")) {
+    baseThresholds = [0.55, 0.78, 1.00];
+  } else if (n.includes("row")) {
+    baseThresholds = [0.46, 0.68, 0.88];
+  } else if (n.includes("hip thrust")) {
+    baseThresholds = [1.10, 1.65, 2.20];
+  } else if (n.includes("calf raise")) {
+    baseThresholds = [0.90, 1.35, 1.80];
+  } else if (n.includes("leg press")) {
+    baseThresholds = [1.50, 2.30, 3.10];
+  } else if (n.includes("hack") || n.includes("pendulum") || n.includes("v-squat")) {
+    baseThresholds = [0.95, 1.40, 1.85];
+  } else if (n.includes("bulgarian") || n.includes("lunge") || n.includes("step up")) {
+    baseThresholds = [0.35, 0.55, 0.75];
+  } else if (n.includes("squat")) {
+    baseThresholds = [0.85, 1.25, 1.65];
+  } else if (n.includes("deadlift") || n.includes("rdl")) {
+    baseThresholds = [1.05, 1.55, 2.05];
+  } else if (n.includes("leg curl") || n.includes("hamstring curl")) {
+    baseThresholds = [0.32, 0.48, 0.65];
+  } else if (n.includes("leg extension")) {
+    baseThresholds = [0.38, 0.56, 0.75];
+  } else if (n.includes("crunch") || n.includes("abs")) {
+    baseThresholds = [0.30, 0.45, 0.60];
+  } else {
+    baseThresholds = [0.30, 0.48, 0.65];
   }
 
   // Parse target working reps from prescription (default to 8 reps)
@@ -2388,28 +2391,22 @@ export function evaluateRelativeStrength(
   }
 
   // 6. Reverse Epley Calculation
-  // Target Total e1RM in LBS = targetRatio * userBwLbs
-  let targetTotalE1RMLbs = targetRatio * userBwLbs;
-
-  // Calculate working weight (Total load)
+  const targetTotalE1RMLbs = targetRatio * userBwLbs;
   let targetTotalWorkingLbs = targetTotalE1RMLbs / (1 + targetWorkingReps / 30);
 
-  // IMPORTANT: Divide by 2 if Dumbbell or Single-limb movement!
-  if (isDumbbell || isSingleArmLeg) {
+  // Divide by 2 for DB/single-limb BUT NOT for weighted bodyweight (added plates are per-person)
+  if (!isWeightedBodyweight && (isDumbbell || isSingleArmLeg)) {
     targetTotalWorkingLbs = targetTotalWorkingLbs / 2;
   }
 
   // 7. Snap to Realistic Gym Increments
-  const ratio = userBwLbs > 0 ? e1RMLbs / userBwLbs : 0;
   let targetDisplayWeight: number;
   if (unit === "kg") {
     const targetWorkingKg = targetTotalWorkingLbs * 0.453592;
-    // Snap dumbbells to 1kg and barbells/plates to 2.5kg
     const step = isDumbbell ? 1 : 2.5;
     targetDisplayWeight = Math.max(step, Math.round(targetWorkingKg / step) * step);
     targetDisplayWeight = Math.round(targetDisplayWeight * 10) / 10;
   } else {
-    // LBS: snap dumbbells to 2.5 lbs, machines/barbells to 5 lbs
     const step = isDumbbell ? 2.5 : 5;
     targetDisplayWeight = Math.max(step, Math.round(targetTotalWorkingLbs / step) * step);
     targetDisplayWeight = Math.round(targetDisplayWeight * 10) / 10;
@@ -2430,16 +2427,19 @@ export function evaluateRelativeStrength(
   };
 
   // Per-hand label for dumbbell/single-limb exercises
-  const perHandLabel = (isDumbbell || isSingleArmLeg) ? " (ต่อข้าง)" : "";
+  const perHandLabel = (!isWeightedBodyweight && (isDumbbell || isSingleArmLeg)) ? " (ต่อข้าง)" : "";
+  const addedPlateLabel = isWeightedBodyweight ? " (แผ่นถ่วงเพิ่ม)" : "";
 
   let actionableMessage = "";
   if (tier === "Elite") {
     actionableMessage = "🏆 ระดับสูงสุด (Elite): มุ่งเน้นการรักษาฟอร์มและการพัฒนาต่อเนื่อง";
   } else if (!hasHistory) {
-    actionableMessage = `🎯 แนะนำเริ่มต้น (${tier}): ยก ${targetDisplayWeight} ${unit}${perHandLabel} × ${targetWorkingReps} ครั้ง`;
+    actionableMessage = `🎯 แนะนำเริ่มต้น (${tier}): ยก ${targetDisplayWeight} ${unit}${perHandLabel}${addedPlateLabel} × ${targetWorkingReps} ครั้ง`;
   } else {
-    actionableMessage = `🎯 สู่ระดับ ${nextTierLabel}: ยก ${targetDisplayWeight} ${unit}${perHandLabel} × ${targetWorkingReps} ครั้ง`;
+    actionableMessage = `🎯 สู่ระดับ ${nextTierLabel}: ยก ${targetDisplayWeight} ${unit}${perHandLabel}${addedPlateLabel} × ${targetWorkingReps} ครั้ง`;
   }
+
+  const ratio = userBwLbs > 0 ? e1RMLbs / userBwLbs : 0;
 
   return {
     tier,
