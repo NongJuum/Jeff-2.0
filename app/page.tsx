@@ -2396,12 +2396,11 @@ export function evaluateRelativeStrength(
     baseThresholds = [0.25, 0.40, 0.55];
   }
 
-  // 4. Target Working Reps from prescription
-
+  // 5. Gender Scaling Factor
   const femaleFactor = gender === "female" ? 0.70 : 1.0;
   const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
 
-  // 4. Resolve Active Tier
+  // 6. Active Tier Determination
   let tier: "Beginner" | "Intermediate" | "Advanced" | "Elite" = "Beginner";
   const hasHistory = Number.isFinite(e1RMLbs) && e1RMLbs > 0;
 
@@ -2450,7 +2449,11 @@ export function evaluateRelativeStrength(
     }
   }
 
-  // 6. Reverse Epley Target Weight Computation
+  // 6. Target Working Reps from prescription
+  const repMatch = prescriptionReps.match(/\d+/g);
+  const targetWorkingReps = repMatch ? parseInt(repMatch[0], 10) : 8;
+
+  // 7. Reverse Epley Target Weight Computation
   const targetTotalE1RMLbs = prescriptionRatio * effectiveBwLbs;
   let targetTotalWorkingLbs = targetTotalE1RMLbs / (1 + targetWorkingReps / 30);
 
