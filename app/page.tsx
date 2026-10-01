@@ -2291,9 +2291,11 @@ export function evaluateRelativeStrength(
   prescriptionReps = "8 to 12",
   userExperienceMonths = 12,
   forcedTier?: "Beginner" | "Intermediate" | "Advanced" | "Elite",
-  userMuscleMassKg?: number
+  userMuscleMassKg?: number,
+  machineVariant?: string
 ) {
   const n = exerciseName.toLowerCase();
+  const currentMachineName = (machineVariant || "").toLowerCase();
 
   // 1. Precise Equipment & Biomechanical Flags
   const isExplicitMachine = loadType === "selectorized" || loadType === "plate-loaded" || loadType === "cable" || loadType === "smith";
@@ -2395,8 +2397,14 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   } else if (n.includes("chest supported t-bar row") || (n.includes("t-bar") && (n.includes("supported") || n.includes("chest")))) {
     baseThresholds = [0.26, 0.40, 0.54]; // Single-sleeve central plate weight (Not divided by 2)
-  } else if (n.includes("chest supported row") || (n.includes("chest supported") && isDumbbell)) {
-    baseThresholds = [0.26, 0.40, 0.54]; // DB Row prone (Divided by 2 per hand)
+  } else if (n.includes("chest supported") && (loadType === "selectorized" || n.includes("machine") || (currentMachineName && currentMachineName.includes("machine")))) {
+    baseThresholds = [0.45, 0.66, 0.86]; // Two-handed / selectorized chest-supported row machine (Total stack)
+  } else if (n.includes("chest supported") && (loadType === "plate-loaded" || (currentMachineName && currentMachineName.includes("plate")))) {
+    baseThresholds = [0.46, 0.68, 0.88]; // Plate-loaded chest supported machine
+  } else if (n.includes("chest supported") && (loadType === "cable" || (currentMachineName && currentMachineName.includes("cable")))) {
+    baseThresholds = [0.38, 0.56, 0.75]; // Cable chest supported / seated row
+  } else if (n.includes("chest supported row") || n.includes("chest supported")) {
+    baseThresholds = [0.26, 0.40, 0.54]; // Default: Chest Supported DB Row (Divided by 2 per hand)
   } else if (n.includes("seal row")) {
     baseThresholds = [0.48, 0.70, 0.92];
   } else if (n.includes("machine high row")) {
@@ -2709,7 +2717,9 @@ export function evaluateRelativeStrength(
   };
 
   // Only true iso-lateral dual-handled machines display "ข้างละ" (Exclude single-sleeve T-Bar)
-  const isIsoLateral = loadType === "plate-loaded" && (n.includes("iso-lateral") || n.includes("iso ")) && !n.includes("t-bar");
+  const isIsoLateral = loadType === "plate-loaded" && 
+    (n.includes("iso-lateral") || n.includes("iso ") || currentMachineName.includes("iso-lateral") || currentMachineName.includes("iso ")) && 
+    !n.includes("t-bar") && !currentMachineName.includes("t-bar");
   
   let sideDetail = "";
   if (isDumbbell || isSingleArmLeg) {
@@ -5629,7 +5639,8 @@ export default function Page() {
           exercise.reps,
           userProfile?.expMonths ?? 12,
           forcedTier,
-          userProfile?.muscleMassKg
+          userProfile?.muscleMassKg,
+          currentMachine
         )
       : null;
 
