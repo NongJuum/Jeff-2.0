@@ -645,10 +645,12 @@ function mapMachineVariantToLoad(machineVariant?: string, fallbackLoad: LoadType
   const m = machineVariant.toLowerCase();
   if (m.includes("plate-loaded") || m.includes("plate loaded")) return "plate-loaded";
   if (m.includes("pin-selectorized") || m.includes("selectorized") || m.includes("pin-loaded")) return "selectorized";
-  if (m.includes("cable")) return "cable";
+  if (m.includes("iso-lateral") || m.includes("t-bar supported") || m.includes("t-bar")) return "plate-loaded";
+  if (m.includes("cable") || m.includes("pulldown")) return "cable";
   if (m.includes("smith")) return "smith";
   if (m.includes("dumbbell") || m.includes("db")) return "dumbbell";
   if (m.includes("barbell") || m.includes("bb")) return "barbell";
+  if (m.includes("machine")) return "selectorized";
   return fallbackLoad;
 }
 
@@ -5231,7 +5233,7 @@ export default function Page() {
     const strengthTierInfo = userBwLbs > 0
       ? evaluateRelativeStrength(
           exercise.name,
-          getLoadType(exercise),
+          effectiveLoad,
           e1RMLbs,
           userBwLbs,
           currentGender,
@@ -5273,7 +5275,7 @@ export default function Page() {
                             <span>{completedSetsCount}/{effectiveSets}</span>
                           </span>
                           <span className="text-[11px] text-zinc-500 hidden sm:inline">
-                            {LOAD_LABELS[getLoadType(exercise)]}
+                            {LOAD_LABELS[effectiveLoad]}
                           </span>
                         </div>
                       </div>
@@ -5331,7 +5333,7 @@ export default function Page() {
                             <span className="rounded-full bg-yellow-400/10 px-2.5 py-0.5 text-xs font-bold text-yellow-300">{exercise.group}</span>
                             <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">{exercise.movement}</span>
                             <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">
-                              {LOAD_LABELS[getLoadType(exercise)]}
+                              {LOAD_LABELS[effectiveLoad]}
                             </span>
                             {mode === "preset" && substituteMap[baseExercise.id] && (
                               <span className="rounded-full bg-blue-400/10 px-2.5 py-0.5 text-xs font-bold text-blue-300">Subbed</span>
