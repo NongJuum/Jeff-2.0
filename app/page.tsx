@@ -2294,23 +2294,31 @@ export function evaluateRelativeStrength(
 ) {
   const n = exerciseName.toLowerCase();
 
-  // 1. Equipment & Biomechanics Flags
+  // 1. Precise Equipment & Biomechanical Flags
   const isExplicitMachine = loadType === "selectorized" || loadType === "plate-loaded" || loadType === "cable" || loadType === "smith";
   const isDumbbell = loadType === "dumbbell" || (!isExplicitMachine && (n.includes("db ") || n.includes("dumbbell")));
-  const isSingleArmLeg = !isDumbbell && (n.includes("1 arm") || n.includes("one arm") || n.includes("single leg") || n.includes("bulgarian") || n.includes("lunge"));
+  
+  // Accurately capture ALL unilateral movements (including single-arm cables, lunges, step ups, kickbacks)
+  const isSingleArmLeg = !isDumbbell && (
+    n.includes("1 arm") || n.includes("one arm") || 
+    n.includes("single leg") || n.includes("bulgarian") || 
+    n.includes("lunge") || n.includes("step up") ||
+    n.includes("kickback") || n.includes("cable lat raise") || 
+    n.includes("behind back cable")
+  );
+  
   const isWeightedBodyweight = n.includes("weighted dip") || n.includes("weighted pull up");
   const isChestSupported = n.includes("chest supported") || n.includes("seal row") || n.includes("t-bar");
 
-  // 2. Continuous Allometric Bodyweight Scaling (Smooth curve across all weights: 45kg to 130kg+)
-  // Reference baseline: 75 kg (165.35 lbs) male, 60 kg (132.28 lbs) female
+  // 2. Continuous Allometric Scaling (Fair curve across 45kg to 130kg+)
   const baseWeightLbs = gender === "female" ? 132.28 : 165.35;
   const safeUserBw = userBwLbs > 0 ? userBwLbs : baseWeightLbs;
   const effectiveBwLbs = baseWeightLbs * Math.pow(safeUserBw / baseWeightLbs, 0.67);
 
-  // 3. Ergonomically Calibrated Thresholds [Novice->Inter, Inter->Adv, Adv->Elite]
+  // 3. Realistic Working Thresholds [Novice->Inter, Inter->Adv, Adv->Elite]
   let baseThresholds: [number, number, number];
 
-  // A. DELTS & REAR DELT ISOLATION (Safe Joint Mechanics)
+  // A. DELTS & REAR DELTS
   if (n.includes("lat raise") || n.includes("lateral raise") || n.includes("y raise")) {
     baseThresholds = [0.06, 0.10, 0.14];
   } else if (n.includes("rear delt") || n.includes("face pull") || n.includes("cable crossover") || n.includes("cable flye") || n.includes("pec deck") || n.includes("db flye")) {
@@ -2322,7 +2330,7 @@ export function evaluateRelativeStrength(
   } else if (n.includes("curl") || n.includes("tricep") || n.includes("extension") || n.includes("pushdown") || n.includes("pressdown") || n.includes("skullcrusher") || n.includes("katana")) {
     baseThresholds = [0.18, 0.28, 0.38];
 
-  // C. WEIGHTED BODYWEIGHT (Added Plate Weight Only)
+  // C. WEIGHTED BODYWEIGHT (Added Plate Load Only)
   } else if (isWeightedBodyweight) {
     baseThresholds = [0.08, 0.20, 0.32];
 
@@ -2342,7 +2350,7 @@ export function evaluateRelativeStrength(
 
   // F. ROWS & PULLDOWNS (Zero-Momentum Prone Rows separated from Barbell)
   } else if (isChestSupported) {
-    baseThresholds = [0.26, 0.40, 0.54]; // Realistic dumbbell / t-bar targets
+    baseThresholds = [0.26, 0.40, 0.54]; // Prone Chest-Supported / T-Bar realistic working loads
   } else if (n.includes("shrug")) {
     baseThresholds = [0.55, 0.85, 1.15];
   } else if (n.includes("pulldown") || n.includes("pull up") || n.includes("chin")) {
@@ -2350,7 +2358,7 @@ export function evaluateRelativeStrength(
   } else if (n.includes("row")) {
     baseThresholds = [0.38, 0.56, 0.75];
 
-  // G. LEGS & LOWER BODY
+  // G. LEGS
   } else if (n.includes("hip thrust")) {
     baseThresholds = [0.90, 1.35, 1.75];
   } else if (n.includes("calf raise")) {
@@ -2360,7 +2368,7 @@ export function evaluateRelativeStrength(
   } else if (n.includes("hack") || n.includes("pendulum") || n.includes("v-squat")) {
     baseThresholds = [0.80, 1.20, 1.55];
   } else if (n.includes("bulgarian") || n.includes("lunge") || n.includes("step up")) {
-    baseThresholds = [0.24, 0.38, 0.52];
+    baseThresholds = [0.22, 0.35, 0.48];
   } else if (n.includes("squat")) {
     baseThresholds = [0.75, 1.08, 1.40];
   } else if (n.includes("deadlift") || n.includes("rdl")) {
@@ -2373,15 +2381,13 @@ export function evaluateRelativeStrength(
     baseThresholds = [0.25, 0.40, 0.55];
   }
 
-  // 4. Target Working Reps from prescription
   const repMatch = prescriptionReps.match(/\d+/g);
   const targetWorkingReps = repMatch ? parseInt(repMatch[0], 10) : 8;
 
-  // 5. Gender Scaling Factor
   const femaleFactor = gender === "female" ? 0.70 : 1.0;
   const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
 
-  // 6. Active Tier Determination
+  // 4. Resolve Active Tier
   let tier: "Beginner" | "Intermediate" | "Advanced" | "Elite" = "Beginner";
   const hasHistory = Number.isFinite(e1RMLbs) && e1RMLbs > 0;
 
@@ -2401,34 +2407,45 @@ export function evaluateRelativeStrength(
     else tier = "Beginner";
   }
 
-  // 7. Target Ratio for Next Level
-  let targetRatio = thresholds[0];
+  // 5. Separate Ratio for "Starting Prescription" vs "Next Tier Target"
+  let prescriptionRatio: number;
   let nextTierLabel = "Intermediate";
 
-  if (tier === "Beginner") {
-    targetRatio = thresholds[0];
-    nextTierLabel = "Intermediate";
-  } else if (tier === "Intermediate") {
-    targetRatio = thresholds[1];
-    nextTierLabel = "Advanced";
-  } else if (tier === "Advanced") {
-    targetRatio = thresholds[2];
-    nextTierLabel = "Elite";
+  if (!hasHistory) {
+    prescriptionRatio = tier === "Beginner" 
+      ? thresholds[0] * 0.75 
+      : tier === "Intermediate" 
+      ? thresholds[0] 
+      : tier === "Advanced" 
+      ? thresholds[1] 
+      : thresholds[2];
+    nextTierLabel = tier === "Beginner" ? "Intermediate" : tier === "Intermediate" ? "Advanced" : "Elite";
   } else {
-    targetRatio = thresholds[2];
-    nextTierLabel = "ระดับสูงสุด";
+    if (tier === "Beginner") {
+      prescriptionRatio = thresholds[0];
+      nextTierLabel = "Intermediate";
+    } else if (tier === "Intermediate") {
+      prescriptionRatio = thresholds[1];
+      nextTierLabel = "Advanced";
+    } else if (tier === "Advanced") {
+      prescriptionRatio = thresholds[2];
+      nextTierLabel = "Elite";
+    } else {
+      prescriptionRatio = thresholds[2];
+      nextTierLabel = "ระดับสูงสุด";
+    }
   }
 
-  // 8. Reverse Epley Target Weight Calculation
-  const targetTotalE1RMLbs = targetRatio * effectiveBwLbs;
+  // 6. Reverse Epley Target Weight Computation
+  const targetTotalE1RMLbs = prescriptionRatio * effectiveBwLbs;
   let targetTotalWorkingLbs = targetTotalE1RMLbs / (1 + targetWorkingReps / 30);
 
-  // Divide by 2 for dumbbells and single limbs (Per-Hand/Per-Leg load)
+  // Divide by 2 for dumbbells and single limb movements
   if (!isWeightedBodyweight && (isDumbbell || isSingleArmLeg)) {
     targetTotalWorkingLbs = targetTotalWorkingLbs / 2;
   }
 
-  // 9. Snap to Standard Gym Steps
+  // 7. Snap to Standard Gym Steps
   let targetDisplayWeight: number;
   if (unit === "kg") {
     const targetWorkingKg = targetTotalWorkingLbs * 0.453592;
@@ -2455,12 +2472,13 @@ export function evaluateRelativeStrength(
     Elite: "border-yellow-400 bg-yellow-400/20 text-yellow-300 shadow-[0_0_10px_rgba(250,204,21,0.25)]",
   };
 
-  const isPlateLoadedIso = loadType === "plate-loaded" && (n.includes("iso") || n.includes("press") || n.includes("row") || n.includes("pulldown")) && !n.includes("leg press");
-
+  // Only true iso-lateral dual-handled machines display "ข้างละ" (Exclude single-sleeve T-Bar)
+  const isIsoLateral = loadType === "plate-loaded" && (n.includes("iso-lateral") || n.includes("iso ")) && !n.includes("t-bar");
+  
   let sideDetail = "";
   if (isDumbbell || isSingleArmLeg) {
     sideDetail = " (ต่อข้าง)";
-  } else if (isPlateLoadedIso) {
+  } else if (isIsoLateral) {
     const perSide = Math.round((targetDisplayWeight / 2) * 10) / 10;
     sideDetail = ` (ข้างละ ${perSide} ${unit})`;
   } else if (isWeightedBodyweight) {
@@ -2468,7 +2486,7 @@ export function evaluateRelativeStrength(
   }
 
   let actionableMessage = "";
-  if (tier === "Elite") {
+  if (tier === "Elite" && hasHistory) {
     actionableMessage = "🏆 ระดับสูงสุด (Elite): มุ่งเน้นการรักษาฟอร์มและการพัฒนาต่อเนื่อง";
   } else if (!hasHistory) {
     actionableMessage = `🎯 แนะนำเริ่มต้น (${tier}): ยก ${targetDisplayWeight} ${unit}${sideDetail} × ${targetWorkingReps} ครั้ง`;
@@ -5626,7 +5644,7 @@ export default function Page() {
                         {warmupInfo.steps.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-1.5 w-full">
                             {warmupInfo.steps.map((st, sIdx) => {
-                              const isIso = effectiveLoad === "plate-loaded" && !exercise.name.toLowerCase().includes("leg press");
+                              const isIso = effectiveLoad === "plate-loaded" && (exercise.name.toLowerCase().includes("iso-lateral") || exercise.name.toLowerCase().includes("iso ")) && !exercise.name.toLowerCase().includes("t-bar");
                               const perSideText = isIso ? ` (ข้างละ ${Math.round((st.weight / 2) * 10) / 10})` : "";
                               return (
                                 <div
@@ -5750,7 +5768,7 @@ export default function Page() {
                                       className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
                                     >+</button>
                                   </div>
-                                  {effectiveLoad === "plate-loaded" && !exercise.name.toLowerCase().includes("leg press") && (
+                                  {effectiveLoad === "plate-loaded" && (exercise.name.toLowerCase().includes("iso-lateral") || exercise.name.toLowerCase().includes("iso ")) && !exercise.name.toLowerCase().includes("t-bar") && (
                                     (() => {
                                       const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
                                       const perSideW = Math.round((totalW / 2) * 10) / 10;
