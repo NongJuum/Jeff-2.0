@@ -823,11 +823,11 @@ function getPrescription(exercise: Exercise) {
   };
 }
 
-function toPlanExercise(name: string, customId?: string): PlanExercise {
+function toPlanExercise(name: string, customId?: string | number): PlanExercise {
   const exercise = findExercise(name);
   const prescription = getPrescription(exercise);
   return {
-    id: customId || makeId("ex"),
+    id: customId !== undefined ? String(customId) : makeId("ex"),
     name: exercise.name,
     group: exercise.group,
     sets: prescription.sets,
@@ -900,7 +900,7 @@ function recommendForGroups(groups: MuscleGroup[]) {
 
   // Keep the day dense enough for hypertrophy but avoid junk volume.
   const maxExercises = groups.includes("Legs") ? 6 : groups.length >= 3 ? 7 : 6;
-  return Array.from(new Set(names)).slice(0, maxExercises).map(toPlanExercise);
+  return Array.from(new Set(names)).slice(0, maxExercises).map((name) => toPlanExercise(name));
 }
 
 function createStarterCustomPlan() {
