@@ -2432,17 +2432,26 @@ export function evaluateRelativeStrength(
     Elite: "border-yellow-400 bg-yellow-400/20 text-yellow-300 shadow-[0_0_10px_rgba(250,204,21,0.25)]",
   };
 
-  // Per-hand label for dumbbell/single-limb exercises
-  const perHandLabel = (!isWeightedBodyweight && (isDumbbell || isSingleArmLeg)) ? " (ต่อข้าง)" : "";
-  const addedPlateLabel = isWeightedBodyweight ? " (แผ่นถ่วงเพิ่ม)" : "";
+  const isPlateLoadedIso = loadType === "plate-loaded" && (n.includes("iso") || n.includes("press") || n.includes("row") || n.includes("pulldown")) && !n.includes("leg press");
+
+  // In the actionable message formatting:
+  let sideDetail = "";
+  if (isDumbbell || isSingleArmLeg) {
+    sideDetail = " (ต่อข้าง)";
+  } else if (isPlateLoadedIso) {
+    const perSide = Math.round((targetDisplayWeight / 2) * 10) / 10;
+    sideDetail = ` (ข้างละ ${perSide} ${unit})`;
+  } else if (isWeightedBodyweight) {
+    sideDetail = " (แผ่นถ่วงเพิ่ม)";
+  }
 
   let actionableMessage = "";
   if (tier === "Elite") {
     actionableMessage = "🏆 ระดับสูงสุด (Elite): มุ่งเน้นการรักษาฟอร์มและการพัฒนาต่อเนื่อง";
   } else if (!hasHistory) {
-    actionableMessage = `🎯 แนะนำเริ่มต้น (${tier}): ยก ${targetDisplayWeight} ${unit}${perHandLabel}${addedPlateLabel} × ${targetWorkingReps} ครั้ง`;
+    actionableMessage = `🎯 แนะนำเริ่มต้น (${tier}): ยก ${targetDisplayWeight} ${unit}${sideDetail} × ${targetWorkingReps} ครั้ง`;
   } else {
-    actionableMessage = `🎯 สู่ระดับ ${nextTierLabel}: ยก ${targetDisplayWeight} ${unit}${perHandLabel}${addedPlateLabel} × ${targetWorkingReps} ครั้ง`;
+    actionableMessage = `🎯 สู่ระดับ ${nextTierLabel}: ยก ${targetDisplayWeight} ${unit}${sideDetail} × ${targetWorkingReps} ครั้ง`;
   }
 
   const ratio = userBwLbs > 0 ? e1RMLbs / userBwLbs : 0;
@@ -5571,16 +5580,20 @@ export default function Page() {
 
                         {warmupInfo.steps.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-1.5 w-full">
-                            {warmupInfo.steps.map((st, sIdx) => (
-                              <div
-                                key={sIdx}
-                                className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold border border-yellow-500/40 bg-yellow-950/30 text-yellow-300"
-                              >
-                                <span>{st.label}:</span>
-                                <span className="font-black text-white">{st.weight} {effectiveUnit}</span>
-                                <span className="text-zinc-400">× {st.reps}</span>
-                              </div>
-                            ))}
+                            {warmupInfo.steps.map((st, sIdx) => {
+                              const isIso = effectiveLoad === "plate-loaded" && !exercise.name.toLowerCase().includes("leg press");
+                              const perSideText = isIso ? ` (ข้างละ ${Math.round((st.weight / 2) * 10) / 10})` : "";
+                              return (
+                                <div
+                                  key={sIdx}
+                                  className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold border border-yellow-500/40 bg-yellow-950/30 text-yellow-300"
+                                >
+                                  <span>{st.label}:</span>
+                                  <span className="font-black text-white">{st.weight} {effectiveUnit}{perSideText}</span>
+                                  <span className="text-zinc-400">× {st.reps}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -5667,26 +5680,39 @@ export default function Page() {
                                 </div>
 
                                 {/* Weight Input Box */}
-                                <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
-                                  <button
-                                    type="button"
-                                    onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
-                                  >−</button>
-                                  <input
-                                    id={`weight-input-${baseExercise.id}-${setIndex}`}
-                                    inputMode="decimal"
-                                    value={set.weightLbs}
-                                    onChange={(e) => updateSet(baseExercise.id, setIndex, "weightLbs", e.target.value, effectiveSets)}
-                                    onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs", currentMachine)}
-                                    className="w-full text-center font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
-                                    placeholder={String(effectivePlaceholderWeight || 0)}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                    className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
-                                  >+</button>
+                                <div className="flex flex-col w-full min-w-0">
+                                  <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
+                                    <button
+                                      type="button"
+                                      onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
+                                      className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
+                                    >−</button>
+                                    <input
+                                      id={`weight-input-${baseExercise.id}-${setIndex}`}
+                                      inputMode="decimal"
+                                      value={set.weightLbs}
+                                      onChange={(e) => updateSet(baseExercise.id, setIndex, "weightLbs", e.target.value, effectiveSets)}
+                                      onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs", currentMachine)}
+                                      className="w-full text-center font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
+                                      placeholder={String(effectivePlaceholderWeight || 0)}
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
+                                      className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
+                                    >+</button>
+                                  </div>
+                                  {effectiveLoad === "plate-loaded" && !exercise.name.toLowerCase().includes("leg press") && (
+                                    (() => {
+                                      const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
+                                      const perSideW = Math.round((totalW / 2) * 10) / 10;
+                                      return (
+                                        <span className="block text-[9px] font-mono text-zinc-500 text-center mt-0.5 truncate">
+                                          {totalW > 0 ? `(ข้างละ ${perSideW} ${effectiveUnit})` : ""}
+                                        </span>
+                                      );
+                                    })()
+                                  )}
                                 </div>
 
                                 {/* Reps Input Box */}
