@@ -643,14 +643,12 @@ function getLoadType(ex: { name: string; load?: LoadType }): LoadType {
 function mapMachineVariantToLoad(machineVariant?: string, fallbackLoad: LoadType = "barbell"): LoadType {
   if (!machineVariant) return fallbackLoad;
   const m = machineVariant.toLowerCase();
-  if (m.includes("plate-loaded") || m.includes("plate loaded")) return "plate-loaded";
-  if (m.includes("pin-selectorized") || m.includes("selectorized") || m.includes("pin-loaded")) return "selectorized";
-  if (m.includes("iso-lateral") || m.includes("t-bar supported") || m.includes("t-bar")) return "plate-loaded";
+  if (m.includes("plate-loaded") || m.includes("plate loaded") || m.includes("iso-lateral") || m.includes("t-bar")) return "plate-loaded";
+  if (m.includes("pin-selectorized") || m.includes("selectorized") || m.includes("pin-loaded") || m.includes("chest-supported machine") || m.includes("machine")) return "selectorized";
   if (m.includes("cable") || m.includes("pulldown")) return "cable";
   if (m.includes("smith")) return "smith";
   if (m.includes("dumbbell") || m.includes("db")) return "dumbbell";
   if (m.includes("barbell") || m.includes("bb")) return "barbell";
-  if (m.includes("machine")) return "selectorized";
   return fallbackLoad;
 }
 
@@ -2294,9 +2292,9 @@ export function evaluateRelativeStrength(
 ) {
   const n = exerciseName.toLowerCase();
 
-  // 1. Identify Movement Ergonomics
-  const isDumbbell = loadType === "dumbbell" || n.includes("db ") || n.includes("dumbbell");
-  const isSingleArmLeg = n.includes("1 arm") || n.includes("one arm") || n.includes("single leg") || n.includes("bulgarian") || n.includes("step up") || n.includes("lunge");
+  // Strict equipment check: If loadType is explicitly NOT dumbbell, do NOT treat as dumbbell!
+  const isDumbbell = loadType === "dumbbell";
+  const isSingleArmLeg = !isDumbbell && (n.includes("1 arm") || n.includes("one arm") || n.includes("single leg") || n.includes("bulgarian"));
   const isWeightedBodyweight = n.includes("weighted dip") || n.includes("weighted pull up");
 
   // 2. Strict Biomechanical Ratio Thresholds (Total Load / BW)
@@ -2630,7 +2628,14 @@ export default function Page() {
   const currentGender: Gender = userProfile?.gender || "male";
 
   function getEffectiveUnitForExercise(exerciseName: string, machineTag?: string): WeightUnit {
-    return resolveEffectiveUnit(exerciseName, machineTag, globalWeightUnit, exerciseUnits, machineUnits);
+    const trimmed = (machineTag ?? "").trim();
+    if (trimmed && machineUnits[trimmed]) {
+      return machineUnits[trimmed];
+    }
+    if (exerciseUnits[exerciseName]) {
+      return exerciseUnits[exerciseName];
+    }
+    return globalWeightUnit;
   }
 
   function handleToggleExerciseUnit(exercise: PlanExercise, machineTag?: string, defaultSets?: number) {
@@ -3900,6 +3905,22 @@ export default function Page() {
   function substituteExercise(currentExercise: PlanExercise, newName: string) {
     const next = toPlanExercise(newName);
 
+    // Clear machine override for this slot so the new exercise starts with its own default equipment
+    setMachineTags((old) => {
+      const copy = { ...old };
+      delete copy[currentExercise.id];
+      writeLocalJson(MACHINE_TAGS_KEY, copy);
+      return copy;
+    });
+
+    // Clear input fields so stale weights from previous exercise do not leak
+    setInputs((old) => {
+      const copy = { ...old };
+      delete copy[currentExercise.id];
+      writeLocalJson(SET_INPUTS_KEY, copy);
+      return copy;
+    });
+
     if (mode === "custom") {
       updateCustomExercise(currentExercise.id, {
         name: next.name,
@@ -3909,6 +3930,7 @@ export default function Page() {
         reps: next.reps,
         sets: next.sets,
         warmup: next.warmup,
+        load: next.load,
       });
       return;
     }
@@ -5169,8 +5191,9 @@ export default function Page() {
                 // Priority 3: Assessed / anatomical default (exercise.load)
                 const autoResolvedMachine = lastUsedMachine || favMachine || "";
                 const currentMachine = machineTags[baseExercise.id] !== undefined ? machineTags[baseExercise.id] : autoResolvedMachine;
-                const isFavoriteMachine = !!currentMachine && favoriteMachines[exercise.name] === currentMachine;
-                const effectiveLoad = mapMachineVariantToLoad(currentMachine, getLoadType(exercise));
+                const effectiveLoad: LoadType = currentMachine
+                  ? mapMachineVariantToLoad(currentMachine, exercise.load)
+                  : (exercise.load || getLoadType(exercise));
                 const effectiveKey = getEffectiveExerciseKey(exercise.name, currentMachine);
                 const records = recordsMap[effectiveKey] ?? (currentMachine ? {} : recordsMap[exercise.name]) ?? {};
                 const pr = records.maxWeight ?? prMap[effectiveKey] ?? (currentMachine ? undefined : prMap[exercise.name]);
@@ -5442,6 +5465,20 @@ export default function Page() {
                               const nextU: WeightUnit = currentU === "kg" ? "lbs" : "kg";
                               saveMachineUnit(currentMachine, nextU);
                               setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
+
+                              // Re-snap existing input numbers cleanly to the new unit
+                              setInputs((old) => {
+                                const curInputs = normalizeSetInputs(old[baseExercise.id], effectiveSets);
+                                const converted = curInputs.map((s) => {
+                                  const val = parseFloat(s.weightLbs);
+                                  if (!Number.isFinite(val) || val <= 0) return s;
+                                  const newWeight = convertAndSnapWeight(val, currentU, nextU, isIso);
+                                  return { ...s, weightLbs: String(newWeight) };
+                                });
+                                const nextInputs = { ...old, [baseExercise.id]: converted };
+                                writeLocalJson(SET_INPUTS_KEY, nextInputs);
+                                return nextInputs;
+                              });
                             }}
                             className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-black text-yellow-300 hover:border-yellow-400 transition"
                             title="สลับหน่วยเฉพาะเครื่องนี้"
