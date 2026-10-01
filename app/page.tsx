@@ -2294,8 +2294,9 @@ export function evaluateRelativeStrength(
 ) {
   const n = exerciseName.toLowerCase();
 
-  // Strict equipment check: If loadType is explicitly NOT dumbbell, do NOT treat as dumbbell!
-  const isDumbbell = loadType === "dumbbell";
+  // Detect dumbbell: true if loadType is dumbbell, OR if name contains DB/dumbbell unless explicitly mapped to a machine/cable
+  const isExplicitMachine = loadType === "selectorized" || loadType === "plate-loaded" || loadType === "cable" || loadType === "smith";
+  const isDumbbell = loadType === "dumbbell" || (!isExplicitMachine && (n.includes("db ") || n.includes("dumbbell")));
   const isSingleArmLeg = !isDumbbell && (n.includes("1 arm") || n.includes("one arm") || n.includes("single leg") || n.includes("bulgarian"));
   const isWeightedBodyweight = n.includes("weighted dip") || n.includes("weighted pull up");
 
@@ -5286,16 +5287,19 @@ export default function Page() {
     const inputWeightSet1 = parseFloat(currentSetInputs[0]?.weightLbs);
     const inputRepsSet1 = parseFloat(currentSetInputs[0]?.reps);
     const lastSet1 = lastSetMap[effectiveKey]?.[1] ?? (!currentMachine ? lastSetMap[exercise.name]?.[1] : undefined);
-    const lastSet1Lbs = lastSet1 ? lastSet1.weightLbs : 0;
-    const loggedWeightSet1 = lastSet1Lbs > 0
-      ? (effectiveUnit === "kg" ? Math.round(lastSet1Lbs * 0.453592 * 10) / 10 : lastSet1Lbs)
+    const lastSet1Weight = lastSet1 ? (lastSet1.rawValue ?? lastSet1.weightLbs) : 0;
+    const lastSet1Unit = lastSet1?.unit ?? "lbs";
+    const lastSet1InLbs = lastSet1Unit === "kg" ? convertWeight(lastSet1Weight, "kg", "lbs") : lastSet1Weight;
+
+    const loggedWeightSet1 = lastSet1Weight > 0
+      ? (lastSet1Unit === effectiveUnit ? lastSet1Weight : (effectiveUnit === "kg" ? Math.round(lastSet1InLbs * 0.453592 * 10) / 10 : Math.round(lastSet1InLbs * 10) / 10))
       : undefined;
     const loggedRepsSet1 = lastSet1?.reps;
     const prWeight = pr?.weightLbs ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs) : 0;
 
     const baselineWorkingWeight = 
       (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0) ? inputWeightSet1 :
-      (loggedWeightSet1 && loggedWeightSet1 > 0) ? loggedWeightSet1 :
+      (loggedWeightSet1 !== undefined && loggedWeightSet1 > 0) ? loggedWeightSet1 :
       (aiWeightSuggestion > 0) ? aiWeightSuggestion :
       (prWeight > 0) ? prWeight :
       (effectiveUnit === "kg" ? 40 : 90);
@@ -5314,8 +5318,8 @@ export default function Page() {
       ? epley1RM(pr.weightLbs, pr.reps || 1)
       : (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0)
       ? epley1RM(effectiveUnit === "kg" ? inputWeightSet1 * 2.20462 : inputWeightSet1, inputRepsSet1 > 0 ? inputRepsSet1 : 8)
-      : (lastSet1Lbs > 0)
-      ? epley1RM(lastSet1Lbs, lastSet1?.reps ? Number(lastSet1.reps) : 8)
+      : (lastSet1InLbs > 0)
+      ? epley1RM(lastSet1InLbs, loggedRepsSet1 ? Number(loggedRepsSet1) : 8)
       : epley1RM(effectiveUnit === "kg" ? baselineWorkingWeight * 2.20462 : baselineWorkingWeight, 8);
 
     const forcedTier = manualTierMap[baseExercise.id];
@@ -5491,7 +5495,7 @@ export default function Page() {
                                 onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
                                 className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-8 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
                               >
-                                <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[getLoadType(exercise)]})</option>
+                                <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[exercise.load || getLoadType(exercise)]})</option>
                                 {contextualMachineOptions.map((tag) => (
                                   <option key={tag} value={tag}>
                                     {tag} {lastUsedMachine === tag ? "● ล่าสุด" : ""} {favoriteMachines[exercise.name] === tag ? "⭐" : ""}
