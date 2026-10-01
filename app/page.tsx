@@ -644,11 +644,12 @@ function mapMachineVariantToLoad(machineVariant?: string, fallbackLoad: LoadType
   if (!machineVariant) return fallbackLoad;
   const m = machineVariant.toLowerCase();
   if (m.includes("plate-loaded") || m.includes("plate loaded") || m.includes("iso-lateral") || m.includes("t-bar")) return "plate-loaded";
-  if (m.includes("cable") || m.includes("pulldown")) return "cable";
+  if (m.includes("pin-selectorized") || m.includes("pin-loaded") || m.includes("selectorized") || m.includes("pin stack") || m.includes("standard selectorized")) return "selectorized";
+  if (m.includes("cable") || m.includes("dual cable")) return "cable";
   if (m.includes("smith")) return "smith";
   if (m.includes("dumbbell") || m.includes("db")) return "dumbbell";
   if (m.includes("barbell") || m.includes("bb")) return "barbell";
-  if (m.includes("machine") || m.includes("selectorized") || m.includes("pin")) return "selectorized";
+  if (m.includes("machine") || m.includes("mts")) return "selectorized";
   return fallbackLoad;
 }
 
@@ -5272,7 +5273,7 @@ export default function Page() {
 
     const aiWeightSuggestion = userProfile ? (() => {
       const muscleMass = userProfile.muscleMassKg ?? Math.round(userProfile.weightKg * 0.42);
-      const muscleMode = userProfile.muscleMassMode;
+      const muscleMode = userProfile.muscleMassMode ?? "smm";
       const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
       const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
       const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine);
@@ -5574,7 +5575,13 @@ export default function Page() {
                             {warmupInfo.type === "full" && <span className="text-yellow-400">⚡</span>}
                             {warmupInfo.type === "acclimation" && <span className="text-yellow-400">🔥</span>}
                             {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
-                            {warmupInfo.headline}
+                            <span>
+                              {warmupInfo.type === "skip"
+                                ? warmupInfo.headline
+                                : warmupInfo.type === "acclimation"
+                                ? warmupInfo.headline
+                                : `ลำดับ Warmup แนะนำ (${effectiveLoad === "dumbbell" ? "ดัมเบล" : effectiveLoad === "cable" ? "เคเบิล" : "เครื่องเล่น"} 1-2 เซต)`}
+                            </span>
                           </span>
                         </div>
 
@@ -5655,8 +5662,11 @@ export default function Page() {
                             : 0;
 
                           const aiWeightSuggestion = userProfile ? (() => {
-                            const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
-                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier, currentMachine);
+                            const muscleMass = userProfile.muscleMassKg ?? Math.round(userProfile.weightKg * 0.42);
+                            const muscleMode = userProfile.muscleMassMode ?? "smm";
+                            const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
+                            const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
+                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine);
                             return effectiveUnit === "lbs"
                               ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
                               : bioRes.hardwareWeightKg;
