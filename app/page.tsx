@@ -823,11 +823,11 @@ function getPrescription(exercise: Exercise) {
   };
 }
 
-function toPlanExercise(name: string): PlanExercise {
+function toPlanExercise(name: string, customId?: string): PlanExercise {
   const exercise = findExercise(name);
   const prescription = getPrescription(exercise);
   return {
-    id: makeId("ex"),
+    id: customId || makeId("ex"),
     name: exercise.name,
     group: exercise.group,
     sets: prescription.sets,
@@ -839,49 +839,49 @@ function toPlanExercise(name: string): PlanExercise {
   };
 }
 
-function makeDay(title: string, subtitle: string, focus: MuscleGroup[], exerciseNames: string[]): DayPlan {
+function makeDay(dayIdPrefix: string, title: string, subtitle: string, focus: MuscleGroup[], exerciseNames: string[]): DayPlan {
   return {
-    id: makeId("day"),
+    id: dayIdPrefix,
     title,
     subtitle,
     focus,
     exercises: exerciseNames
       .map((n) => exerciseByNameMap.get(n))
       .filter((e): e is Exercise => Boolean(e))
-      .map((e) => toPlanExercise(e.name)),
+      .map((e, idx) => toPlanExercise(e.name, `${dayIdPrefix}_ex_${idx}`)),
   };
 }
 
 function makePresetPlans() {
   return {
     3: [
-      makeDay("Day 1 Full Body A", "Squat, horizontal press, row, hamstrings, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Hack Squat", "Machine Chest Press", "Chest Supported Row", "Seated Hamstring Curl", "Cable Lat Raise", "Overhead Cable Ext"]),
-      makeDay("Day 2 Full Body B", "Hinge, vertical pull, incline press, quads, rear delts, biceps", ["Legs", "Back", "Chest", "Shoulders", "Arms"], ["Romanian Deadlift RDL", "Neutral Grip Lat Pull Down", "Incline DB Press", "Leg Extension", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
-      makeDay("Day 3 Full Body C", "Belt squat, lower chest, row, glutes, delts, abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["Belt Squat", "Decline Machine Press", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
+      makeDay("p3_d1", "Day 1 Full Body A", "Squat, horizontal press, row, hamstrings, delts, arms", ["Chest", "Back", "Legs", "Shoulders", "Arms"], ["Hack Squat", "Machine Chest Press", "Chest Supported Row", "Seated Hamstring Curl", "Cable Lat Raise", "Overhead Cable Ext"]),
+      makeDay("p3_d2", "Day 2 Full Body B", "Hinge, vertical pull, incline press, quads, rear delts, biceps", ["Legs", "Back", "Chest", "Shoulders", "Arms"], ["Romanian Deadlift RDL", "Neutral Grip Lat Pull Down", "Incline DB Press", "Leg Extension", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
+      makeDay("p3_d3", "Day 3 Full Body C", "Belt squat, lower chest, row, glutes, delts, abs", ["Legs", "Chest", "Back", "Shoulders", "Abs & Calves"], ["Belt Squat", "Decline Machine Press", "Cable Row", "Machine Hip Thrust", "Cable Lat Raise", "Cable Crunch"]),
     ],
     4: [
-      makeDay("Day 1 Upper A", "Mid chest, lats, side delts, upper traps, triceps long", ["Chest", "Back", "Shoulders", "Arms"], ["Iso-Lateral Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "DB Shrug", "Overhead Cable Ext"]),
-      makeDay("Day 2 Lower A", "Quad bias, hamstrings, glutes, soleus", ["Legs", "Abs & Calves"], ["Belt Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Seated Calf Raise"]),
-      makeDay("Day 3 Upper B", "Upper+lower chest, lat width, rear delts, lower traps, biceps", ["Chest", "Back", "Shoulders", "Arms"], ["Iso-Lateral Incline Press", "Decline Machine Press", "Iso-Lateral Pulldown", "Cable Row", "Reverse Pec Deck", "Rope Face Pull", "Face Away Bayesian Curl"]),
-      makeDay("Day 4 Lower B", "Hinge, glute press, quads, hamstrings, abs, gastroc", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Seated Hamstring Curl", "Cable Crunch", "Standing Calf Raise"]),
+      makeDay("p4_d1", "Day 1 Upper A", "Mid chest, lats, side delts, upper traps, triceps long", ["Chest", "Back", "Shoulders", "Arms"], ["Iso-Lateral Chest Press", "Seated Cable Pec Flye", "Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Raise", "DB Shrug", "Overhead Cable Ext"]),
+      makeDay("p4_d2", "Day 2 Lower A", "Quad bias, hamstrings, glutes, soleus", ["Legs", "Abs & Calves"], ["Belt Squat", "Leg Extension", "Seated Hamstring Curl", "Machine Hip Thrust", "Seated Calf Raise"]),
+      makeDay("p4_d3", "Day 3 Upper B", "Upper+lower chest, lat width, rear delts, lower traps, biceps", ["Chest", "Back", "Shoulders", "Arms"], ["Iso-Lateral Incline Press", "Decline Machine Press", "Iso-Lateral Pulldown", "Cable Row", "Reverse Pec Deck", "Rope Face Pull", "Face Away Bayesian Curl"]),
+      makeDay("p4_d4", "Day 4 Lower B", "Hinge, glute press, quads, hamstrings, abs, gastroc", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Bulgarian Split Squat", "Seated Hamstring Curl", "Cable Crunch", "Standing Calf Raise"]),
     ],
     5: [
-      makeDay("Day 1 Chest + Back A", "Horizontal press, row, incline press, vertical pull, flye", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye"]),
-      makeDay("Day 2 Legs Quad Bias", "Squat press, leg curl, quad isolation, glute, soleus", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Seated Calf Raise"]),
-      makeDay("Day 3 Shoulders + Arms", "Shoulder press, side delt, rear delt, lower traps, biceps, triceps long", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Cable Y Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
-      makeDay("Day 4 Chest + Back B", "Row bias, lat isolation, lower chest, rear delt, upper traps", ["Back", "Chest", "Shoulders"], ["Cable Row", "Straight Arm Pulldown", "Decline Machine Press", "Pec Deck", "Rope Face Pull", "DB Shrug"]),
-      makeDay("Day 5 Legs Posterior Bias", "Hinge, glute press, hamstring curl, glute, abs, gastroc", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Seated Hamstring Curl", "Machine Hip Thrust", "Cable Crunch", "Standing Calf Raise"]),
+      makeDay("p5_d1", "Day 1 Chest + Back A", "Horizontal press, row, incline press, vertical pull, flye", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row", "Incline DB Press", "Neutral Grip Lat Pull Down", "Seated Cable Pec Flye"]),
+      makeDay("p5_d2", "Day 2 Legs Quad Bias", "Squat press, leg curl, quad isolation, glute, soleus", ["Legs", "Abs & Calves"], ["Hack Squat", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Seated Calf Raise"]),
+      makeDay("p5_d3", "Day 3 Shoulders + Arms", "Shoulder press, side delt, rear delt, lower traps, biceps, triceps long", ["Shoulders", "Arms"], ["Machine Shoulder Press", "Cable Lat Raise", "Reverse Pec Deck", "Cable Y Raise", "Face Away Bayesian Curl", "Overhead Cable Ext"]),
+      makeDay("p5_d4", "Day 4 Chest + Back B", "Row bias, lat isolation, lower chest, rear delt, upper traps", ["Back", "Chest", "Shoulders"], ["Cable Row", "Straight Arm Pulldown", "Decline Machine Press", "Pec Deck", "Rope Face Pull", "DB Shrug"]),
+      makeDay("p5_d5", "Day 5 Legs Posterior Bias", "Hinge, glute press, hamstring curl, glute, abs, gastroc", ["Legs", "Abs & Calves"], ["Romanian Deadlift RDL", "45° Leg Press High Foot", "Seated Hamstring Curl", "Machine Hip Thrust", "Cable Crunch", "Standing Calf Raise"]),
     ],
   } satisfies Record<3 | 4 | 5, DayPlan[]>;
 }
 
 function makeFiveDayLegOncePlan() {
   return [
-    makeDay("Day 1 Push", "Chest press, incline, flye, side delt, triceps", ["Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye", "Cable Lat Raise", "Overhead Cable Ext"]),
-    makeDay("Day 2 Pull", "Row, pulldown, lat isolation, rear delt, biceps", ["Back", "Shoulders", "Arms"], ["Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
-    makeDay("Day 3 Legs Only", "Single weekly leg day with complete lower-body coverage", ["Legs", "Abs & Calves"], ["Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Standing Calf Raise"]),
-    makeDay("Day 4 Upper A", "Chest and back volume without extra leg fatigue", ["Chest", "Back", "Shoulders"], ["Incline Machine Bench", "Cable Row", "Pec Deck", "Widegrip Lat Pull Down", "Rope Face Pull"]),
-    makeDay("Day 5 Upper B + Arms", "Upper pump with direct arm work", ["Back", "Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Chest Supported Row", "Cable Lat Raise", "Machine Preacher Curl", "Triceps Pressdown Bar"]),
+    makeDay("p5leg1_d1", "Day 1 Push", "Chest press, incline, flye, side delt, triceps", ["Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Incline DB Press", "Seated Cable Pec Flye", "Cable Lat Raise", "Overhead Cable Ext"]),
+    makeDay("p5leg1_d2", "Day 2 Pull", "Row, pulldown, lat isolation, rear delt, biceps", ["Back", "Shoulders", "Arms"], ["Chest Supported Row", "Neutral Grip Lat Pull Down", "Cable Lat Prayers", "Reverse Pec Deck", "Face Away Bayesian Curl"]),
+    makeDay("p5leg1_d3", "Day 3 Legs Only", "Single weekly leg day with complete lower-body coverage", ["Legs", "Abs & Calves"], ["Hack Squat", "Romanian Deadlift RDL", "Seated Hamstring Curl", "Leg Extension", "Machine Hip Thrust", "Standing Calf Raise"]),
+    makeDay("p5leg1_d4", "Day 4 Upper A", "Chest and back volume without extra leg fatigue", ["Chest", "Back", "Shoulders"], ["Incline Machine Bench", "Cable Row", "Pec Deck", "Widegrip Lat Pull Down", "Rope Face Pull"]),
+    makeDay("p5leg1_d5", "Day 5 Upper B + Arms", "Upper pump with direct arm work", ["Back", "Chest", "Shoulders", "Arms"], ["Machine Chest Press", "Chest Supported Row", "Cable Lat Raise", "Machine Preacher Curl", "Triceps Pressdown Bar"]),
   ];
 }
 
@@ -907,7 +907,7 @@ function createStarterCustomPlan() {
   return {
     id: makeId("plan"),
     name: "My Custom Split",
-    days: [makeDay("Custom Day 1", "Choose target muscles then press Recommend", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row"])],
+    days: [makeDay("c_d1", "Custom Day 1", "Choose target muscles then press Recommend", ["Chest", "Back"], ["Machine Chest Press", "Chest Supported Row"])],
   } satisfies CustomPlan;
 }
 
@@ -2361,15 +2361,20 @@ export function evaluateRelativeStrength(
   let tier: "Beginner" | "Intermediate" | "Advanced" | "Elite" = "Beginner";
   const hasHistory = Number.isFinite(e1RMLbs) && e1RMLbs > 0;
 
+  // Double the ratio for single-limb/dumbbell when evaluating tier against bilateral thresholds
+  const rawRatio = userBwLbs > 0 ? e1RMLbs / userBwLbs : 0;
+  const effectiveRatioForTier = (!isWeightedBodyweight && (isDumbbell || isSingleArmLeg))
+    ? rawRatio * 2
+    : rawRatio;
+
   if (forcedTier) {
     tier = forcedTier;
   } else if (!hasHistory) {
     tier = userExperienceMonths >= 36 ? "Advanced" : userExperienceMonths >= 12 ? "Intermediate" : "Beginner";
   } else {
-    const currentRatio = userBwLbs > 0 ? e1RMLbs / userBwLbs : 0;
-    if (currentRatio >= thresholds[2]) tier = "Elite";
-    else if (currentRatio >= thresholds[1]) tier = "Advanced";
-    else if (currentRatio >= thresholds[0]) tier = "Intermediate";
+    if (effectiveRatioForTier >= thresholds[2]) tier = "Elite";
+    else if (effectiveRatioForTier >= thresholds[1]) tier = "Advanced";
+    else if (effectiveRatioForTier >= thresholds[0]) tier = "Intermediate";
     else tier = "Beginner";
   }
 
@@ -2580,21 +2585,56 @@ export default function Page() {
   }
 
   function handleTriggerFinishWorkout(dayTitle: string, currentDayExercises: PlanExercise[]) {
-    // Calculate stats
     let totalSetsDone = 0;
     let totalVol = 0;
+    const allCompletedSets: LogSet[] = [];
+    const todayKey = getLocalDateKey(new Date());
 
     currentDayExercises.forEach((ex) => {
-      const exInputs = inputs[ex.id] || [];
-      exInputs.forEach((s) => {
-        if (s.done) {
+      const trimmedTag = (machineTags[ex.id] ?? "").trim();
+      const effUnit = getEffectiveUnitForExercise(ex.name, trimmedTag);
+      const exInputs = normalizeSetInputs(inputs[ex.id], ex.sets);
+
+      exInputs.forEach((s, idx) => {
+        const w = parseFloat(s.weightLbs) || 0;
+        const r = parseFloat(s.reps) || 0;
+        if (s.done && w > 0 && r > 0) {
           totalSetsDone += 1;
-          const w = parseFloat(s.weightLbs) || 0;
-          const r = parseFloat(s.reps) || 0;
-          totalVol += w * r;
+          const wLbs = effUnit === "kg" ? convertWeight(w, "kg", "lbs") : w;
+          totalVol += wLbs * r;
+          allCompletedSets.push({
+            exerciseId: ex.id,
+            exerciseName: ex.name,
+            weightLbs: wLbs,
+            reps: r,
+            setNumber: idx + 1,
+            date: new Date().toISOString(),
+            machine: trimmedTag || undefined,
+            unit: effUnit,
+            rawValue: w,
+          });
         }
       });
     });
+
+    // Persist logs & records if any sets were completed
+    if (allCompletedSets.length > 0) {
+      setLogs((old) => {
+        const updated = [...old, ...allCompletedSets];
+        writeLocalJson(LATEST_LOGS_KEY, updated);
+        return updated;
+      });
+
+      setRecordsMap((old) => {
+        let updated = { ...old };
+        for (const s of allCompletedSets) {
+          updated = updateRecordsWithSet(updated, s);
+        }
+        writeLocalJson(PERMANENT_RECORDS_KEY, updated);
+        writeLocalJson(LEGACY_STATS_KEY, updated);
+        return updated;
+      });
+    }
 
     const durationStr = formatStopwatch(sessionElapsedSeconds);
     const totalVolumeKg = Math.round(totalVol * 0.453592);
@@ -2644,24 +2684,24 @@ export default function Page() {
     const targetUnit: WeightUnit = currentUnit === "kg" ? "lbs" : "kg";
     const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
 
-    // Save exercise unit override
+    const trimmed = (machineTag ?? "").trim();
+    if (trimmed) {
+      saveMachineUnit(trimmed, targetUnit);
+      setMachineUnits((prev) => ({ ...prev, [trimmed]: targetUnit }));
+    }
     saveExerciseUnit(exercise.name, targetUnit);
     setExerciseUnits((prev) => ({ ...prev, [exercise.name]: targetUnit }));
 
-    // Re-calculate and snap existing input value on unit toggle
     const setsCount = defaultSets || exercise.sets;
-    setInputs((old) => {
-      const currentInputs = normalizeSetInputs(old[exercise.id], setsCount);
-      const convertedInputs = currentInputs.map((s) => {
+    setInputs((old: Record<string, SetInput[]>) => {
+      const cur = normalizeSetInputs(old[exercise.id], setsCount);
+      const converted = cur.map((s) => {
         const numVal = parseFloat(s.weightLbs);
         if (!Number.isFinite(numVal) || numVal <= 0) return s;
-        const converted = convertAndSnapWeight(numVal, currentUnit, targetUnit, isIso);
-        return {
-          ...s,
-          weightLbs: String(converted),
-        };
+        const convertedVal = convertAndSnapWeight(numVal, currentUnit, targetUnit, isIso);
+        return { ...s, weightLbs: String(convertedVal) };
       });
-      const nextInputs = { ...old, [exercise.id]: convertedInputs };
+      const nextInputs = { ...old, [exercise.id]: converted };
       writeLocalJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
     });
@@ -2878,10 +2918,19 @@ export default function Page() {
   const day = useMemo(() => {
     if (!rawDay) return rawDay;
     const customOrder = sessionExerciseOrders[currentDayKey];
-    if (!customOrder || customOrder.length === 0) return rawDay;
-    
-    // Sort rawDay.exercises according to customOrder
-    const sorted = [...rawDay.exercises].sort((a, b) => {
+
+    // 1. Resolve substituted identities first
+    const resolvedExercises = rawDay.exercises.map((base) => {
+      const subName = substituteMap[base.id];
+      return subName ? applyExerciseIdentity(base, subName) : base;
+    });
+
+    if (!customOrder || customOrder.length === 0) {
+      return { ...rawDay, exercises: resolvedExercises };
+    }
+
+    // 2. Sort according to custom order
+    const sorted = [...resolvedExercises].sort((a, b) => {
       const idxA = customOrder.indexOf(a.id);
       const idxB = customOrder.indexOf(b.id);
       if (idxA === -1 && idxB === -1) return 0;
@@ -2890,7 +2939,7 @@ export default function Page() {
       return idxA - idxB;
     });
     return { ...rawDay, exercises: sorted };
-  }, [rawDay, sessionExerciseOrders, currentDayKey]);
+  }, [rawDay, sessionExerciseOrders, currentDayKey, substituteMap]);
 
   // Smart Weekly Schedule Resolver
   const todayDayOfWeek = useMemo(() => {
@@ -3841,7 +3890,8 @@ export default function Page() {
 
   function addCustomDay() {
     if (!selectedCustomPlan) return;
-    const newDay = makeDay(`Custom Day ${selectedCustomPlan.days.length + 1}`, "Choose target muscles then press Recommend", ["Chest"], []);
+    const dayId = makeId("c_day");
+    const newDay = makeDay(dayId, `Custom Day ${selectedCustomPlan.days.length + 1}`, "Choose target muscles then press Recommend", ["Chest"], []);
     setCustomPlans((old) => old.map((plan) => (plan.id === selectedCustomPlan.id ? { ...plan, days: [...plan.days, newDay] } : plan)));
     setSelectedCustomDay(selectedCustomPlan.days.length);
   }
@@ -3858,7 +3908,7 @@ export default function Page() {
   function deleteCustomDay(dayId: string) {
     if (!selectedCustomPlan) return;
     const nextDays = selectedCustomPlan.days.filter((item) => item.id !== dayId);
-    const safeDays = nextDays.length > 0 ? nextDays : [makeDay("Custom Day 1", "Choose target muscles then press Recommend", ["Chest"], [])];
+    const safeDays = nextDays.length > 0 ? nextDays : [makeDay("c_d1", "Custom Day 1", "Choose target muscles then press Recommend", ["Chest"], [])];
     setCustomPlans((old) => old.map((plan) => (plan.id === selectedCustomPlan.id ? { ...plan, days: safeDays } : plan)));
     setSelectedCustomDay(0);
   }
@@ -5225,7 +5275,10 @@ export default function Page() {
     // Check set #1 from inputs or logs (Set numbers start at 1, not 0)
     const inputWeightSet1 = parseFloat(currentSetInputs[0]?.weightLbs);
     const inputRepsSet1 = parseFloat(currentSetInputs[0]?.reps);
-    const loggedWeightSet1 = lastSetMap[effectiveKey]?.[1]?.rawValue ?? lastSetMap[effectiveKey]?.[1]?.weightLbs ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.rawValue : undefined);
+    const lastSet1Lbs = lastSetMap[effectiveKey]?.[1]?.weightLbs ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.weightLbs : undefined);
+    const loggedWeightSet1 = lastSet1Lbs !== undefined
+      ? (effectiveUnit === "kg" ? Math.round(lastSet1Lbs * 0.453592 * 10) / 10 : lastSet1Lbs)
+      : undefined;
     const loggedRepsSet1 = lastSetMap[effectiveKey]?.[1]?.reps ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.reps : undefined);
     const prWeight = pr?.weightLbs ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs) : 0;
 
