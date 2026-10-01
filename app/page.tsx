@@ -4489,6 +4489,7 @@ export default function Page() {
                       <button
                         type="button"
                         onClick={() => {
+                          setSessionStage("lifting");
                           setMode("today");
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
@@ -5152,6 +5153,8 @@ export default function Page() {
           </>
         )}
 
+            {/* Exercise Cards Grid — ONLY during lifting stage */}
+            {sessionStage === "lifting" && (
             <div className="mt-4 grid gap-4">
               {visibleExercises.map((baseExercise) => {
                 const index = day.exercises.findIndex((item) => item.id === baseExercise.id);
@@ -5182,8 +5185,11 @@ export default function Page() {
     const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
 
     const aiWeightSuggestion = userProfile ? (() => {
-      const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, userProfile.muscleMassKg, userProfile.muscleMassMode);
-      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, muscleInfo.modifier, currentMachine);
+      const muscleMass = userProfile.muscleMassKg ?? Math.round(userProfile.weightKg * 0.42);
+      const muscleMode = userProfile.muscleMassMode ?? "percentage";
+      const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
+      const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
+      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine);
       return effectiveUnit === "lbs"
         ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
         : bioRes.hardwareWeightKg;
@@ -5985,13 +5991,28 @@ export default function Page() {
                 );
               })}
             </div>
+            )}
+
             {/* Render Cardio Controller ONLY when sessionStage is "cardio" */}
             {sessionStage === "cardio" && (
-              <div className="mt-4">
-                <CardioController
-                  onSaveCardioLog={handleSaveCardioLog}
-                  savedToast={cardioSavedToast}
-                />
+              <div className="mt-4 animate-in fade-in duration-150">
+                <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4 sm:p-5 shadow-xl">
+                  <div className="mb-4 flex items-center justify-between border-b border-zinc-900 pb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-yellow-400/10 border border-yellow-500/20 text-yellow-400 font-bold">
+                        ⚡
+                      </div>
+                      <div>
+                        <h3 className="text-base font-black text-white">คาร์ดิโอ & ปรับสภาพร่างกาย (Cardio / Zone 2)</h3>
+                        <p className="text-[11px] text-zinc-500">บันทึกกิจกรรมคาร์ดิโอเพื่อเสริมการฟื้นตัวและระบบหัวใจ</p>
+                      </div>
+                    </div>
+                  </div>
+                  <CardioController
+                    onSaveCardioLog={handleSaveCardioLog}
+                    savedToast={cardioSavedToast}
+                  />
+                </div>
               </div>
             )}
           </>
