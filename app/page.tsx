@@ -5211,7 +5211,7 @@ export default function Page() {
 
     const aiWeightSuggestion = userProfile ? (() => {
       const muscleMass = userProfile.muscleMassKg ?? Math.round(userProfile.weightKg * 0.42);
-      const muscleMode = userProfile.muscleMassMode ?? "percentage";
+      const muscleMode = userProfile.muscleMassMode;
       const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
       const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
       const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine);
