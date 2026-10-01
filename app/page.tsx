@@ -2333,19 +2333,27 @@ export function evaluateRelativeStrength(
   // 4. Ergonomically Calibrated Thresholds [Novice->Inter, Inter->Adv, Adv->Elite]
   let baseThresholds: [number, number, number];
 
-  // A. DELTS & REAR DELT ISOLATION
-  if (n.includes("lat raise") || n.includes("lateral raise") || n.includes("y raise")) {
-    baseThresholds = [0.06, 0.10, 0.14]; // Prevents unsafe lateral swings
+  // A. DELTS & REAR DELTS
+  if (
+    n.includes("lat raise") || n.includes("lateral raise") || 
+    n.includes("y raise") || n.includes("db raise") || 
+    (n.includes("raise") && (n.includes("lean in") || n.includes("side")))
+  ) {
+    baseThresholds = [0.06, 0.10, 0.14];
   } else if (n.includes("rear delt") || n.includes("face pull") || n.includes("cable crossover") || n.includes("cable flye") || n.includes("pec deck") || n.includes("db flye")) {
     baseThresholds = [0.12, 0.19, 0.26];
 
   // B. ARMS & PULLOVERS
   } else if (n.includes("straight arm") || n.includes("lat prayers") || n.includes("pullover")) {
     baseThresholds = [0.16, 0.25, 0.34];
-  } else if (n.includes("curl") || n.includes("tricep") || n.includes("extension") || n.includes("pushdown") || n.includes("pressdown") || n.includes("skullcrusher") || n.includes("katana")) {
+  } else if (
+    n.includes("curl") || n.includes("tricep") || n.includes("extension") || 
+    n.includes("pushdown") || n.includes("pressdown") || n.includes("skullcrusher") || 
+    n.includes("katana") || n.includes("cable ext") || (n.includes("overhead") && n.includes("db"))
+  ) {
     baseThresholds = [0.18, 0.28, 0.38];
 
-  // C. WEIGHTED BODYWEIGHT (Added Plate Weight Only)
+  // C. WEIGHTED BODYWEIGHT
   } else if (isWeightedBodyweight) {
     baseThresholds = [0.08, 0.20, 0.32];
 
@@ -2353,22 +2361,25 @@ export function evaluateRelativeStrength(
   } else if (n.includes("shoulder press") || n.includes("overhead press") || n.includes("military")) {
     baseThresholds = isDumbbell ? [0.26, 0.40, 0.54] : [0.36, 0.54, 0.70];
 
-  // E. CHEST PRESS
+  // E. CHEST PRESS (Match bench, chest press, machine press, floor press, and smith press)
   } else if (n.includes("converging cable") || (n.includes("cable") && n.includes("press"))) {
     baseThresholds = [0.28, 0.42, 0.56];
   } else if (isDumbbell && (n.includes("press") || n.includes("bench"))) {
     baseThresholds = [0.36, 0.54, 0.72];
   } else if (n.includes("incline") && (n.includes("press") || n.includes("bench"))) {
     baseThresholds = isBarbell ? [0.55, 0.78, 1.02] : [0.45, 0.65, 0.85];
-  } else if (n.includes("bench") || n.includes("chest press") || n.includes("dip")) {
+  } else if (
+    n.includes("bench") || n.includes("chest press") || n.includes("dip") || 
+    n.includes("machine press") || n.includes("floor press") || (n.includes("smith") && n.includes("press"))
+  ) {
     baseThresholds = isBarbell ? [0.65, 0.92, 1.20] : [0.55, 0.80, 1.05];
 
-  // F. ROWS & PULLDOWNS (Zero-Momentum Prone Rows separated from Barbell)
+  // F. ROWS & PULLDOWNS (Handle "pull down" with space, and chest-supported rows)
   } else if (isChestSupported) {
-    baseThresholds = [0.26, 0.40, 0.54]; // Prone Chest-Supported / T-Bar realistic working loads
+    baseThresholds = [0.26, 0.40, 0.54];
   } else if (n.includes("shrug")) {
     baseThresholds = [0.60, 0.90, 1.25];
-  } else if (n.includes("pulldown") || n.includes("pull up") || n.includes("chin")) {
+  } else if (n.includes("pulldown") || n.includes("pull down") || n.includes("pull-down") || n.includes("pull up") || n.includes("chin")) {
     baseThresholds = [0.45, 0.66, 0.86];
   } else if (n.includes("row")) {
     baseThresholds = isBarbell ? [0.50, 0.72, 0.95] : [0.38, 0.56, 0.75];
@@ -5749,7 +5760,9 @@ export default function Page() {
                               : bioRes.hardwareWeightKg;
                           })() : 0;
 
-                          const effectivePlaceholderWeight = fallbackWeightVal > 0 ? fallbackWeightVal : (aiWeightSuggestion > 0 ? aiWeightSuggestion : 0);
+                          const effectivePlaceholderWeight = fallbackWeightVal > 0 
+                            ? fallbackWeightVal 
+                            : (strengthTierInfo?.targetDisplayWeight ?? 0);
 
                           return (
                             <div key={setIndex} className="rounded-2xl bg-[#141416] p-2 hover:bg-[#18181c] transition">
