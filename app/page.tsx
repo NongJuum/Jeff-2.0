@@ -2628,14 +2628,40 @@ export default function Page() {
       });
     });
 
-    // Persist logs & records if any sets were completed
     if (allCompletedSets.length > 0) {
+      // 1. Check for any PRs
+      for (const s of allCompletedSets) {
+        const prCheck = checkIsPr(recordsMap, s);
+        if (prCheck) {
+          setPrCelebration({
+            exerciseName: s.exerciseName,
+            machine: s.machine,
+            recordType: prCheck.type,
+            oldVal: prCheck.oldVal,
+            newVal: prCheck.newVal,
+          });
+          break;
+        }
+      }
+
+      // 2. Persist Logs (deduplicated by exercise, set, and date)
       setLogs((old) => {
-        const updated = [...old, ...allCompletedSets];
+        const without = old.filter(
+          (l) =>
+            !allCompletedSets.some(
+              (c) =>
+                c.exerciseName === l.exerciseName &&
+                (c.machine || "") === (l.machine || "") &&
+                c.setNumber === l.setNumber &&
+                getLocalDateKey(l.date) === todayKey
+            )
+        );
+        const updated = [...without, ...allCompletedSets];
         writeLocalJson(LATEST_LOGS_KEY, updated);
         return updated;
       });
 
+      // 3. Update Records Map
       setRecordsMap((old) => {
         let updated = { ...old };
         for (const s of allCompletedSets) {
@@ -2644,6 +2670,16 @@ export default function Page() {
         writeLocalJson(PERMANENT_RECORDS_KEY, updated);
         writeLocalJson(LEGACY_STATS_KEY, updated);
         return updated;
+      });
+
+      // 4. Reset inputs for completed exercises
+      setInputs((old) => {
+        const nextInputs = { ...old };
+        currentDayExercises.forEach((ex) => {
+          nextInputs[ex.id] = createDefaultSetInputs(ex.sets);
+        });
+        writeLocalJson(SET_INPUTS_KEY, nextInputs);
+        return nextInputs;
       });
     }
 
@@ -2958,13 +2994,11 @@ export default function Page() {
     return daysArr[new Date().getDay()];
   }, []);
 
-  // Dashboard Workout Resolver: ALWAYS bind to active preset plan if current day is Custom or empty
+  // Dashboard Workout Resolver: ALWAYS bind to active plan if current day has exercises
   const dashboardDay = useMemo(() => {
-    // If day exists, has exercises, and is not an empty or unconfigured custom day
-    if (day && Array.isArray(day.exercises) && day.exercises.length > 0 && !day.title.startsWith("Custom Day")) {
+    if (day && Array.isArray(day.exercises) && day.exercises.length > 0) {
       return day;
     }
-    // Fallback to current scheduled split day from presetPlans
     const presetList = days === 5 && fiveDayMode === "oneLegDay" ? fiveDayLegOncePlan : presetPlans[days];
     const safePresetIndex = selectedDay < presetList.length ? selectedDay : 0;
     return presetList[safePresetIndex] || presetList[0];
@@ -5314,13 +5348,15 @@ export default function Page() {
     );
 
     const userBwLbs = bodyweightEntry?.lbs ?? (userProfile?.weightKg ? userProfile.weightKg * 2.20462 : 0);
-    const e1RMLbs = pr?.weightLbs && pr.weightLbs > 0
+
+    // Only calculate e1RM if real history exists; otherwise keep as 0 to trigger !hasHistory
+    const e1RMLbs = (pr?.weightLbs && pr.weightLbs > 0)
       ? epley1RM(pr.weightLbs, pr.reps || 1)
       : (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0)
       ? epley1RM(effectiveUnit === "kg" ? inputWeightSet1 * 2.20462 : inputWeightSet1, inputRepsSet1 > 0 ? inputRepsSet1 : 8)
       : (lastSet1InLbs > 0)
       ? epley1RM(lastSet1InLbs, loggedRepsSet1 ? Number(loggedRepsSet1) : 8)
-      : epley1RM(effectiveUnit === "kg" ? baselineWorkingWeight * 2.20462 : baselineWorkingWeight, 8);
+      : 0;
 
     const forcedTier = manualTierMap[baseExercise.id];
     const strengthTierInfo = userBwLbs > 0
@@ -5530,29 +5566,7 @@ export default function Page() {
 
                           <button
                             type="button"
-                            onClick={() => {
-                              const nextU: WeightUnit = effectiveUnit === "kg" ? "lbs" : "kg";
-                              if (currentMachine) {
-                                saveMachineUnit(currentMachine, nextU);
-                                setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
-                              }
-                              saveExerciseUnit(exercise.name, nextU);
-                              setExerciseUnits((prev) => ({ ...prev, [exercise.name]: nextU }));
-
-                              // Convert existing inputs cleanly to the new unit
-                              setInputs((old: Record<string, SetInput[]>) => {
-                                const curInputs = normalizeSetInputs(old[baseExercise.id], effectiveSets);
-                                const converted = curInputs.map((s) => {
-                                  const val = parseFloat(s.weightLbs);
-                                  if (!Number.isFinite(val) || val <= 0) return s;
-                                  const newWeight = convertAndSnapWeight(val, effectiveUnit, nextU, isIso);
-                                  return { ...s, weightLbs: String(newWeight) };
-                                });
-                                const nextInputs = { ...old, [baseExercise.id]: converted };
-                                writeLocalJson(SET_INPUTS_KEY, nextInputs);
-                                return nextInputs;
-                              });
-                            }}
+                            onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
                             className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-black text-yellow-300 hover:border-yellow-400 transition"
                             title="สลับหน่วยน้ำหนัก"
                           >
