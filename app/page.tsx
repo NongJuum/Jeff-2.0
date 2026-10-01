@@ -5206,7 +5206,7 @@ export default function Page() {
                   ? presetSetsMap[baseExercise.id]
                   : exercise.sets;
                 const rawSetInputs = inputs[baseExercise.id];
-                const setInputs = normalizeSetInputs(rawSetInputs, effectiveSets);
+                const currentSetInputs = normalizeSetInputs(rawSetInputs, effectiveSets);
                 const alternatives = getAlternatives(exercise);
                 const effectiveUnit = getEffectiveUnitForExercise(exercise.name, currentMachine);
     const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
@@ -5223,8 +5223,8 @@ export default function Page() {
     })() : 0;
 
     // Check set #1 from inputs or logs (Set numbers start at 1, not 0)
-    const inputWeightSet1 = parseFloat(setInputs[0]?.weightLbs);
-    const inputRepsSet1 = parseFloat(setInputs[0]?.reps);
+    const inputWeightSet1 = parseFloat(currentSetInputs[0]?.weightLbs);
+    const inputRepsSet1 = parseFloat(currentSetInputs[0]?.reps);
     const loggedWeightSet1 = lastSetMap[effectiveKey]?.[1]?.rawValue ?? lastSetMap[effectiveKey]?.[1]?.weightLbs ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.rawValue : undefined);
     const loggedRepsSet1 = lastSetMap[effectiveKey]?.[1]?.reps ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.reps : undefined);
     const prWeight = pr?.weightLbs ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs) : 0;
@@ -5270,7 +5270,7 @@ export default function Page() {
       : null;
 
                 const isExpanded = expandedExercises[baseExercise.id] ?? true;
-                const completedSetsCount = setInputs.filter((s) => s.done).length;
+                const completedSetsCount = currentSetInputs.filter((s) => s.done).length;
 
                 return (
                   <article key={baseExercise.id} className="rounded-3xl bg-[#121214] border border-zinc-800/60 shadow-xl overflow-hidden w-full max-w-full transition-all">
@@ -5538,7 +5538,7 @@ export default function Page() {
                         <div>
                           <p className="text-xs font-bold uppercase text-zinc-400">Working sets</p>
                           <p className="mt-0.5 text-[11px] text-zinc-500">
-                            Plan {effectiveSets} · Log {setInputs.length}
+                            Plan {effectiveSets} · Log {currentSetInputs.length}
                           </p>
                         </div>
 
@@ -5546,7 +5546,7 @@ export default function Page() {
                           <button
                             onClick={() => removeManualSet(baseExercise.id, effectiveSets)}
                             className="flex items-center gap-1 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 select-none"
-                            disabled={setInputs.length <= 1}
+                            disabled={currentSetInputs.length <= 1}
                             aria-label="Remove last set"
                             type="button"
                           >
@@ -5578,7 +5578,7 @@ export default function Page() {
                       </div>
 
                       <div className="space-y-2">
-                        {setInputs.map((set, setIndex) => {
+                        {currentSetInputs.map((set, setIndex) => {
                           const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1];
                           const fallbackRepVal = latestSet ? Number(latestSet.reps) : 10;
                           const fallbackWeightVal = latestSet
