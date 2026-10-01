@@ -2296,17 +2296,39 @@ export function evaluateRelativeStrength(
 ) {
   const n = exerciseName.toLowerCase();
   const currentMachineName = (machineVariant || "").toLowerCase();
+  const hasMachineOverride = Boolean(currentMachineName && currentMachineName !== "");
 
-  // 1. Precise Equipment & Biomechanical Flags
-  const isExplicitMachine = loadType === "selectorized" || loadType === "plate-loaded" || loadType === "cable" || loadType === "smith";
-  
-  // Specific single-hand rows and pull movements
-  const isSpecificSingleArm = n.includes("one arm") || n.includes("1 arm") || n.includes("meadows row") || n.includes("kroc row") || n.includes("bayesian");
-  
-  // Dumbbell flag (excludes explicit machines, but covers movements identified as dumbbell)
-  const isDumbbell = loadType === "dumbbell" || (!isExplicitMachine && (n.includes("db ") || n.includes("db") || n.includes("dumbbell")));
-  
-  // Accurately capture ALL unilateral movements (single arm cables, lunges, step ups, kickbacks, single-leg, meadows, kroc)
+  // 1. Precise Dynamic Equipment & Biomechanical Flags
+  // Priority: User's selected machine variant & effective loadType override default exercise name keywords
+  const isDumbbell = hasMachineOverride
+    ? (loadType === "dumbbell" || currentMachineName.includes("dumbbell") || currentMachineName.includes("db")) && !currentMachineName.includes("machine")
+    : (loadType === "dumbbell" || (!["selectorized", "plate-loaded", "cable", "smith"].includes(loadType) && (n.includes("db ") || n.includes("db") || n.includes("dumbbell"))));
+
+  const isSmith = hasMachineOverride
+    ? (loadType === "smith" || currentMachineName.includes("smith"))
+    : (loadType === "smith" || n.includes("smith"));
+
+  const isPlateLoaded = hasMachineOverride
+    ? (loadType === "plate-loaded" || currentMachineName.includes("plate") || currentMachineName.includes("iso-lateral") || currentMachineName.includes("t-bar"))
+    : (loadType === "plate-loaded" || n.includes("plate-loaded") || n.includes("iso-lateral"));
+
+  const isCable = hasMachineOverride
+    ? (loadType === "cable" || currentMachineName.includes("cable") || (currentMachineName.includes("pulldown") && currentMachineName.includes("dual")))
+    : (loadType === "cable" || n.includes("cable") || n.includes("crossover") || n.includes("face pull") || n.includes("pushdown") || n.includes("pulldown"));
+
+  const isSelectorized = hasMachineOverride
+    ? (loadType === "selectorized" || currentMachineName.includes("selectorized") || currentMachineName.includes("pin") || currentMachineName.includes("machine")) && !isSmith && !isPlateLoaded && !isCable && !isDumbbell
+    : (loadType === "selectorized" || n.includes("machine") || n.includes("pin-loaded") || n.includes("pec deck"));
+
+  const isChestSupported = n.includes("chest supported") || n.includes("seal row") || n.includes("t-bar") || currentMachineName.includes("chest-supported") || currentMachineName.includes("t-bar");
+
+  const isBarbell = hasMachineOverride
+    ? (loadType === "barbell" || currentMachineName.includes("barbell") || currentMachineName.includes("bb")) && !isSmith && !isPlateLoaded && !isSelectorized && !isCable && !isDumbbell
+    : (loadType === "barbell" || (!isDumbbell && !isSmith && !isCable && !isPlateLoaded && !isSelectorized && !isChestSupported));
+
+  // Specific single-hand or unilateral movements
+  const isSpecificSingleArm = n.includes("one arm") || n.includes("1 arm") || n.includes("meadows row") || n.includes("kroc row") || n.includes("bayesian") || currentMachineName.includes("one arm") || currentMachineName.includes("1 arm");
+
   const isSingleArmLeg = !isDumbbell && (
     isSpecificSingleArm ||
     n.includes("single leg") || n.includes("bulgarian") || 
@@ -2314,10 +2336,8 @@ export function evaluateRelativeStrength(
     n.includes("kickback") || n.includes("cable lat raise") || 
     n.includes("behind back cable") || n.includes("b-stance")
   );
-  
+
   const isWeightedBodyweight = n.includes("weighted dip") || n.includes("weighted pull up");
-  const isChestSupported = n.includes("chest supported") || n.includes("seal row") || n.includes("t-bar");
-  const isBarbell = loadType === "barbell" && !isChestSupported;
 
   // 2. Physiological Muscle Mass Estimation (If user does not know InBody / SMM)
   const userBwKg = userBwLbs * 0.453592;
@@ -2341,284 +2361,234 @@ export function evaluateRelativeStrength(
   let baseThresholds: [number, number, number];
 
   // -------------------------------------------------------------
-  // 1. CHEST (24 Exercises)
+  // 1. CHEST PRESS & FLYES (All Variations & Dynamic Machines)
   // -------------------------------------------------------------
-  if (n === "bench press" || (n.includes("bench press") && !n.includes("incline") && !n.includes("decline") && !n.includes("smith") && !n.includes("close-grip") && !n.includes("db"))) {
-    baseThresholds = [0.65, 0.92, 1.20];
-  } else if (n.includes("incline barbell") || (n.includes("incline") && n.includes("bench") && isBarbell)) {
-    baseThresholds = [0.58, 0.84, 1.10];
-  } else if (n.includes("decline bench press") || (n.includes("decline") && n.includes("bench") && isBarbell)) {
-    baseThresholds = [0.70, 1.00, 1.30];
-  } else if (n.includes("flat db press") || (isDumbbell && (n.includes("flat") || (!n.includes("incline") && !n.includes("shoulder") && !n.includes("overhead"))) && (n.includes("press") || n.includes("bench")))) {
-    baseThresholds = [0.36, 0.54, 0.72];
-  } else if (n.includes("incline db press") || (isDumbbell && n.includes("incline") && (n.includes("press") || n.includes("bench")))) {
-    baseThresholds = [0.36, 0.54, 0.72];
-  } else if (n.includes("db flye") || (isDumbbell && n.includes("flye"))) {
-    baseThresholds = [0.12, 0.19, 0.26];
-  } else if (n.includes("pin-loaded chest press")) {
-    baseThresholds = [0.58, 0.85, 1.12];
-  } else if (n.includes("plate-loaded chest press")) {
-    baseThresholds = [0.62, 0.90, 1.18];
-  } else if (n.includes("converging cable chest press") || n.includes("converging cable")) {
-    baseThresholds = [0.32, 0.48, 0.64];
-  } else if (n.includes("incline converging chest press") || (n.includes("converging") && n.includes("incline"))) {
-    baseThresholds = [0.30, 0.45, 0.60];
-  } else if (n.includes("incline machine bench") || (n.includes("incline") && (n.includes("machine") || loadType === "selectorized") && (n.includes("press") || n.includes("bench")))) {
-    baseThresholds = [0.50, 0.75, 0.98];
-  } else if (n.includes("decline machine press") || (n.includes("decline") && (n.includes("machine") || loadType === "selectorized" || loadType === "plate-loaded") && n.includes("press"))) {
-    baseThresholds = [0.70, 1.02, 1.35];
-  } else if (n.includes("iso-lateral incline press") || (n.includes("iso") && n.includes("incline") && n.includes("press"))) {
-    baseThresholds = [0.52, 0.76, 1.00];
-  } else if (n.includes("iso-lateral chest press") || (n.includes("iso") && n.includes("chest press"))) {
-    baseThresholds = [0.62, 0.90, 1.18];
-  } else if (n.includes("machine chest press") || ((n.includes("chest press") || n.includes("machine press")) && !isDumbbell && !isBarbell)) {
-    baseThresholds = [0.60, 0.88, 1.15];
-  } else if (n.includes("incline smith machine") || (n.includes("smith") && n.includes("incline") && n.includes("bench"))) {
-    baseThresholds = [0.60, 0.86, 1.12];
-  } else if (n.includes("smith machine floor press") || (n.includes("smith") && n.includes("floor"))) {
-    baseThresholds = [0.62, 0.90, 1.18];
-  } else if (n.includes("smith machine press") || (n.includes("smith") && (n.includes("bench") || (n.includes("press") && !n.includes("shoulder"))))) {
-    baseThresholds = [0.68, 0.96, 1.25];
-  } else if (n.includes("pec deck")) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  } else if (n.includes("seated cable pec flye") || (n.includes("cable") && n.includes("pec flye"))) {
-    baseThresholds = [0.15, 0.24, 0.32];
-  } else if (n.includes("low-to-high cable flye") || (n.includes("low") && n.includes("high") && n.includes("flye"))) {
-    baseThresholds = [0.14, 0.22, 0.30];
-  } else if (n.includes("high-to-low cable flye") || (n.includes("high") && n.includes("low") && n.includes("flye"))) {
-    baseThresholds = [0.16, 0.26, 0.35];
-  } else if (n.includes("cable crossover") || (n.includes("cable") && n.includes("flye"))) {
-    baseThresholds = [0.15, 0.24, 0.32];
-  } else if (n.includes("weighted dip")) {
-    baseThresholds = [0.08, 0.20, 0.32];
+  const isChestMovement = n.includes("bench") || n.includes("chest press") || (n.includes("press") && !n.includes("overhead") && !n.includes("shoulder") && !n.includes("leg press")) || n.includes("flye") || n.includes("pec deck") || n.includes("crossover") || n.includes("dip");
+
+  if (isChestMovement) {
+    if (n.includes("weighted dip")) {
+      baseThresholds = [0.08, 0.20, 0.32];
+    } else if (n.includes("pec deck")) {
+      baseThresholds = [0.18, 0.28, 0.38];
+    } else if (n.includes("db flye") || (isDumbbell && n.includes("flye"))) {
+      baseThresholds = [0.12, 0.19, 0.26];
+    } else if (n.includes("flye") || n.includes("crossover")) {
+      if (n.includes("low-to-high") || currentMachineName.includes("low-to-high")) {
+        baseThresholds = [0.14, 0.22, 0.30];
+      } else if (n.includes("high-to-low") || currentMachineName.includes("high-to-low")) {
+        baseThresholds = [0.16, 0.26, 0.35];
+      } else {
+        baseThresholds = [0.15, 0.24, 0.32];
+      }
+    } else {
+      // Compound Chest Press (Incline, Decline, Flat across Barbell, DB, Smith, Machine, Plate-Loaded, Cable)
+      const isIncline = currentMachineName.includes("incline") || (!hasMachineOverride && n.includes("incline"));
+      const isDecline = currentMachineName.includes("decline") || (!hasMachineOverride && n.includes("decline"));
+
+      if (isDumbbell) {
+        baseThresholds = [0.36, 0.54, 0.72]; // Divided by 2 per hand
+      } else if (isSmith) {
+        baseThresholds = isIncline ? [0.60, 0.86, 1.12] : [0.68, 0.96, 1.25];
+      } else if (isPlateLoaded || currentMachineName.includes("iso-lateral")) {
+        baseThresholds = isIncline ? [0.52, 0.76, 1.00] : [0.62, 0.90, 1.18];
+      } else if (isCable || currentMachineName.includes("cable")) {
+        baseThresholds = isIncline ? [0.30, 0.45, 0.60] : [0.32, 0.48, 0.64];
+      } else if (isSelectorized || currentMachineName.includes("machine")) {
+        baseThresholds = isDecline ? [0.70, 1.02, 1.35] : isIncline ? [0.50, 0.75, 0.98] : [0.58, 0.85, 1.12];
+      } else {
+        // Barbell
+        baseThresholds = isDecline ? [0.70, 1.00, 1.30] : isIncline ? [0.58, 0.84, 1.10] : [0.65, 0.92, 1.20];
+      }
+    }
 
   // -------------------------------------------------------------
-  // 2. BACK (23 Exercises)
+  // 2. BACK (ROWS, PULLDOWNS, PULLUPS, SHRUGS)
   // -------------------------------------------------------------
-  } else if (n.includes("chest supported t-bar row") || (n.includes("t-bar") && (n.includes("supported") || n.includes("chest")))) {
-    baseThresholds = [0.26, 0.40, 0.54]; // Single-sleeve central plate weight (Not divided by 2)
-  } else if (n.includes("chest supported") && (loadType === "selectorized" || n.includes("machine") || (currentMachineName && currentMachineName.includes("machine")))) {
-    baseThresholds = [0.45, 0.66, 0.86]; // Two-handed / selectorized chest-supported row machine (Total stack)
-  } else if (n.includes("chest supported") && (loadType === "plate-loaded" || (currentMachineName && currentMachineName.includes("plate")))) {
-    baseThresholds = [0.46, 0.68, 0.88]; // Plate-loaded chest supported machine
-  } else if (n.includes("chest supported") && (loadType === "cable" || (currentMachineName && currentMachineName.includes("cable")))) {
-    baseThresholds = [0.38, 0.56, 0.75]; // Cable chest supported / seated row
-  } else if (n.includes("chest supported row") || n.includes("chest supported")) {
-    baseThresholds = [0.26, 0.40, 0.54]; // Default: Chest Supported DB Row (Divided by 2 per hand)
-  } else if (n.includes("seal row")) {
-    baseThresholds = [0.48, 0.70, 0.92];
-  } else if (n.includes("machine high row")) {
-    baseThresholds = [0.45, 0.66, 0.86];
-  } else if (n.includes("iso-lateral low row") || (n.includes("iso") && n.includes("low row"))) {
-    baseThresholds = [0.46, 0.68, 0.88];
-  } else if (n.includes("wide grip cable row") || (n.includes("wide") && n.includes("cable row"))) {
-    baseThresholds = [0.35, 0.52, 0.70];
-  } else if (n.includes("cable row") || (n.includes("seated cable") && n.includes("row"))) {
-    baseThresholds = [0.38, 0.56, 0.75];
-  } else if (n.includes("deficit pendlay row") || n.includes("pendlay")) {
-    baseThresholds = [0.48, 0.70, 0.92];
-  } else if (n.includes("barbell bent-over row") || (n.includes("bent") && n.includes("row")) || (isBarbell && n.includes("row"))) {
-    baseThresholds = [0.50, 0.72, 0.95];
-  } else if (n.includes("meadows row")) {
-    baseThresholds = [0.28, 0.44, 0.60];
-  } else if (n.includes("kroc row")) {
-    baseThresholds = [0.42, 0.62, 0.82];
-  } else if (n.includes("one arm db row") || (isDumbbell && n.includes("row"))) {
-    baseThresholds = [0.38, 0.56, 0.75];
-  } else if (n.includes("neutral grip lat pull down") || (n.includes("neutral") && (n.includes("pulldown") || n.includes("pull down")))) {
-    baseThresholds = [0.45, 0.66, 0.86];
-  } else if (n.includes("iso-lateral pulldown") || (n.includes("iso") && (n.includes("pulldown") || n.includes("pull down")))) {
-    baseThresholds = [0.46, 0.68, 0.88];
-  } else if (n.includes("widegrip lat pull down") || (n.includes("wide") && (n.includes("pulldown") || n.includes("pull down")))) {
-    baseThresholds = [0.42, 0.62, 0.82];
-  } else if (n.includes("one arm lat pull down") || (n.includes("one arm") && (n.includes("pulldown") || n.includes("pull down")))) {
-    baseThresholds = [0.22, 0.34, 0.46];
-  } else if (n.includes("weighted pull up")) {
-    baseThresholds = [0.08, 0.20, 0.32];
-  } else if (n.includes("assisted pull up machine") || n.includes("assisted pull")) {
-    baseThresholds = [0.35, 0.52, 0.70];
-  } else if (n.includes("straight arm pulldown") || n.includes("straight arm")) {
-    baseThresholds = [0.20, 0.32, 0.44];
-  } else if (n.includes("cable lat prayers") || n.includes("prayers")) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  } else if (n.includes("pullover") || n.includes("pullovers")) {
-    baseThresholds = [0.22, 0.34, 0.46];
-  } else if (n.includes("smith machine shrug") || (n.includes("smith") && n.includes("shrug"))) {
-    baseThresholds = [0.65, 0.95, 1.30];
-  } else if (n.includes("shrug")) {
-    baseThresholds = [0.60, 0.90, 1.25];
-  } else if (n.includes("pulldown") || n.includes("pull down") || n.includes("pull up") || n.includes("chin")) {
-    baseThresholds = [0.45, 0.66, 0.86];
-  } else if (n.includes("row")) {
-    baseThresholds = isBarbell ? [0.50, 0.72, 0.95] : [0.38, 0.56, 0.75];
+  } else if (n.includes("row") || n.includes("pulldown") || n.includes("pull down") || n.includes("pull up") || n.includes("chin") || n.includes("pullover") || n.includes("shrug") || n.includes("straight arm") || n.includes("prayers")) {
+    if (n.includes("smith machine shrug") || (n.includes("shrug") && isSmith)) {
+      baseThresholds = [0.65, 0.95, 1.30];
+    } else if (n.includes("shrug")) {
+      baseThresholds = [0.60, 0.90, 1.25];
+    } else if (n.includes("straight arm") || n.includes("prayers")) {
+      baseThresholds = [0.18, 0.28, 0.38];
+    } else if (n.includes("pullover")) {
+      baseThresholds = [0.22, 0.34, 0.46];
+    } else if (n.includes("weighted pull up")) {
+      baseThresholds = [0.08, 0.20, 0.32];
+    } else if (n.includes("assisted pull up machine") || n.includes("assisted pull")) {
+      baseThresholds = [0.35, 0.52, 0.70];
+    } else if (n.includes("pulldown") || n.includes("pull down") || n.includes("pull up") || n.includes("chin")) {
+      // Pulldowns
+      if (n.includes("one arm") || currentMachineName.includes("one arm")) {
+        baseThresholds = [0.22, 0.34, 0.46];
+      } else if (isPlateLoaded || currentMachineName.includes("iso-lateral") || n.includes("iso-lateral")) {
+        baseThresholds = [0.46, 0.68, 0.88];
+      } else if (isCable || currentMachineName.includes("cable")) {
+        baseThresholds = [0.38, 0.56, 0.75];
+      } else if (n.includes("wide") || currentMachineName.includes("wide")) {
+        baseThresholds = [0.42, 0.62, 0.82];
+      } else {
+        baseThresholds = [0.45, 0.66, 0.86]; // Pin-loaded / selectorized standard pulldown
+      }
+    } else {
+      // Rows (Chest Supported, Bent-Over, Low/High, T-Bar, Cable, DB)
+      if (currentMachineName.includes("t-bar") || n.includes("t-bar")) {
+        baseThresholds = [0.26, 0.40, 0.54]; // Single-sleeve central plate weight
+      } else if (currentMachineName.includes("iso-lateral") || currentMachineName.includes("high row") || currentMachineName.includes("low row") || (isPlateLoaded && !isBarbell)) {
+        baseThresholds = [0.46, 0.68, 0.88]; // Plate-loaded iso-lateral
+      } else if (currentMachineName.includes("seated cable") || (isCable && !isBarbell)) {
+        baseThresholds = [0.38, 0.56, 0.75]; // Seated cable row
+      } else if (isSelectorized || currentMachineName.includes("chest-supported machine") || currentMachineName.includes("machine")) {
+        baseThresholds = [0.45, 0.66, 0.86]; // Two-handed machine row stack
+      } else if (isDumbbell || n.includes("one arm db row")) {
+        baseThresholds = [0.38, 0.56, 0.75]; // DB Row (Divided by 2 per hand)
+      } else if (isSmith) {
+        baseThresholds = [0.52, 0.74, 0.98];
+      } else if (n.includes("meadows")) {
+        baseThresholds = [0.28, 0.44, 0.60];
+      } else if (n.includes("kroc")) {
+        baseThresholds = [0.42, 0.62, 0.82];
+      } else {
+        // Barbell Bent-Over Row / Pendlay / Seal
+        baseThresholds = [0.50, 0.72, 0.95];
+      }
+    }
 
   // -------------------------------------------------------------
-  // 3. LEGS & LOWER BODY (32 Exercises)
+  // 3. LEGS & LOWER BODY
   // -------------------------------------------------------------
-  } else if (n.includes("hack squat") || n.includes("hack")) {
-    baseThresholds = [0.85, 1.25, 1.65];
-  } else if (n.includes("belt squat")) {
-    baseThresholds = [0.80, 1.20, 1.55];
-  } else if (n.includes("pendulum squat") || n.includes("pendulum")) {
-    baseThresholds = [0.85, 1.25, 1.65];
-  } else if (n.includes("v-squat machine") || n.includes("v-squat")) {
-    baseThresholds = [0.80, 1.18, 1.52];
-  } else if (n.includes("barbell back squat") || (isBarbell && n.includes("back squat")) || n === "squat") {
-    baseThresholds = [0.75, 1.08, 1.40];
-  } else if (n.includes("front squat")) {
-    baseThresholds = [0.68, 0.98, 1.28];
-  } else if (n.includes("smith machine squat feet forward") || (n.includes("smith") && n.includes("feet forward"))) {
-    baseThresholds = [0.75, 1.10, 1.45];
-  } else if (n.includes("smith machine squat") || (n.includes("smith") && n.includes("squat"))) {
-    baseThresholds = [0.80, 1.15, 1.50];
-  } else if (n.includes("45° leg press high foot") || (n.includes("leg press") && n.includes("high foot"))) {
-    baseThresholds = [1.20, 1.75, 2.30];
-  } else if (n.includes("leg press") && !n.includes("calf")) {
-    baseThresholds = [1.30, 1.90, 2.50];
-  } else if (n.includes("bulgarian split squat") || n.includes("bulgarian")) {
-    baseThresholds = [0.22, 0.35, 0.48];
-  } else if (n.includes("smith machine lunge ffe") || (n.includes("smith") && n.includes("lunge"))) {
-    baseThresholds = [0.25, 0.40, 0.55];
-  } else if (n.includes("lunge") || n.includes("lunges")) {
-    baseThresholds = [0.20, 0.32, 0.44];
-  } else if (n.includes("step ups") || n.includes("step up")) {
-    baseThresholds = [0.20, 0.32, 0.44];
-  } else if (n.includes("leg extension")) {
-    baseThresholds = [0.30, 0.46, 0.62];
-  } else if (n.includes("reverse nordic")) {
-    baseThresholds = [0.15, 0.30, 0.45];
-  } else if (n.includes("sissy squat")) {
-    baseThresholds = [0.12, 0.25, 0.38];
-  } else if (n.includes("seated hamstring curl") || (n.includes("seated") && n.includes("hamstring"))) {
-    baseThresholds = [0.26, 0.40, 0.54];
-  } else if (n.includes("lying leg curl") || n.includes("leg curl") || n.includes("hamstring curl")) {
-    baseThresholds = [0.24, 0.38, 0.52];
-  } else if (n.includes("nordic hamstring curl") || n.includes("nordic")) {
-    baseThresholds = [0.18, 0.35, 0.50];
-  } else if (n.includes("smith machine rdl") || (n.includes("smith") && n.includes("rdl"))) {
-    baseThresholds = [0.92, 1.35, 1.75];
-  } else if (n.includes("b-stance rdl") || n.includes("b-stance")) {
-    baseThresholds = [0.45, 0.68, 0.90];
-  } else if (n.includes("romanian deadlift") || n.includes("rdl")) {
-    baseThresholds = [0.90, 1.30, 1.70];
-  } else if (n.includes("trap bar deadlift") || n.includes("trap bar")) {
-    baseThresholds = [1.00, 1.48, 1.95];
-  } else if (n.includes("deadlift")) {
-    baseThresholds = [0.95, 1.40, 1.85];
-  } else if (n.includes("cable pull through") || n.includes("pull through")) {
-    baseThresholds = [0.25, 0.40, 0.55];
-  } else if (n.includes("glute hyperextension") || (n.includes("glute") && n.includes("hyperextension"))) {
-    baseThresholds = [0.20, 0.35, 0.50];
-  } else if (n.includes("45° back extension") || n.includes("back extension") || n.includes("hyperextension")) {
-    baseThresholds = [0.20, 0.35, 0.50];
-  } else if (n.includes("machine hip thrust") || n.includes("hip thrust")) {
-    baseThresholds = [0.90, 1.35, 1.75];
-  } else if (n.includes("kickbacks") || n.includes("kickback")) {
-    baseThresholds = [0.12, 0.20, 0.28];
-  } else if (n.includes("hip abduction") || n.includes("abduction")) {
-    baseThresholds = [0.30, 0.45, 0.60];
-  } else if (n.includes("hip adduction") || n.includes("adduction")) {
-    baseThresholds = [0.30, 0.45, 0.60];
+  } else if (n.includes("squat") || n.includes("leg press") || n.includes("lunge") || n.includes("step up") || n.includes("leg extension") || (n.includes("curl") && (n.includes("hamstring") || n.includes("leg"))) || n.includes("deadlift") || n.includes("rdl") || n.includes("hip thrust") || n.includes("kickback") || n.includes("abduction") || n.includes("adduction") || (n.includes("extension") && n.includes("back")) || n.includes("nordic") || n.includes("sissy")) {
+    if (n.includes("leg press") && !n.includes("calf")) {
+      baseThresholds = (n.includes("high foot") || currentMachineName.includes("high foot")) ? [1.20, 1.75, 2.30] : [1.30, 1.90, 2.50];
+    } else if (n.includes("hack") || currentMachineName.includes("hack") || n.includes("pendulum") || currentMachineName.includes("pendulum")) {
+      baseThresholds = [0.85, 1.25, 1.65];
+    } else if (n.includes("belt squat") || currentMachineName.includes("belt") || n.includes("v-squat") || currentMachineName.includes("v-squat")) {
+      baseThresholds = [0.80, 1.18, 1.52];
+    } else if (n.includes("bulgarian") || n.includes("lunge") || n.includes("step up")) {
+      baseThresholds = isSmith ? [0.25, 0.40, 0.55] : [0.20, 0.32, 0.44];
+    } else if (n.includes("leg extension")) {
+      baseThresholds = [0.30, 0.46, 0.62];
+    } else if (n.includes("reverse nordic") || n.includes("sissy")) {
+      baseThresholds = [0.15, 0.30, 0.45];
+    } else if (n.includes("seated hamstring curl") || (n.includes("seated") && n.includes("hamstring"))) {
+      baseThresholds = [0.26, 0.40, 0.54];
+    } else if (n.includes("hamstring") || n.includes("leg curl")) {
+      baseThresholds = n.includes("nordic") ? [0.18, 0.35, 0.50] : [0.24, 0.38, 0.52];
+    } else if (n.includes("rdl") || n.includes("deadlift")) {
+      if (isSmith) {
+        baseThresholds = [0.92, 1.35, 1.75];
+      } else if (isDumbbell || n.includes("b-stance")) {
+        baseThresholds = [0.45, 0.68, 0.90]; // DB RDL (Divided by 2)
+      } else if (isCable || n.includes("pull through")) {
+        baseThresholds = [0.25, 0.40, 0.55];
+      } else if (n.includes("trap bar")) {
+        baseThresholds = [1.00, 1.48, 1.95];
+      } else if (n.includes("deadlift") && !n.includes("romanian")) {
+        baseThresholds = [0.95, 1.40, 1.85];
+      } else {
+        baseThresholds = [0.90, 1.30, 1.70]; // Barbell RDL
+      }
+    } else if (n.includes("hip thrust")) {
+      baseThresholds = [0.90, 1.35, 1.75];
+    } else if (n.includes("kickback")) {
+      baseThresholds = [0.12, 0.20, 0.28];
+    } else if (n.includes("abduction") || n.includes("adduction")) {
+      baseThresholds = [0.30, 0.45, 0.60];
+    } else if (n.includes("hyperextension") || n.includes("back extension")) {
+      baseThresholds = [0.20, 0.35, 0.50];
+    } else {
+      // Squats
+      if (isSmith) {
+        baseThresholds = [0.80, 1.15, 1.50];
+      } else if (isDumbbell) {
+        baseThresholds = [0.35, 0.52, 0.70];
+      } else if (n.includes("front squat")) {
+        baseThresholds = [0.68, 0.98, 1.28];
+      } else {
+        baseThresholds = [0.75, 1.08, 1.40]; // Barbell Back Squat
+      }
+    }
 
   // -------------------------------------------------------------
-  // 4. SHOULDERS (14 Exercises)
+  // 4. SHOULDERS (PRESSES & RAISES)
   // -------------------------------------------------------------
-  } else if (n.includes("smith machine shoulder press") || (n.includes("smith") && n.includes("shoulder"))) {
-    baseThresholds = [0.42, 0.60, 0.78];
-  } else if (n.includes("machine shoulder press") || (!isDumbbell && !isBarbell && n.includes("shoulder press"))) {
-    baseThresholds = [0.40, 0.58, 0.75];
-  } else if (n.includes("seated db overhead press") || (isDumbbell && (n.includes("overhead press") || n.includes("shoulder press")))) {
-    baseThresholds = [0.32, 0.48, 0.64];
-  } else if (n.includes("barbell overhead press") || (isBarbell && (n.includes("overhead press") || n.includes("military")))) {
-    baseThresholds = [0.36, 0.54, 0.70];
-  } else if (n.includes("behind back cable lat raise") || (n.includes("behind back") && n.includes("cable"))) {
-    baseThresholds = [0.06, 0.10, 0.14];
-  } else if (n.includes("cable lat raise")) {
-    baseThresholds = [0.06, 0.10, 0.14];
-  } else if (n.includes("atlantis machine lat raise") || (n.includes("machine") && (n.includes("lat raise") || n.includes("lateral raise")))) {
-    baseThresholds = [0.08, 0.13, 0.18];
-  } else if (n.includes("lean in db raise") || (n.includes("lean in") && n.includes("raise"))) {
-    baseThresholds = [0.07, 0.11, 0.15];
-  } else if (n.includes("db lateral raise") || n.includes("lat raise") || n.includes("lateral raise")) {
-    baseThresholds = [0.06, 0.10, 0.14];
-  } else if (n.includes("cable y raise") || n.includes("y raise")) {
-    baseThresholds = [0.08, 0.13, 0.18];
-  } else if (n.includes("reverse pec deck")) {
-    baseThresholds = [0.12, 0.19, 0.26];
-  } else if (n.includes("reverse cable crossover")) {
-    baseThresholds = [0.12, 0.19, 0.26];
-  } else if (n.includes("rope face pull") || n.includes("face pull")) {
-    baseThresholds = [0.14, 0.22, 0.30];
-  } else if (n.includes("db rear delt flye") || n.includes("rear delt")) {
-    baseThresholds = [0.10, 0.16, 0.22];
+  } else if (n.includes("shoulder") || n.includes("overhead press") || n.includes("military") || n.includes("lat raise") || n.includes("lateral raise") || n.includes("y raise") || n.includes("face pull") || n.includes("rear delt")) {
+    if (n.includes("behind back") || (isCable && (n.includes("lat raise") || n.includes("lateral raise")))) {
+      baseThresholds = [0.06, 0.10, 0.14];
+    } else if (isSelectorized && (n.includes("lat raise") || n.includes("lateral raise"))) {
+      baseThresholds = [0.08, 0.13, 0.18];
+    } else if (n.includes("lat raise") || n.includes("lateral raise")) {
+      baseThresholds = [0.06, 0.10, 0.14];
+    } else if (n.includes("y raise")) {
+      baseThresholds = [0.08, 0.13, 0.18];
+    } else if (n.includes("reverse pec deck") || n.includes("reverse cable")) {
+      baseThresholds = [0.12, 0.19, 0.26];
+    } else if (n.includes("face pull")) {
+      baseThresholds = [0.14, 0.22, 0.30];
+    } else if (n.includes("rear delt")) {
+      baseThresholds = [0.10, 0.16, 0.22];
+    } else {
+      // Overhead Press / Shoulder Press
+      if (isSmith) {
+        baseThresholds = [0.42, 0.60, 0.78];
+      } else if (isPlateLoaded || currentMachineName.includes("iso-lateral")) {
+        baseThresholds = [0.42, 0.60, 0.78];
+      } else if (isSelectorized) {
+        baseThresholds = [0.40, 0.58, 0.75];
+      } else if (isDumbbell) {
+        baseThresholds = [0.32, 0.48, 0.64]; // Divided by 2 per hand
+      } else if (isCable) {
+        baseThresholds = [0.25, 0.38, 0.50];
+      } else {
+        baseThresholds = [0.36, 0.54, 0.70]; // Barbell OHP
+      }
+    }
 
   // -------------------------------------------------------------
-  // 5. ARMS (18 Exercises)
+  // 5. ARMS (TRICEPS & BICEPS)
   // -------------------------------------------------------------
-  } else if (n.includes("overhead cable ext") || (n.includes("cable") && n.includes("overhead") && n.includes("ext"))) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  } else if (n.includes("katana cable") || n.includes("katana")) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  } else if (n.includes("1 arm db overhead") || (isDumbbell && n.includes("overhead") && (n.includes("tricep") || n.includes("ext")))) {
-    baseThresholds = [0.16, 0.25, 0.34];
-  } else if (n.includes("barbell skullcrusher") || (isBarbell && n.includes("skullcrusher"))) {
-    baseThresholds = [0.22, 0.32, 0.44];
-  } else if (n.includes("db skullcrusher") || (isDumbbell && n.includes("skullcrusher"))) {
-    baseThresholds = [0.20, 0.30, 0.40];
-  } else if (n.includes("machine triceps extension") || (n.includes("machine") && n.includes("tricep"))) {
-    baseThresholds = [0.22, 0.32, 0.44];
-  } else if (n.includes("triceps pressdown bar") || n.includes("pressdown bar")) {
-    baseThresholds = [0.22, 0.32, 0.44];
-  } else if (n.includes("rope tricep pushdown") || (n.includes("rope") && (n.includes("pushdown") || n.includes("pressdown")))) {
-    baseThresholds = [0.20, 0.30, 0.40];
-  } else if (n.includes("close-grip bench press") || n.includes("close-grip")) {
-    baseThresholds = [0.50, 0.72, 0.95];
-  } else if (n.includes("face away bayesian curl") || n.includes("bayesian")) {
-    baseThresholds = [0.16, 0.25, 0.34];
-  } else if (n.includes("incline curl")) {
-    baseThresholds = [0.15, 0.24, 0.32];
-  } else if (n.includes("standing db curl")) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  } else if (n.includes("ez bar curl") || (n.includes("ez") && n.includes("curl"))) {
-    baseThresholds = [0.22, 0.32, 0.44];
-  } else if (n.includes("db preacher curl")) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  } else if (n.includes("machine preacher curl")) {
-    baseThresholds = [0.20, 0.30, 0.40];
-  } else if (n.includes("db hammer curl")) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  } else if (n.includes("cable rope hammer curl") || (n.includes("rope") && n.includes("hammer"))) {
-    baseThresholds = [0.18, 0.28, 0.38];
-  } else if (n.includes("straight bar cable curl") || (n.includes("straight bar") && n.includes("curl"))) {
-    baseThresholds = [0.20, 0.30, 0.40];
-  } else if (n.includes("curl")) {
-    baseThresholds = isDumbbell ? [0.18, 0.28, 0.38] : [0.22, 0.32, 0.44];
-  } else if (n.includes("tricep") || n.includes("extension") || n.includes("pushdown") || n.includes("pressdown")) {
-    baseThresholds = [0.20, 0.30, 0.40];
+  } else if (n.includes("tricep") || n.includes("skullcrusher") || n.includes("pressdown") || n.includes("pushdown") || n.includes("close-grip") || n.includes("curl") || n.includes("katana")) {
+    if (n.includes("close-grip")) {
+      baseThresholds = [0.50, 0.72, 0.95];
+    } else if (n.includes("skullcrusher")) {
+      baseThresholds = isDumbbell ? [0.20, 0.30, 0.40] : [0.22, 0.32, 0.44];
+    } else if (n.includes("overhead") && (n.includes("cable") || n.includes("katana") || n.includes("tricep"))) {
+      baseThresholds = isDumbbell ? [0.16, 0.25, 0.34] : [0.18, 0.28, 0.38];
+    } else if (n.includes("pushdown") || n.includes("pressdown") || n.includes("tricep")) {
+      baseThresholds = isSelectorized ? [0.22, 0.32, 0.44] : [0.20, 0.30, 0.40];
+    } else if (n.includes("bayesian") || n.includes("incline curl")) {
+      baseThresholds = [0.16, 0.25, 0.34];
+    } else if (n.includes("preacher")) {
+      baseThresholds = isSelectorized ? [0.20, 0.30, 0.40] : [0.18, 0.28, 0.38];
+    } else if (n.includes("hammer")) {
+      baseThresholds = [0.18, 0.28, 0.38];
+    } else if (n.includes("curl")) {
+      if (isDumbbell) {
+        baseThresholds = [0.18, 0.28, 0.38];
+      } else if (isBarbell || n.includes("ez")) {
+        baseThresholds = [0.22, 0.32, 0.44];
+      } else {
+        baseThresholds = [0.20, 0.30, 0.40]; // Cable or Machine Curl
+      }
+    } else {
+      baseThresholds = [0.20, 0.30, 0.40];
+    }
 
   // -------------------------------------------------------------
-  // 6. ABS & CALVES (9 Exercises)
+  // 6. ABS & CALVES
   // -------------------------------------------------------------
-  } else if (n.includes("cable crunch")) {
-    baseThresholds = [0.25, 0.40, 0.55];
-  } else if (n.includes("machine abs crunch") || n.includes("abs crunch") || n.includes("crunch")) {
-    baseThresholds = [0.25, 0.40, 0.55];
-  } else if (n.includes("hanging knee raise")) {
-    baseThresholds = [0.10, 0.25, 0.40];
-  } else if (n.includes("captain's chair knee raise") || n.includes("captain")) {
-    baseThresholds = [0.10, 0.25, 0.40];
-  } else if (n.includes("hanging leg raise")) {
-    baseThresholds = [0.12, 0.28, 0.42];
-  } else if (n.includes("ab wheel rollout") || n.includes("ab wheel")) {
-    baseThresholds = [0.12, 0.28, 0.42];
-  } else if (n.includes("seated calf raise") || (n.includes("seated") && n.includes("calf"))) {
-    baseThresholds = [0.75, 1.10, 1.45];
-  } else if (n.includes("standing calf raise") || (n.includes("standing") && n.includes("calf"))) {
-    baseThresholds = [0.80, 1.20, 1.60];
-  } else if (n.includes("leg press calf raise") || (n.includes("leg press") && n.includes("calf"))) {
-    baseThresholds = [1.00, 1.45, 1.90];
-  } else if (n.includes("calf")) {
-    baseThresholds = [0.75, 1.10, 1.45];
+  } else if (n.includes("calf") || n.includes("crunch") || n.includes("raise") || n.includes("rollout")) {
+    if (n.includes("leg press calf") || (n.includes("calf") && currentMachineName.includes("leg press"))) {
+      baseThresholds = [1.00, 1.45, 1.90];
+    } else if (n.includes("seated calf") || (n.includes("calf") && currentMachineName.includes("seated"))) {
+      baseThresholds = [0.75, 1.10, 1.45];
+    } else if (n.includes("calf")) {
+      baseThresholds = [0.80, 1.20, 1.60];
+    } else if (n.includes("crunch")) {
+      baseThresholds = [0.25, 0.40, 0.55];
+    } else {
+      baseThresholds = [0.12, 0.28, 0.42]; // Hanging Leg/Knee Raise / Rollout
+    }
   } else {
     baseThresholds = [0.25, 0.40, 0.55];
   }
@@ -2717,7 +2687,7 @@ export function evaluateRelativeStrength(
   };
 
   // Only true iso-lateral dual-handled machines display "ข้างละ" (Exclude single-sleeve T-Bar)
-  const isIsoLateral = loadType === "plate-loaded" && 
+  const isIsoLateral = (loadType === "plate-loaded" || isPlateLoaded) && 
     (n.includes("iso-lateral") || n.includes("iso ") || currentMachineName.includes("iso-lateral") || currentMachineName.includes("iso ")) && 
     !n.includes("t-bar") && !currentMachineName.includes("t-bar");
   
