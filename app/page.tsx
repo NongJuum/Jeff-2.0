@@ -2376,13 +2376,13 @@ export function evaluateRelativeStrength(
 
   // F. ROWS & PULLDOWNS (Handle "pull down" with space, and chest-supported rows)
   } else if (isChestSupported) {
-    baseThresholds = [0.26, 0.40, 0.54];
+    baseThresholds = [0.26, 0.40, 0.54]; // ปรับเกณฑ์ท่าล็อกอกให้สมจริง (ไม่หลุดไป 70/140 lbs)
   } else if (n.includes("shrug")) {
     baseThresholds = [0.60, 0.90, 1.25];
   } else if (n.includes("pulldown") || n.includes("pull down") || n.includes("pull-down") || n.includes("pull up") || n.includes("chin")) {
-    baseThresholds = [0.45, 0.66, 0.86];
+    baseThresholds = [0.55, 0.78, 1.00];
   } else if (n.includes("row")) {
-    baseThresholds = isBarbell ? [0.50, 0.72, 0.95] : [0.38, 0.56, 0.75];
+    baseThresholds = [0.46, 0.68, 0.88]; // สำหรับ Barbell Bent-Over Row ปกติ
 
   // G. LEGS & LOWER BODY
   } else if (n.includes("hip thrust")) {
