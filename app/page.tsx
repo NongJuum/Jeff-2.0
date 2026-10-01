@@ -2285,11 +2285,12 @@ export function evaluateRelativeStrength(
   e1RMLbs: number,
   userBwLbs: number,
   gender: "male" | "female" = "male",
-  unit: "kg" | "lbs" = "lbs"
+  unit: "kg" | "lbs" = "lbs",
+  prescriptionReps = "8 to 12",
+  userExperienceMonths = 12,
+  forcedTier?: "Beginner" | "Intermediate" | "Advanced" | "Elite"
 ) {
   const name = exerciseName.toLowerCase();
-  const femaleFactor = gender === "female" ? 0.68 : 1.0;
-  const ratio = userBwLbs > 0 ? e1RMLbs / userBwLbs : 0;
 
   // STRICT SCIENTIFIC BENCHMARKS (e1RM / BW)
   let baseThresholds: [number, number, number]; // [Novice->Inter, Inter->Adv, Adv->Elite]
@@ -2353,49 +2354,102 @@ export function evaluateRelativeStrength(
     baseThresholds = [0.30, 0.50, 0.70];
   }
 
-  const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
+  // 1. Parse target working reps from prescription (default to 8 or 10 reps)
+  const repMatch = prescriptionReps.match(/\d+/g);
+  const targetWorkingReps = repMatch ? parseInt(repMatch[0], 10) : 8;
 
+  // 2. Gender scaling factor & Base thresholds
+  const femaleFactor = gender === "female" ? 0.68 : 1.0;
+  const thresholds = baseThresholds.map((t) => Math.round(t * femaleFactor * 100) / 100);
+  const ratio = userBwLbs > 0 ? e1RMLbs / userBwLbs : 0;
+
+  // 3. Resolve anchor tier from Profile when exercise has no lift history
+  let profileDefaultTier: "Beginner" | "Intermediate" | "Advanced" = "Beginner";
+  if (userExperienceMonths >= 36) {
+    profileDefaultTier = "Advanced";
+  } else if (userExperienceMonths >= 12) {
+    profileDefaultTier = "Intermediate";
+  }
+
+  // 4. Resolve Active Tier
   let tier: "Beginner" | "Intermediate" | "Advanced" | "Elite" = "Beginner";
-  let label = "🌱 NOVICE";
-  let badgeClass = "border-zinc-800 bg-zinc-950 text-zinc-400 font-mono tracking-wider";
+  const hasHistory = Number.isFinite(e1RMLbs) && e1RMLbs > 0;
+
+  if (forcedTier) {
+    tier = forcedTier;
+  } else if (!hasHistory) {
+    tier = profileDefaultTier;
+  } else {
+    if (ratio >= thresholds[2]) tier = "Elite";
+    else if (ratio >= thresholds[1]) tier = "Advanced";
+    else if (ratio >= thresholds[0]) tier = "Intermediate";
+    else tier = "Beginner";
+  }
+
+  // 5. Determine Next Tier & Target Ratio
   let targetRatio = thresholds[0];
   let nextTierLabel = "Intermediate";
 
-  if (ratio >= thresholds[2]) {
-    tier = "Elite";
-    label = "🏆 ELITE";
-    badgeClass = "border-yellow-400 bg-yellow-400/20 text-yellow-300 font-mono tracking-wider shadow-[0_0_10px_rgba(250,204,21,0.25)]";
-    targetRatio = thresholds[2];
-    nextTierLabel = "ระดับสูงสุด";
-  } else if (ratio >= thresholds[1]) {
-    tier = "Advanced";
-    label = "🔥 ADVANCED";
-    badgeClass = "border-zinc-500 bg-zinc-800 text-zinc-100 font-mono tracking-wider";
-    targetRatio = thresholds[2];
-    nextTierLabel = "Elite";
-  } else if (ratio >= thresholds[0]) {
-    tier = "Intermediate";
-    label = "💪 INTERMEDIATE";
-    badgeClass = "border-yellow-500/40 bg-zinc-900 text-yellow-400 font-mono tracking-wider";
-    targetRatio = thresholds[1];
-    nextTierLabel = "Advanced";
-  } else {
-    tier = "Beginner";
-    label = "🌱 NOVICE";
-    badgeClass = "border-zinc-800 bg-zinc-950 text-zinc-400 font-mono tracking-wider";
+  if (tier === "Beginner") {
     targetRatio = thresholds[0];
     nextTierLabel = "Intermediate";
+  } else if (tier === "Intermediate") {
+    targetRatio = thresholds[1];
+    nextTierLabel = "Advanced";
+  } else if (tier === "Advanced") {
+    targetRatio = thresholds[2];
+    nextTierLabel = "Elite";
+  } else {
+    targetRatio = thresholds[2];
+    nextTierLabel = "ระดับสูงสุด";
   }
 
-  const targetWeightLbs = targetRatio * userBwLbs;
-  const diffLbs = Math.max(0, targetWeightLbs - e1RMLbs);
-  const diffConverted = unit === "kg" ? Math.round(diffLbs * 0.453592 * 10) / 10 : Math.round(diffLbs * 10) / 10;
+  // 6. Reverse Epley calculation: Weight = e1RM / (1 + Reps / 30)
+  const targetE1RMLbs = targetRatio * userBwLbs;
+  const targetWorkingLbs = targetE1RMLbs / (1 + targetWorkingReps / 30);
 
-  const gapMessage = tier === "Elite"
-    ? "คุณอยู่ในระดับมาตรฐานสูงสุดแล้ว!"
-    : `ขาดอีก ~${diffConverted} ${unit} (หรืออีก 1–2 Reps) เพื่อขึ้นสู่ระดับ ${nextTierLabel}`;
+  // Snap to standard gym increments (2.5 kg or 5 lbs)
+  let targetDisplayWeight: number;
+  if (unit === "kg") {
+    const rawKg = targetWorkingLbs * 0.453592;
+    targetDisplayWeight = Math.round(rawKg / 2.5) * 2.5;
+  } else {
+    targetDisplayWeight = Math.round(targetWorkingLbs / 5) * 5;
+  }
 
-  return { tier, label, badgeClass, gapMessage, ratio };
+  const labelMap = {
+    Beginner: "🌱 NOVICE",
+    Intermediate: "💪 INTERMEDIATE",
+    Advanced: "🔥 ADVANCED",
+    Elite: "🏆 ELITE",
+  };
+
+  const badgeClassMap = {
+    Beginner: "border-zinc-800 bg-zinc-950 text-zinc-400",
+    Intermediate: "border-yellow-500/40 bg-zinc-900 text-yellow-400",
+    Advanced: "border-zinc-500 bg-zinc-800 text-zinc-100",
+    Elite: "border-yellow-400 bg-yellow-400/20 text-yellow-300 shadow-[0_0_10px_rgba(250,204,21,0.25)]",
+  };
+
+  let actionableMessage = "";
+  if (tier === "Elite") {
+    actionableMessage = "🏆 ระดับสูงสุด (Elite): มุ่งเน้นการรักษาฟอร์มและการพัฒนาต่อเนื่อง";
+  } else if (!hasHistory) {
+    actionableMessage = `🎯 แนะนำเริ่มต้น (${tier}): ยก ${targetDisplayWeight} ${unit} × ${targetWorkingReps} ครั้ง`;
+  } else {
+    actionableMessage = `🎯 สู่ระดับ ${nextTierLabel}: ยก ${targetDisplayWeight} ${unit} × ${targetWorkingReps} ครั้ง`;
+  }
+
+  return {
+    tier,
+    label: labelMap[tier],
+    badgeClass: badgeClassMap[tier],
+    actionableMessage,
+    targetDisplayWeight,
+    targetWorkingReps,
+    nextTierLabel,
+    ratio,
+  };
 }
 
 function playCountdownBeep(freq = 660) {
@@ -2462,6 +2516,7 @@ export default function Page() {
   const [substituteMap, setSubstituteMap] = useState<Record<string, string>>(() => readJson<Record<string, string>>(SUBSTITUTE_KEY, {}));
   const [presetSetsMap, setPresetSetsMap] = useState<Record<string, number>>(() => readJson<Record<string, number>>(PRESET_SETS_KEY, {}));
   const [cardioLogs, setCardioLogs] = useState<CardioLog[]>(() => readJson<CardioLog[]>(CARDIO_LOGS_KEY, []));
+  const [manualTierMap, setManualTierMap] = useState<Record<string, "Beginner" | "Intermediate" | "Advanced" | "Elite">>({});
 
   // Active Session Engine & Accordion States (Hevy/Strong Style)
   const savedActiveSession = useMemo(() => {
@@ -5165,14 +5220,18 @@ export default function Page() {
       ? epley1RM(effectiveUnit === "kg" ? loggedWeightSet1 * 2.20462 : loggedWeightSet1, loggedRepsSet1 ? Number(loggedRepsSet1) : 8)
       : epley1RM(effectiveUnit === "kg" ? baselineWorkingWeight * 2.20462 : baselineWorkingWeight, 8);
 
-    const strengthTierInfo = userBwLbs > 0 && e1RMLbs > 0
+    const forcedTier = manualTierMap[baseExercise.id];
+    const strengthTierInfo = userBwLbs > 0
       ? evaluateRelativeStrength(
           exercise.name,
           getLoadType(exercise),
           e1RMLbs,
           userBwLbs,
           currentGender,
-          effectiveUnit
+          effectiveUnit,
+          exercise.reps,
+          userProfile?.expMonths ?? 12,
+          forcedTier
         )
       : null;
 
@@ -5278,12 +5337,28 @@ export default function Page() {
                           </div>
 
                           {strengthTierInfo && (
-                            <div className="mt-2 flex items-center">
-                              <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-0.5 text-xs font-black tabular-nums uppercase ${strengthTierInfo.badgeClass}`}>
+                            <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 rounded-xl bg-zinc-950/80 border border-zinc-800 p-2.5">
+                              {/* Interactive Click-to-Cycle Tier Badge */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const order: ("Beginner" | "Intermediate" | "Advanced" | "Elite")[] = ["Beginner", "Intermediate", "Advanced", "Elite"];
+                                  const nextIdx = (order.indexOf(strengthTierInfo.tier) + 1) % order.length;
+                                  setManualTierMap((prev) => ({ ...prev, [baseExercise.id]: order[nextIdx] }));
+                                }}
+                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-black uppercase transition active:scale-95 ${strengthTierInfo.badgeClass}`}
+                                title="แตะเพื่อสลับระดับเป้าหมายที่ต้องการคำนวณ"
+                              >
                                 <span>{strengthTierInfo.label}</span>
-                                <span className="opacity-60">·</span>
-                                <span>{strengthTierInfo.ratio.toFixed(2)}× BW</span>
-                              </span>
+                                <span className="text-[10px] text-zinc-500 font-normal">✎</span>
+                              </button>
+
+                              {/* Clear Actionable Goal Message */}
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <span className="font-bold text-yellow-300">
+                                  {strengthTierInfo.actionableMessage}
+                                </span>
+                              </div>
                             </div>
                           )}
                         </div>
