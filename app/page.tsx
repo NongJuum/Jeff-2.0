@@ -2290,7 +2290,8 @@ export function evaluateRelativeStrength(
   unit: "kg" | "lbs" = "lbs",
   prescriptionReps = "8 to 12",
   userExperienceMonths = 12,
-  forcedTier?: "Beginner" | "Intermediate" | "Advanced" | "Elite"
+  forcedTier?: "Beginner" | "Intermediate" | "Advanced" | "Elite",
+  userMuscleMassKg?: number
 ) {
   const n = exerciseName.toLowerCase();
 
@@ -2311,75 +2312,88 @@ export function evaluateRelativeStrength(
   const isChestSupported = n.includes("chest supported") || n.includes("seal row") || n.includes("t-bar");
   const isBarbell = loadType === "barbell" && !isChestSupported;
 
-  // 2. Continuous Allometric Bodyweight Scaling (Smooth curve across all weights: 45kg to 130kg+)
-  const baseWeightLbs = gender === "female" ? 132.28 : 165.35;
-  const safeUserBw = userBwLbs > 0 ? userBwLbs : baseWeightLbs;
-  const effectiveBwLbs = baseWeightLbs * Math.pow(safeUserBw / baseWeightLbs, 0.67);
+  // 2. Physiological Muscle Mass Estimation (If user does not know InBody / SMM)
+  const userBwKg = userBwLbs * 0.453592;
+  const baseRatio = gender === "female" ? 0.28 : 0.38;
+  const expBonus = gender === "female"
+    ? Math.min(0.08, userExperienceMonths * 0.0012)
+    : Math.min(0.10, userExperienceMonths * 0.0015);
+  
+  const effectiveSmmKg = userMuscleMassKg && userMuscleMassKg > 15
+    ? userMuscleMassKg
+    : userBwKg * (baseRatio + expBonus);
+  
+  const muscleEfficiencyModifier = Math.min(1.25, Math.max(0.75, effectiveSmmKg / (userBwKg * (gender === "female" ? 0.30 : 0.40))));
 
-  // 3. Ergonomically Calibrated Thresholds [Novice->Inter, Inter->Adv, Adv->Elite]
+  // 3. Continuous Allometric Bodyweight Scaling (Smooth curve across all weights: 45kg to 130kg+)
+  const baseRefLbs = gender === "female" ? 132.28 : 165.35;
+  const safeUserBw = userBwLbs > 0 ? userBwLbs : baseRefLbs;
+  const effectiveBwLbs = (baseRefLbs * Math.pow(safeUserBw / baseRefLbs, 0.67)) * muscleEfficiencyModifier;
+
+  // 4. Ergonomically Calibrated Thresholds [Novice->Inter, Inter->Adv, Adv->Elite]
   let baseThresholds: [number, number, number];
 
   // A. DELTS & REAR DELT ISOLATION
   if (n.includes("lat raise") || n.includes("lateral raise") || n.includes("y raise")) {
-    baseThresholds = [0.08, 0.14, 0.20]; // DB: ~15-25 lbs per hand for Adv/Elite
+    baseThresholds = [0.06, 0.10, 0.14]; // Prevents unsafe lateral swings
   } else if (n.includes("rear delt") || n.includes("face pull") || n.includes("cable crossover") || n.includes("cable flye") || n.includes("pec deck") || n.includes("db flye")) {
-    baseThresholds = [0.15, 0.24, 0.34];
+    baseThresholds = [0.12, 0.19, 0.26];
 
   // B. ARMS & PULLOVERS
   } else if (n.includes("straight arm") || n.includes("lat prayers") || n.includes("pullover")) {
-    baseThresholds = [0.18, 0.28, 0.38];
+    baseThresholds = [0.16, 0.25, 0.34];
   } else if (n.includes("curl") || n.includes("tricep") || n.includes("extension") || n.includes("pushdown") || n.includes("pressdown") || n.includes("skullcrusher") || n.includes("katana")) {
-    baseThresholds = [0.22, 0.32, 0.44];
+    baseThresholds = [0.18, 0.28, 0.38];
 
   // C. WEIGHTED BODYWEIGHT (Added Plate Weight Only)
   } else if (isWeightedBodyweight) {
-    baseThresholds = [0.10, 0.25, 0.40];
+    baseThresholds = [0.08, 0.20, 0.32];
 
   // D. SHOULDER PRESS
   } else if (n.includes("shoulder press") || n.includes("overhead press") || n.includes("military")) {
-    baseThresholds = isDumbbell ? [0.32, 0.48, 0.64] : [0.45, 0.65, 0.85];
+    baseThresholds = isDumbbell ? [0.26, 0.40, 0.54] : [0.36, 0.54, 0.70];
 
   // E. CHEST PRESS
   } else if (n.includes("converging cable") || (n.includes("cable") && n.includes("press"))) {
-    baseThresholds = [0.32, 0.48, 0.64];
+    baseThresholds = [0.28, 0.42, 0.56];
   } else if (isDumbbell && (n.includes("press") || n.includes("bench"))) {
-    baseThresholds = [0.42, 0.64, 0.86]; // Realistic dumbbell bench targets (35-45kg per hand Elite)
+    baseThresholds = [0.36, 0.54, 0.72];
   } else if (n.includes("incline") && (n.includes("press") || n.includes("bench"))) {
-    baseThresholds = isBarbell ? [0.60, 0.85, 1.10] : [0.50, 0.72, 0.94];
+    baseThresholds = isBarbell ? [0.55, 0.78, 1.02] : [0.45, 0.65, 0.85];
   } else if (n.includes("bench") || n.includes("chest press") || n.includes("dip")) {
-    baseThresholds = isBarbell ? [0.70, 1.00, 1.30] : [0.60, 0.88, 1.15];
+    baseThresholds = isBarbell ? [0.65, 0.92, 1.20] : [0.55, 0.80, 1.05];
 
-  // F. ROWS & PULLDOWNS
+  // F. ROWS & PULLDOWNS (Zero-Momentum Prone Rows separated from Barbell)
   } else if (isChestSupported) {
-    baseThresholds = [0.28, 0.42, 0.56]; // Zero-momentum prone rows & T-bar
+    baseThresholds = [0.26, 0.40, 0.54]; // Prone Chest-Supported / T-Bar realistic working loads
   } else if (n.includes("shrug")) {
-    baseThresholds = [0.70, 1.05, 1.40];
+    baseThresholds = [0.60, 0.90, 1.25];
   } else if (n.includes("pulldown") || n.includes("pull up") || n.includes("chin")) {
-    baseThresholds = [0.55, 0.78, 1.02];
+    baseThresholds = [0.45, 0.66, 0.86];
   } else if (n.includes("row")) {
-    baseThresholds = isBarbell ? [0.55, 0.80, 1.05] : [0.44, 0.66, 0.88];
+    baseThresholds = isBarbell ? [0.50, 0.72, 0.95] : [0.38, 0.56, 0.75];
 
   // G. LEGS & LOWER BODY
   } else if (n.includes("hip thrust")) {
-    baseThresholds = [1.00, 1.50, 2.00];
+    baseThresholds = [0.90, 1.35, 1.75];
   } else if (n.includes("calf raise")) {
-    baseThresholds = [0.85, 1.25, 1.65];
+    baseThresholds = [0.75, 1.10, 1.45];
   } else if (n.includes("leg press")) {
-    baseThresholds = [1.50, 2.25, 3.00];
+    baseThresholds = [1.30, 1.90, 2.50];
   } else if (n.includes("hack") || n.includes("pendulum") || n.includes("v-squat")) {
-    baseThresholds = [0.95, 1.40, 1.85];
+    baseThresholds = [0.80, 1.20, 1.55];
   } else if (n.includes("bulgarian") || n.includes("lunge") || n.includes("step up")) {
-    baseThresholds = [0.26, 0.40, 0.55]; // Controlled single-leg dumbbell loads
+    baseThresholds = [0.22, 0.35, 0.48];
   } else if (n.includes("squat")) {
-    baseThresholds = isBarbell ? [0.85, 1.25, 1.65] : [0.75, 1.10, 1.45];
+    baseThresholds = isBarbell ? [0.80, 1.15, 1.50] : [0.70, 1.05, 1.38];
   } else if (n.includes("deadlift") || n.includes("rdl")) {
-    baseThresholds = isBarbell ? [1.05, 1.55, 2.05] : [0.90, 1.35, 1.80];
+    baseThresholds = isBarbell ? [0.95, 1.40, 1.85] : [0.85, 1.25, 1.65];
   } else if (n.includes("leg curl") || n.includes("hamstring curl")) {
-    baseThresholds = [0.32, 0.48, 0.65];
+    baseThresholds = [0.26, 0.40, 0.54];
   } else if (n.includes("leg extension")) {
-    baseThresholds = [0.36, 0.54, 0.72];
-  } else {
     baseThresholds = [0.30, 0.46, 0.62];
+  } else {
+    baseThresholds = [0.25, 0.40, 0.55];
   }
 
   // 4. Target Working Reps from prescription
@@ -5392,7 +5406,8 @@ export default function Page() {
           effectiveUnit,
           exercise.reps,
           userProfile?.expMonths ?? 12,
-          forcedTier
+          forcedTier,
+          userProfile?.muscleMassKg
         )
       : null;
 
