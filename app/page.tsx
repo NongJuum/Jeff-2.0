@@ -5275,11 +5275,12 @@ export default function Page() {
     // Check set #1 from inputs or logs (Set numbers start at 1, not 0)
     const inputWeightSet1 = parseFloat(currentSetInputs[0]?.weightLbs);
     const inputRepsSet1 = parseFloat(currentSetInputs[0]?.reps);
-    const lastSet1Lbs = lastSetMap[effectiveKey]?.[1]?.weightLbs ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.weightLbs : undefined);
-    const loggedWeightSet1 = lastSet1Lbs !== undefined
+    const lastSet1 = lastSetMap[effectiveKey]?.[1] ?? (!currentMachine ? lastSetMap[exercise.name]?.[1] : undefined);
+    const lastSet1Lbs = lastSet1 ? lastSet1.weightLbs : 0;
+    const loggedWeightSet1 = lastSet1Lbs > 0
       ? (effectiveUnit === "kg" ? Math.round(lastSet1Lbs * 0.453592 * 10) / 10 : lastSet1Lbs)
       : undefined;
-    const loggedRepsSet1 = lastSetMap[effectiveKey]?.[1]?.reps ?? (!currentMachine ? lastSetMap[exercise.name]?.[1]?.reps : undefined);
+    const loggedRepsSet1 = lastSet1?.reps;
     const prWeight = pr?.weightLbs ? (effectiveUnit === "kg" ? Math.round(pr.weightLbs * 0.453592) : pr.weightLbs) : 0;
 
     const baselineWorkingWeight = 
@@ -5303,8 +5304,8 @@ export default function Page() {
       ? epley1RM(pr.weightLbs, pr.reps || 1)
       : (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0)
       ? epley1RM(effectiveUnit === "kg" ? inputWeightSet1 * 2.20462 : inputWeightSet1, inputRepsSet1 > 0 ? inputRepsSet1 : 8)
-      : (loggedWeightSet1 && loggedWeightSet1 > 0)
-      ? epley1RM(effectiveUnit === "kg" ? loggedWeightSet1 * 2.20462 : loggedWeightSet1, loggedRepsSet1 ? Number(loggedRepsSet1) : 8)
+      : (lastSet1Lbs > 0)
+      ? epley1RM(lastSet1Lbs, lastSet1?.reps ? Number(lastSet1.reps) : 8)
       : epley1RM(effectiveUnit === "kg" ? baselineWorkingWeight * 2.20462 : baselineWorkingWeight, 8);
 
     const forcedTier = manualTierMap[baseExercise.id];
