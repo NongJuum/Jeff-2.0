@@ -5191,6 +5191,7 @@ export default function Page() {
                 // Priority 3: Assessed / anatomical default (exercise.load)
                 const autoResolvedMachine = lastUsedMachine || favMachine || "";
                 const currentMachine = machineTags[baseExercise.id] !== undefined ? machineTags[baseExercise.id] : autoResolvedMachine;
+                const isFavoriteMachine = Boolean(currentMachine && favoriteMachines[exercise.name] === currentMachine);
                 const effectiveLoad: LoadType = currentMachine
                   ? mapMachineVariantToLoad(currentMachine, exercise.load)
                   : (exercise.load || getLoadType(exercise));
@@ -5467,7 +5468,7 @@ export default function Page() {
                               setMachineUnits((prev) => ({ ...prev, [currentMachine]: nextU }));
 
                               // Re-snap existing input numbers cleanly to the new unit
-                              setInputs((old) => {
+                              setInputs((old: Record<string, SetInput[]>) => {
                                 const curInputs = normalizeSetInputs(old[baseExercise.id], effectiveSets);
                                 const converted = curInputs.map((s) => {
                                   const val = parseFloat(s.weightLbs);
