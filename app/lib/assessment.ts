@@ -232,9 +232,12 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string):
   const lowerName = exerciseName.toLowerCase();
 
   // Special Overrides first:
-  if (lowerName.includes("45° leg press") || lowerName.includes("leg press")) {
-    // 45° Leg press: leverageRatio 1.414 (hypotenuse force component = 1/sin(45) or load effective ratio 1.414)
-    // angleThetaDeg = 0 so cos(0)=1, avoiding double angle division
+  // Exclude calf raise from leg press override so it gets Calf category + proper ratio.
+  if (
+    (lowerName.includes("45° leg press") || lowerName.includes("leg press")) &&
+    !lowerName.includes("calf")
+  ) {
+    // 45° Leg press: leverageRatio 1.414 (hypotenuse force component)
     return {
       leverageRatio: 1.414,
       camModifier: 1.0,
@@ -248,34 +251,64 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string):
     };
   }
 
+  // ─── Single-arm cable isolation on functional trainers ─────────────────────
+  // isPerHand=true: force÷2 in calculatePrescriptionWeight, then ×2 via pulleyRatio=2.0
+  // Net: rawKg = bilateral force = correct pin setting displayed to user.
   if (
     lowerName.includes("cable lat raise") ||
+    lowerName.includes("cable lateral raise") ||
     lowerName.includes("behind back cable") ||
     lowerName.includes("cable y raise") ||
-    lowerName.includes("cable flye") ||
-    lowerName.includes("cable crossover") ||
-    lowerName.includes("pec flye") ||
-    lowerName.includes("overhead cable ext") ||
-    lowerName.includes("triceps pressdown") ||
-    lowerName.includes("cable rope hammer") ||
+    lowerName.includes("cable rear delt") ||
+    lowerName.includes("cable face pull") ||
     lowerName.includes("bayesian curl") ||
+    lowerName.includes("cable curl") ||
+    lowerName.includes("cable rope hammer") ||
+    lowerName.includes("cable hammer") ||
+    lowerName.includes("overhead cable ext") ||
+    lowerName.includes("cable tricep") ||
+    lowerName.includes("triceps pressdown") ||
+    lowerName.includes("cable pressdown") ||
+    lowerName.includes("cable kickback") ||
+    lowerName.includes("glute kickback") ||
     lowerName.includes("katana")
   ) {
-    // Cable 2:1 (dual pulley / crossover towers)
-    const isSingleArmOrSide = true;
     return {
       leverageRatio: 1.0,
       camModifier: 1.0,
-      pulleyRatio: 2.0,
+      pulleyRatio: 2.0, // 2:1 functional trainer; cancels isPerHand÷2
       frictionCoeff: 0.05,
       angleThetaDeg: 0,
-      isPerHand: isSingleArmOrSide,
-      bilateralDeficit: false, // Independent cable stack per arm
+      isPerHand: true,
+      bilateralDeficit: false,
       minHardwareStep: 2.5,
       tareWeight: 0,
     };
   }
 
+  // ─── Bilateral crossover cable flye (two-arm, shared stack) ─────────────────
+  // Both arms pull against one shared stack (functional trainer split cable).
+  // Force required = total bilateral chest force. No per-hand division.
+  // pulleyRatio = 1.0: rawKg = force directly = pin setting.
+  if (
+    lowerName.includes("cable flye") ||
+    lowerName.includes("cable crossover") ||
+    lowerName.includes("pec flye")
+  ) {
+    return {
+      leverageRatio: 1.0,
+      camModifier: 1.0,
+      pulleyRatio: 1.0, // direct: pin weight = bilateral force required
+      frictionCoeff: 0.05,
+      angleThetaDeg: 0,
+      isPerHand: false,
+      bilateralDeficit: false,
+      minHardwareStep: 2.5,
+      tareWeight: 0,
+    };
+  }
+
+  // ─── Bilateral cable stack (pulldown / row) ───────────────────────────────
   if (
     lowerName.includes("lat pull down") ||
     lowerName.includes("lat pull") ||
@@ -284,7 +317,6 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string):
     lowerName.includes("straight arm pulldown") ||
     lowerName.includes("cable lat prayers")
   ) {
-    // Cable 1:1 (single stack overhead / low row)
     return {
       leverageRatio: 1.0,
       camModifier: 1.0,
@@ -360,7 +392,49 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string):
         minHardwareStep: 5.0,
         tareWeight: 0,
       };
-    case "cable":
+    case "cable": {
+      // Single-arm isolation: isPerHand=true, pulleyRatio=2.0
+      // (force÷2 × 2.0 = bilateral force = correct pin display)
+      const lower = exerciseName.toLowerCase();
+      const isIsolationSingleArm =
+        lower.includes("curl") ||
+        lower.includes("pressdown") ||
+        lower.includes("tricep") ||
+        lower.includes("katana") ||
+        lower.includes("face pull") ||
+        lower.includes("rear delt") ||
+        lower.includes("kickback") ||
+        (lower.includes("raise") && !lower.includes("row") && !lower.includes("press")) ||
+        (lower.includes("overhead") && (lower.includes("extension") || lower.includes("ext")));
+      if (isIsolationSingleArm) {
+        return {
+          leverageRatio: 1.0,
+          camModifier: 1.0,
+          pulleyRatio: 2.0, // 2:1 functional trainer; cancels isPerHand÷2
+          frictionCoeff: 0.05,
+          angleThetaDeg: 0,
+          isPerHand: true,
+          bilateralDeficit: false,
+          minHardwareStep: 2.5,
+          tareWeight: 0,
+        };
+      }
+      // Bilateral crossover flye: no per-hand split, pin = bilateral force
+      const isBilateralFlye = lower.includes("flye") || lower.includes("crossover");
+      if (isBilateralFlye) {
+        return {
+          leverageRatio: 1.0,
+          camModifier: 1.0,
+          pulleyRatio: 1.0, // direct: pin = bilateral force
+          frictionCoeff: 0.05,
+          angleThetaDeg: 0,
+          isPerHand: false,
+          bilateralDeficit: false,
+          minHardwareStep: 2.5,
+          tareWeight: 0,
+        };
+      }
+      // Default bilateral cable stack (lat pulldown, cable row, etc.)
       return {
         leverageRatio: 1.0,
         camModifier: 1.0,
@@ -372,6 +446,7 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string):
         minHardwareStep: 2.5,
         tareWeight: 0,
       };
+    }
     case "bodyweight":
       return {
         leverageRatio: 1.0,
@@ -406,14 +481,21 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   const name = exerciseName.toLowerCase();
   if (name.includes("romanian") || name.includes("rdl")) return "RDL";
   if (name.includes("deadlift")) return "Deadlift";
+  // Calf check before leg press: "Leg Press Calf Raise" → Calf, not LegPress
+  if (name.includes("calf") || name.includes("calves")) return "Calf";
   if (name.includes("leg press")) return "LegPress";
   if (name.includes("leg extension")) return "LegExt";
   if (name.includes("leg curl") || name.includes("hamstring curl")) return "LegCurl";
   if (name.includes("squat") || name.includes("v-squat") || name.includes("lunge") || name.includes("step up")) return "Squat";
-  if (name.includes("hip thrust") || name.includes("kickback") || name.includes("glute")) return "HipThrust";
+  // Tricep kickback must be caught before hip thrust (which also matches "kickback")
+  if ((name.includes("tricep") || name.includes("triceps")) && name.includes("kickback")) return "Tricep";
+  // Glute/cable kickback: isolation movement, use RearDelt as proxy ratio (light)
+  if (name.includes("kickback")) return "RearDelt";
+  if (name.includes("hip thrust") || name.includes("glute")) return "HipThrust";
   if (name.includes("incline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "InclineMachinePress";
   if (name.includes("decline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "DeclineMachinePress";
-  if (name.includes("incline")) return "Incline";
+  // rear delt before flye: "DB Rear Delt Flye" → RearDelt not Flye
+  if (name.includes("rear delt") || name.includes("face pull")) return "RearDelt";
   if (name.includes("flye") || name.includes("crossover") || name.includes("pec deck")) return "Flye";
   if (name.includes("bench") || name.includes("chest press") || name.includes("dip")) return "Bench";
   if (name.includes("lat pull") || name.includes("pull up") || name.includes("pulldown") || name.includes("pullover")) return "LatPull";
@@ -425,10 +507,12 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   if (name.includes("row")) return "Row";
   if (name.includes("shrug")) return "Shrug";
   if (name.includes("lat raise") || name.includes("lateral raise") || name.includes("y raise")) return "LatRaise";
-  if (name.includes("rear delt") || name.includes("face pull")) return "RearDelt";
   if (name.includes("overhead press") || name.includes("shoulder press") || name.includes("ohp")) return "OHP";
-  if (name.includes("curl")) return "Bicep";
-  if (name.includes("tricep") || name.includes("skullcrusher") || name.includes("pressdown") || name.includes("katana")) return "Tricep";
+  // curl: check BEFORE incline so "Incline DB Curl" → Bicep not Incline
+  if (name.includes("curl") && !name.includes("leg curl") && !name.includes("hamstring")) return "Bicep";
+  if (name.includes("incline")) return "Incline";
+  if (name.includes("tricep") || name.includes("skullcrusher") || name.includes("pressdown") || name.includes("katana") ||
+      (name.includes("overhead") && (name.includes("extension") || name.includes("ext")))) return "Tricep";
   if (name.includes("calf") || name.includes("calves")) return "Calf";
   return "Bench";
 }
@@ -549,13 +633,17 @@ export function calculatePrescriptionWeight(
     combinedText.includes("pulldown") ||
     combinedText.includes("pull down");
 
+  // The resolveMechanicalProfile shortcut is intended for machine/cable exercises only.
+  // Free-weight loads (barbell, dumbbell, smith, plate-loaded) must use getDefaultMechanicalProfile
+  // so that tare weights (barbell 20kg, smith 11kg) and per-hand flags are preserved correctly.
+  const isFreeWeightLoad = ["barbell", "dumbbell", "smith", "plate-loaded"].includes(load);
+
   // Check if we should use specialized resolveMechanicalProfile
   const mechProfile = resolveMechanicalProfile(exerciseName, machineTag);
 
-  // If exercise matches a machine/row/press/pulldown profile:
-  // F_physio = Bodyweight × BaseRatio × ExpFactor × RepFactor × StabilityFactor * GoalMod * MuscMod
-  // W_hardware = F_physio × pulleyRatio
-  if (isRowChestOrPulldown && (mechProfile.baseRatio.male !== 0.40 || combinedText.includes("row") || combinedText.includes("press") || combinedText.includes("pulldown"))) {
+  // Only use the machine-profile shortcut for non-free-weight loads where
+  // resolveMechanicalProfile returns a meaningful specialised profile (baseRatio.male !== 0.40 default).
+  if (!isFreeWeightLoad && isRowChestOrPulldown && mechProfile.baseRatio.male !== 0.40) {
     const baseRatio = isFemale ? mechProfile.baseRatio.female : mechProfile.baseRatio.male;
     const f_physio = bw * baseRatio * e_exp * r_rep * mechProfile.stabilityFactor * g_goal * m_musc;
     const rawWeightKg = f_physio * mechProfile.pulleyRatio;
@@ -583,6 +671,7 @@ export function calculatePrescriptionWeight(
       displayNote,
     };
   }
+
 
   // Standard Fallback for Compound Barbell / Dumbbell / Squat / Leg Press etc.
   const cat = getExerciseStrengthCategory(exerciseName);
