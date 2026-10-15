@@ -255,7 +255,7 @@ export function OnboardingWizard({
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-bold text-zinc-400">หน่วยน้ำหนัก / Weight unit</p>
               <div className="flex gap-1 rounded-xl bg-zinc-900 p-1">
-                {(["kg", "lbs"] as WeightUnit[]).map(v => <button key={v} type="button" onClick={() => setUnit(v)} className={`rounded-lg px-3 py-1.5 text-xs font-black ${unit === v ? "bg-emerald-400 text-black" : "text-zinc-400"}`}>{v}</button>)}
+                {(["kg", "lbs"] as WeightUnit[]).map(v => <button key={v} type="button" onClick={() => { const current = Number(weightKg); if (current > 0 && v !== unit) setWeightKg(String(Math.round((unit === "kg" ? current / 0.453592 : current * 0.453592) * 10) / 10)); setUnit(v); }} className={`rounded-lg px-3 py-1.5 text-xs font-black ${unit === v ? "bg-emerald-400 text-black" : "text-zinc-400"}`}>{v}</button>)}
               </div>
             </div>
             <div>
