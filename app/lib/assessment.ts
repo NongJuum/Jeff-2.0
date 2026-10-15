@@ -809,7 +809,11 @@ export function quantizeToHardware(
   const unitLabel = isLbs ? "lbs" : "kg";
   const rawDisplay = toDisplay(safeRawKg);
   const tareDisplay = toDisplay(tareKg);
-  const step = isLbs ? (isIsolation ? 2.5 : 5.0) : Math.max(0.1, profile.minHardwareStep || 2.5);
+  const step = isLbs
+    ? (profile.isPerHand && !isCable
+      ? (isIsolation ? 2.5 : 5.0) // Dumbbell increments are handled separately from machine stack increments.
+      : Math.max(isIsolation ? 2.5 : 5.0, Math.round((profile.minHardwareStep || 2.5) * 2.20462262185 * 10) / 10))
+    : Math.max(0.1, profile.minHardwareStep || 2.5);
   const roundDisplay = (v: number) => Math.round(v * 100) / 100;
   const warning = (actualKg: number) => actualKg > safeRawKg + 0.05
     ? " ⚠️ น้ำหนักต่ำสุดของอุปกรณ์สูงกว่าค่าประเมิน ห้ามฝืนใช้โหลดนี้ ให้เลือกอุปกรณ์/โหลดที่เบากว่า หรือประเมินใหม่"
