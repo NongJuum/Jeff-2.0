@@ -608,7 +608,7 @@ export function quantizeToHardware(
 
   // Cable profiles may be per-side without being dumbbells. Report the actual
   // hardware interface first so cable work is labeled correctly even at 1:1.
-  if (isCable && profile.isPerHand) {
+  if (isCable) {
     return {
       hardwareWeightKg: snapped,
       displayNote: `เสียบสลักพิน ${snapped} kg ต่อฝั่ง (รอกทด ${profile.pulleyRatio}:1)`,
