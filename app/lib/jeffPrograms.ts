@@ -1446,7 +1446,8 @@ export function resolveProgramDayForDate(
  */
 export function advanceJeffProgramAfterFinish(
   currentState: ActiveJeffProgramState,
-  completedDateKey: string
+  completedDateKey: string,
+  completedDayIndex: number = currentState.currentDayIndex
 ): ActiveJeffProgramState {
   // Never advance an already completed program or count a duplicate Finish action twice.
   if (isJeffProgramComplete(currentState) || currentState.completedDays.includes(completedDateKey)) {
@@ -1457,8 +1458,13 @@ export function advanceJeffProgramAfterFinish(
   const weekData = getProgramCurrentWeek(currentState);
   const totalDaysInWeek = weekData?.days.length || currentState.scheduleDays.length || 4;
   const updatedCompleted = [...currentState.completedDays, completedDateKey];
+  const safeCompletedIndex = Number.isInteger(completedDayIndex)
+    ? Math.max(0, Math.min(completedDayIndex, totalDaysInWeek - 1))
+    : currentState.currentDayIndex;
 
-  let nextDayIdx = currentState.currentDayIndex + 1;
+  // If the user intentionally chose a later day from the day switcher, progress follows
+  // that completed workout. Choosing an earlier day must never move progress backwards.
+  let nextDayIdx = Math.max(currentState.currentDayIndex, safeCompletedIndex) + 1;
   let nextWeek = currentState.currentWeek;
 
   if (nextDayIdx >= totalDaysInWeek) {
