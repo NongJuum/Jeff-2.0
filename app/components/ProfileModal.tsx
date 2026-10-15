@@ -6,6 +6,7 @@ import { getMigrationResult } from "../lib/migration";
 import { getCurrentBodyweight } from "./BodyweightManager";
 import { getUserProfile, saveUserProfile, type Gender, type UserProfile } from "../lib/assessment";
 import type { WeightUnit } from "../lib/units";
+import type { AppLanguage, FontScale } from "./OnboardingWizard";
 
 type Props = {
   open: boolean;
@@ -19,6 +20,10 @@ type Props = {
   onOpenAssessment?: () => void;
   currentGender?: Gender;
   onGenderChange?: (gender: Gender) => void;
+  language: AppLanguage;
+  fontScale: FontScale;
+  onLanguageChange: (language: AppLanguage) => void;
+  onFontScaleChange: (scale: FontScale) => void;
 };
 
 export function ProfileModal({
@@ -33,6 +38,10 @@ export function ProfileModal({
   onOpenAssessment,
   currentGender,
   onGenderChange,
+  language,
+  fontScale,
+  onLanguageChange,
+  onFontScaleChange,
 }: Props) {
   if (!open) return null;
 
@@ -75,7 +84,7 @@ export function ProfileModal({
         <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
           <div className="flex items-center gap-2">
             <User size={20} className="text-yellow-400" />
-            <h3 className="text-lg font-black text-white">Profile & Settings</h3>
+            <h3 className="text-lg font-black text-white">{language === "th" ? "โปรไฟล์และการตั้งค่า" : "Profile & Settings"}</h3>
           </div>
           <button
             type="button"
@@ -239,6 +248,34 @@ export function ProfileModal({
               </span>
               <span className="text-xs text-zinc-500">Export</span>
             </button>
+          </div>
+
+          {/* Language and text-size preferences */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-zinc-300">{language === "th" ? "ภาษาแอป" : "App language"}</p>
+              <p className="mt-1 text-[11px] text-zinc-500">{language === "th" ? "เปลี่ยนภาษาที่ใช้แสดงผลในหน้าหลักและหน้าโปรแกรม" : "Choose the language used in the main app and program pages."}</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => onLanguageChange("th")} className={`rounded-xl py-2.5 text-sm font-black transition ${language === "th" ? "bg-yellow-400 text-black" : "border border-zinc-800 bg-zinc-950 text-zinc-300"}`}>ไทย</button>
+                <button type="button" onClick={() => onLanguageChange("en")} className={`rounded-xl py-2.5 text-sm font-black transition ${language === "en" ? "bg-yellow-400 text-black" : "border border-zinc-800 bg-zinc-950 text-zinc-300"}`}>English</button>
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-zinc-300">{language === "th" ? "ขนาดตัวอักษร" : "Text size"}</p>
+              <p className="mt-1 text-[11px] text-zinc-500">{language === "th" ? "ปรับขนาดข้อความทั้งแอป รวมถึงเมนูและการ์ด" : "Adjust text size across the app, including menus and cards."}</p>
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {([
+                  ["small", language === "th" ? "เล็ก" : "Small", "Aa"],
+                  ["medium", language === "th" ? "มาตรฐาน" : "Medium", "Aa"],
+                  ["large", language === "th" ? "ใหญ่" : "Large", "Aa"],
+                ] as [FontScale, string, string][]).map(([value, label, sample]) => (
+                  <button key={value} type="button" onClick={() => onFontScaleChange(value)} className={`rounded-xl border py-2.5 transition ${fontScale === value ? "border-yellow-400 bg-yellow-400/10 text-yellow-300" : "border-zinc-800 bg-zinc-950 text-zinc-400"}`}>
+                    <span className="block font-black" style={{ fontSize: value === "small" ? 12 : value === "large" ? 18 : 15 }}>{sample}</span>
+                    <span className="mt-1 block text-xs font-bold">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* App Info */}
