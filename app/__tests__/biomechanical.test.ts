@@ -247,6 +247,8 @@ describe("Safety factor covers machine-specific exercise categories", () => {
   it("applies back and shoulder reductions to additional relevant categories", async () => {
     const { getSafetyFactor } = await import("../lib/assessment");
     expect(getSafetyFactor(30, ["lowerBack"], "HipThrust").safetyFactor).toBe(0.88);
+    expect(getSafetyFactor(30, ["lowerBack"], "HipHinge").safetyFactor).toBe(0.88);
+    expect(getSafetyFactor(30, ["knee"], "LegPressCalf").safetyFactor).toBe(0.88);
     expect(getSafetyFactor(30, ["lowerBack"], "LegPress").safetyFactor).toBe(0.88);
     expect(getSafetyFactor(30, ["shoulder"], "LatPull").safetyFactor).toBe(0.88);
   });
