@@ -3985,7 +3985,19 @@ export default function Page() {
       const date = new Date(`${key}T12:00:00`);
       return Number.isFinite(date.getTime()) && date >= weekStart && date < nextWeekStart;
     }).length;
-    const weeklyAdherence = Math.min(100, (sessionsThisWeek / Math.max(1, program.daysPerWeek)) * 100);
+    let plannedSessionsToDate = 0;
+    const cursor = new Date(weekStart);
+    while (cursor <= now) {
+      const dateKey = getProgramDateKey(cursor);
+      const dayIndex = (cursor.getDay() + 6) % 7;
+      if (activeJeffProgram.scheduleDays.includes(dayIndex) && (!activeJeffProgram.startDate || dateKey >= activeJeffProgram.startDate)) {
+        plannedSessionsToDate += 1;
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    const weeklyAdherence = plannedSessionsToDate > 0
+      ? Math.min(100, (sessionsThisWeek / plannedSessionsToDate) * 100)
+      : 100;
     const totalSessions = Math.max(1, program.durationWeeks * program.daysPerWeek);
     const overallProgress = Math.min(100, (activeJeffProgram.completedDays.length / totalSessions) * 100);
     const score = Math.round(weeklyAdherence * 0.7 + overallProgress * 0.3);
@@ -4001,6 +4013,8 @@ export default function Page() {
       ...basePerformanceReport,
       score,
       ...info,
+      progress: overallProgress,
+      volume: weeklyAdherence,
       consistency: weeklyAdherence,
       completion: overallProgress,
       hasData: true,
