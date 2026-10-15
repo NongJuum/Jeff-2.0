@@ -2870,17 +2870,22 @@ export default function Page() {
   // Active Jeff Nippard Scientific Workout Program State
   const [activeJeffProgram, setActiveJeffProgram] = useState<ActiveJeffProgramState | null>(() => getActiveJeffProgram());
 
+  // Keep the visible day aligned with persisted program progression after reloads and Finish.
+  useEffect(() => {
+    if (activeJeffProgram) setSelectedDay(activeJeffProgram.currentDayIndex);
+  }, [activeJeffProgram?.programId, activeJeffProgram?.currentWeek, activeJeffProgram?.currentDayIndex]);
+
   function handleSelectJeffProgram(activatedState: ActiveJeffProgramState) {
     const program = findProgramById(activatedState.programId);
     if (!program) return;
-    const resolved = resolveProgramDayForDate(activatedState, new Date());
+    // A newly activated program starts at its first workout; the calendar gates rest/training days.
     const newState: ActiveJeffProgramState = {
       ...activatedState,
-      currentDayIndex: resolved.scheduledDayIndex,
+      currentDayIndex: 0,
     };
     saveActiveJeffProgram(newState);
     setActiveJeffProgram(newState);
-    setSelectedDay(resolved.scheduledDayIndex);
+    setSelectedDay(0);
     setActiveExerciseIndex(0);
     setMode("today");
   }
