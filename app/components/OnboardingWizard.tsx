@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Globe, Minus, Plus } from "lucide-react";
+import React, { useState } from "react";
+import { Check, ChevronLeft, ChevronRight, Globe } from "lucide-react";
 import { saveUserProfile, type Gender, type UserProfile } from "../lib/assessment";
 import type { WeightUnit } from "../lib/units";
 
@@ -165,7 +165,7 @@ export function OnboardingWizard({
       gender,
       age: Number(age),
       heightCm: Number(heightCm),
-      weightKg: Number(weightKg),
+      weightKg: unit === "lbs" ? Math.round(Number(weightKg) * 0.453592 * 10) / 10 : Number(weightKg),
       expMonths: expMonths!,
       daysPerWeek: days,
       goal,
