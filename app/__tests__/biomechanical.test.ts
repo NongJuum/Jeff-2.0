@@ -47,8 +47,9 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
 
     const res = calculatePrescriptionWeight("Flat DB Press", "dumbbell", "6 to 10", profile);
     expect(res.isPerHand).toBe(true);
-    expect(res.hardwareWeightKg).toBe(10);
-    expect(res.displayNote).toContain("10 kg");
+    expect(res.hardwareWeightKg).toBe(7.5);
+    expect(res.hardwareWeightKg).toBeLessThanOrEqual(res.targetWeightKg);
+    expect(res.displayNote).toContain("7.5 kg");
   });
 
   // Case 3: M 70kg Inter Cable Lat Raise (2:1) -> 7.5 kg pin per side
@@ -227,5 +228,42 @@ describe("Safety factor covers machine-specific exercise categories", () => {
   it("does not apply injury adjustments to unrelated categories", async () => {
     const { getSafetyFactor } = await import("../lib/assessment");
     expect(getSafetyFactor(30, ["lowerBack"], "Bicep").safetyFactor).toBe(1.0);
+  });
+});
+
+
+describe("Hardware quantization safety and unit invariants", () => {
+  const profile = {
+    leverageRatio: 1, camModifier: 1, pulleyRatio: 1, frictionCoeff: 0,
+    angleThetaDeg: 0, isPerHand: false, bilateralDeficit: false,
+    minHardwareStep: 2.5, tareWeight: 0,
+  };
+
+  it("rounds machine loads down rather than up when a suitable increment exists", () => {
+    const result = quantizeToHardware(9.9, profile, false, false, "kg");
+    expect(result.hardwareWeightKg).toBe(7.5);
+    expect(result.hardwareExceedsTarget).toBe(false);
+  });
+
+  it("warns when the minimum available load exceeds the target", () => {
+    const result = quantizeToHardware(1.2, profile, true, false, "kg");
+    expect(result.hardwareWeightKg).toBe(2.5);
+    expect(result.hardwareExceedsTarget).toBe(true);
+    expect(result.displayNote).toContain("ห้ามฝืน");
+  });
+
+  it("keeps per-side plate mass in kg even when display unit is lbs", () => {
+    const bar = { ...profile, tareWeight: 20, minHardwareStep: 1.25 };
+    const result = quantizeToHardware(60, bar, false, false, "lbs");
+    expect(result.platesPerSideKg).toBeCloseTo(8.75 * 0.45359237, 2);
+    expect(result.displayNote).toContain("lbs");
+  });
+
+  it("warns when an empty bar exceeds the calculated target", () => {
+    const bar = { ...profile, tareWeight: 20 };
+    const result = quantizeToHardware(14, bar, false, false, "kg");
+    expect(result.hardwareWeightKg).toBe(20);
+    expect(result.hardwareExceedsTarget).toBe(true);
+    expect(result.displayNote).toContain("เลือกอุปกรณ์/โหลดที่เบากว่า");
   });
 });
