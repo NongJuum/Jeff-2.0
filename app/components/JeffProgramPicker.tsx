@@ -34,6 +34,7 @@ import {
   findProgramById,
   getProgramCurrentWeek,
   getProgramScheduledDates,
+  getProgramDateKey,
 } from "../lib/jeffPrograms";
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getUserProfile } from "../lib/assessment";
@@ -255,7 +256,7 @@ function ProgramSetupModal({
   const [selectedDays, setSelectedDays] = useState<number[]>(program.defaultScheduleDays);
   const [startDate, setStartDate] = useState(() => {
     const today = new Date();
-    return today.toISOString().split("T")[0];
+    return getProgramDateKey(today);
   });
 
   const toggleDay = (day: number) => {
@@ -437,7 +438,7 @@ export function ActiveProgramDashboard({
   if (!program) return null;
 
   const currentWeekData = getProgramCurrentWeek(activeState);
-  const todayKey = new Date().toISOString().split("T")[0];
+  const todayKey = getProgramDateKey(new Date());
   const dayOfWeek = (new Date().getDay() + 6) % 7;
   const isTodayTrainingDay = activeState.scheduleDays.includes(dayOfWeek);
   const isCompletedToday = activeState.completedDays.includes(todayKey);
@@ -746,7 +747,7 @@ export function JeffProgramTodayCard({
 }) {
   const program = findProgramById(activeState.programId);
   const currentWeekData = getProgramCurrentWeek(activeState);
-  const todayKey = new Date().toISOString().split("T")[0];
+  const todayKey = getProgramDateKey(new Date());
   const isCompletedToday = activeState.completedDays.includes(todayKey);
 
   if (!program || !currentWeekData) return null;
@@ -767,10 +768,8 @@ export function JeffProgramTodayCard({
     );
   }
 
-  const sortedSchedule = [...activeState.scheduleDays].sort((a, b) => a - b);
-  const dayCount = sortedSchedule.indexOf(dayOfWeek);
-  const safeDayIndex = dayCount !== -1 ? dayCount : activeState.currentDayIndex;
-  const todayWorkout = currentWeekData.days[safeDayIndex % currentWeekData.days.length];
+  const safeDayIndex = Math.max(0, Math.min(activeState.currentDayIndex, currentWeekData.days.length - 1));
+  const todayWorkout = currentWeekData.days[safeDayIndex];
 
   return (
     <div className={`rounded-2xl border border-zinc-700 overflow-hidden`}>
