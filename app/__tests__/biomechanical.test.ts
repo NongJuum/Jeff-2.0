@@ -6,6 +6,7 @@ import {
   type UserProfile,
   getExerciseStrengthCategory,
   getIntelligentWarmup,
+  STANDARD_EQUIPMENT_DEFAULTS,
 } from "../lib/assessment";
 
 describe("Biomechanical Engine & Hardware Quantization", () => {
@@ -75,8 +76,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(res.displayNote).toContain("ต่อฝั่ง");
   });
 
-  // Case 4: M 70kg beginner (8m) 45° Leg Press -> conservatively snapped down to 75 kg plates total
-  it("Case 4: M 70kg Inter 45° Leg Press -> 80 kg plates total", () => {
+  // Case 4: M 70kg beginner (8m) 45° Leg Press -> standardized external plate-load estimate
+  it("Case 4: M 70kg beginner 45° Leg Press uses standardized external load without an angle multiplier", () => {
     const profile: UserProfile = {
       gender: "male",
       age: 26,
@@ -91,8 +92,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     };
 
     const res = calculatePrescriptionWeight("45° Leg Press", "plate-loaded", "8 to 12", profile);
-    expect(res.hardwareWeightKg).toBe(75);
-    expect(res.displayNote).toContain("75 kg");
+    expect(res.hardwareWeightKg).toBe(55);
+    expect(res.displayNote).toContain("55 kg");
   });
 
   // Case 5: F 60kg Novice DB Lat Raise -> hits 2.0-2.5 kg floor
@@ -299,5 +300,25 @@ describe("Warmup recommendations stay within feasible loads", () => {
     const result = getIntelligentWarmup(machineExercise, 0, [machineExercise], 2.5, "kg", "selectorized");
     expect(result.type).toBe("skip");
     expect(result.steps).toHaveLength(0);
+  });
+});
+
+
+describe("Standard commercial equipment midpoint defaults", () => {
+  it("uses consistent baseline assumptions for common commercial machines", () => {
+    expect(STANDARD_EQUIPMENT_DEFAULTS.olympicBarKg).toBe(20);
+    expect(STANDARD_EQUIPMENT_DEFAULTS.smithEffectiveBarKg).toBe(11);
+    expect(STANDARD_EQUIPMENT_DEFAULTS.standardStackPulleyRatio).toBe(1);
+    expect(STANDARD_EQUIPMENT_DEFAULTS.functionalTrainerPulleyRatio).toBe(2);
+    expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").leverageRatio).toBe(1);
+    expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").minHardwareStep).toBe(5);
+    expect(getDefaultMechanicalProfile("selectorized", "Life Fitness Chest Press").minHardwareStep).toBe(5);
+  });
+
+  it("uses 1:1 for common pulldown stacks and 2:1 for functional-trainer isolation cables", () => {
+    const pulldown = getDefaultMechanicalProfile("cable", "Lat Pulldown");
+    const curl = getDefaultMechanicalProfile("cable", "Cable Curl");
+    expect(pulldown.pulleyRatio).toBe(1);
+    expect(curl.pulleyRatio).toBe(2);
   });
 });
