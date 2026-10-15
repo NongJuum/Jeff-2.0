@@ -1360,6 +1360,35 @@ export function getProgramDateKey(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+export function getNextProgramTrainingDate(
+  state: ActiveJeffProgramState,
+  fromDate: Date = new Date()
+): string | null {
+  const scheduleDays = Array.isArray(state.scheduleDays)
+    ? state.scheduleDays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+    : [];
+  if (scheduleDays.length === 0) return null;
+
+  const fromKey = getProgramDateKey(fromDate);
+  const firstKey = state.startDate && state.startDate > fromKey ? state.startDate : fromKey;
+  const current = new Date(`${firstKey}T12:00:00`);
+  if (!Number.isFinite(current.getTime())) return null;
+
+  // Find the next scheduled date within the following week, respecting a future start date.
+  for (let offset = 0; offset <= 7; offset += 1) {
+    const dayOfWeek = (current.getDay() + 6) % 7; // Mon=0 ... Sun=6
+    if (scheduleDays.includes(dayOfWeek)) return getProgramDateKey(current);
+    current.setDate(current.getDate() + 1);
+  }
+  return null;
+}
+
+export function isJeffProgramComplete(state: ActiveJeffProgramState): boolean {
+  const program = findProgramById(state.programId);
+  if (!program) return false;
+  return state.completedDays.length >= program.durationWeeks * program.daysPerWeek;
+}
+
 export function getProgramScheduledDates(
   startDate: string,
   scheduleDays: number[],
@@ -1419,8 +1448,10 @@ export function advanceJeffProgramAfterFinish(
   currentState: ActiveJeffProgramState,
   completedDateKey: string
 ): ActiveJeffProgramState {
-  // A duplicate Finish action on the same local date must not advance twice.
-  if (currentState.completedDays.includes(completedDateKey)) return currentState;
+  // Never advance an already completed program or count a duplicate Finish action twice.
+  if (isJeffProgramComplete(currentState) || currentState.completedDays.includes(completedDateKey)) {
+    return currentState;
+  }
 
   const program = findProgramById(currentState.programId);
   const weekData = getProgramCurrentWeek(currentState);
