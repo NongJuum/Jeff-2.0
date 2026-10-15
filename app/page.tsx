@@ -41,7 +41,7 @@ import {
   User,
   X,
 } from "lucide-react";
-import { OnboardingWizard, hasCompletedOnboarding } from "./components/OnboardingWizard";
+import { OnboardingWizard, hasCompletedOnboarding, getAppLanguage, getFontScale, APP_LANGUAGE_KEY, FONT_SCALE_KEY, type AppLanguage, type FontScale } from "./components/OnboardingWizard";
 import {
   JeffProgramPicker,
   ActiveProgramDashboard,
@@ -3275,6 +3275,18 @@ export default function Page() {
   }
 
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>(() => getAppLanguage());
+  const [fontScale, setFontScale] = useState<FontScale>(() => getFontScale());
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.lang = appLanguage;
+    root.style.fontSize = fontScale === "small" ? "14px" : fontScale === "large" ? "18px" : "16px";
+    try {
+      window.localStorage.setItem(APP_LANGUAGE_KEY, appLanguage);
+      window.localStorage.setItem(FONT_SCALE_KEY, fontScale);
+    } catch {}
+  }, [appLanguage, fontScale]);
 
   // Migration State (M2)
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
@@ -3931,10 +3943,48 @@ export default function Page() {
 
   const weeklyVolumeSummary = useMemo(() => getWeeklyVolumeSummary(activePlan), [activePlan]);
 
-  const performanceReport = useMemo(
+  const basePerformanceReport = useMemo(
     () => computeWeeklyPerformance(logs, days, activePlan),
     [logs, days, activePlan]
   );
+
+  // When a Jeff program is active, score adherence against that program's planned sessions
+  // and overall program progression rather than the generic preset-split rubric.
+  const performanceReport = useMemo(() => {
+    if (!activeJeffProgram) return basePerformanceReport;
+    const program = findProgramById(activeJeffProgram.programId);
+    if (!program) return basePerformanceReport;
+
+    const now = new Date();
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const nextWeekStart = new Date(weekStart);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+    const sessionsThisWeek = activeJeffProgram.completedDays.filter((key) => {
+      const date = new Date(`${key}T12:00:00`);
+      return Number.isFinite(date.getTime()) && date >= weekStart && date < nextWeekStart;
+    }).length;
+    const weeklyAdherence = Math.min(100, (sessionsThisWeek / Math.max(1, program.daysPerWeek)) * 100);
+    const totalSessions = Math.max(1, program.durationWeeks * program.daysPerWeek);
+    const overallProgress = Math.min(100, (activeJeffProgram.completedDays.length / totalSessions) * 100);
+    const score = Math.round(weeklyAdherence * 0.7 + overallProgress * 0.3);
+    const info = score >= 90
+      ? { rank: "S+", emoji: "🏆", message: appLanguage === "th" ? "ทำตามแผนโปรแกรมได้ยอดเยี่ยมมาก" : "Excellent adherence to your program." }
+      : score >= 80
+        ? { rank: "S", emoji: "🔥", message: appLanguage === "th" ? "ทำได้ดีมาก รักษาความสม่ำเสมอต่อไป" : "Great work. Keep your consistency going." }
+        : score >= 60
+          ? { rank: "A", emoji: "💪", message: appLanguage === "th" ? "กำลังเดินหน้า ทำตามตารางฝึกต่อเนื่อง" : "Good progress. Stay with your training schedule." }
+          : { rank: "B", emoji: "🌱", message: appLanguage === "th" ? "ค่อย ๆ สร้างความสม่ำเสมอ ไม่จำเป็นต้องรีบ" : "Build consistency at a sustainable pace." };
+
+    return {
+      ...basePerformanceReport,
+      score,
+      ...info,
+      consistency: weeklyAdherence,
+      completion: overallProgress,
+      hasData: activeJeffProgram.completedDays.length > 0,
+    };
+  }, [basePerformanceReport, activeJeffProgram, appLanguage]);
 
   // บันทึก weekly score ทุกครั้งที่ performanceReport เปลี่ยน (สัปดาห์ละครั้ง) (T2)
   useEffect(() => {
@@ -4558,7 +4608,7 @@ export default function Page() {
               <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-yellow-300">
                 <Dumbbell size={14} /> HA IT
               </p>
-              <h1 className="text-base font-black leading-tight sm:text-lg">Workout Tracker</h1>
+              <h1 className="text-base font-black leading-tight sm:text-lg">{appLanguage === "th" ? "บันทึกการฝึก" : "Workout Tracker"}</h1>
             </div>
           </div>
 
@@ -5021,7 +5071,7 @@ export default function Page() {
             )}
 
             {/* B. "Today's Workout" Visual Hero Card or Rest Day Card */}
-            {(!activeJeffProgram || (!jeffCalendarStatus?.isCompleted && !isJeffProgramComplete(activeJeffProgram))) && (
+            {!activeJeffProgram && (
             isTodayScheduledRest ? (
               <div className="rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-5 shadow-2xl relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -5441,6 +5491,7 @@ export default function Page() {
             <JeffProgramPicker
               onProgramActivated={handleSelectJeffProgram}
               onProgramStopped={handleResetProgram}
+              language={appLanguage}
             />
           </div>
         )}
@@ -7085,7 +7136,11 @@ export default function Page() {
         <OnboardingWizard
           onComplete={(result) => {
             setDays(result.days);
+            setUserProfile(result.profile);
+            setAppLanguage(result.language);
+            setFontScale(result.fontScale);
             setShowOnboarding(false);
+            setMode("programs");
           }}
         />
       )}
@@ -7103,6 +7158,10 @@ export default function Page() {
         onOpenAssessment={() => setShowAssessmentModal(true)}
         currentGender={userProfile?.gender || "male"}
         onGenderChange={handleSetGender}
+        language={appLanguage}
+        fontScale={fontScale}
+        onLanguageChange={setAppLanguage}
+        onFontScaleChange={setFontScale}
       />
 
       {/* Trainer Assessment Modal (Stage 2) */}
