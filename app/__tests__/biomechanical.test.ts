@@ -297,6 +297,13 @@ describe("Hardware quantization safety and unit invariants", () => {
     expect(result.displayNote).toContain("โหลดรวมโดยประมาณ 60 kg");
   });
 
+  it("keeps selectorized stack increments consistent when displaying lbs", () => {
+    const selectorized = { ...profile, minHardwareStep: 5 };
+    const result = quantizeToHardware(23.75, selectorized, true, false, "lbs");
+    expect(result.hardwareWeightKg).toBeCloseTo(20, 1);
+    expect(result.displayNote).toContain("44 lbs");
+  });
+
   it("warns when an empty bar exceeds the calculated target", () => {
     const bar = { ...profile, tareWeight: 20 };
     const result = quantizeToHardware(14, bar, false, false, "kg");
