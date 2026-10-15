@@ -388,4 +388,10 @@ describe("Standard commercial equipment midpoint defaults", () => {
       expect(profile.tareWeight, name).toBe(0);
     }
   });
+
+  it("uses a conservative, distinct strength category for Seated Calf Raise", () => {
+    expect(getExerciseStrengthCategory("Seated Calf Raise")).toBe("SeatedCalf");
+    expect(STRENGTH_RATIOS.SeatedCalf.male).toBeLessThan(STRENGTH_RATIOS.Calf.male);
+    expect(STRENGTH_RATIOS.SeatedCalf.female).toBeLessThan(STRENGTH_RATIOS.Calf.female);
+  });
 });
