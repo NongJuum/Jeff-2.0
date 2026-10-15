@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - fix/standard-machine-midpoints
+      - fix/safety-factor-injury-coverage
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
