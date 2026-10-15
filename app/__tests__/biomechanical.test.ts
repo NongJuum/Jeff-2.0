@@ -10,6 +10,7 @@ import {
   PLATE_LOADED_MACHINE_DEFAULTS,
   getPlateLoadedMachineDefault,
   getPinLoadedMachineDefault,
+  PIN_LOADED_MACHINE_DEFAULTS,
 } from "../lib/assessment";
 
 describe("Biomechanical Engine & Hardware Quantization", () => {
