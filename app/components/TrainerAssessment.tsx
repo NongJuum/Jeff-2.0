@@ -531,8 +531,11 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                           <p className="font-bold text-zinc-200">{ex.name}</p>
                           <p className="text-[11px] text-zinc-500 mt-0.5">{calc.displayNote}</p>
                         </div>
-                        <div className="text-right">
-                          <span className={`rounded-lg px-2.5 py-1 text-xs font-black ${calc.hardwareExceedsTarget ? "bg-amber-950 text-amber-300" : "bg-zinc-800 text-emerald-300"}`}>
+                        <div className="text-right max-w-[45%]">
+                          <span className="block text-[10px] leading-tight font-bold text-zinc-400 mb-1">
+                            {calc.hardwareLoadLabel}
+                          </span>
+                          <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-black ${calc.hardwareExceedsTarget ? "bg-amber-950 text-amber-300" : "bg-zinc-800 text-emerald-300"}`}>
                             {preferredWeightUnit === "lbs"
                               ? `${Math.round(calc.hardwareWeightKg * 2.20462 * 10) / 10} lbs`
                               : `${calc.hardwareWeightKg} kg`}
