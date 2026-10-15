@@ -69,6 +69,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     const res = calculatePrescriptionWeight("Cable Lat Raise", "cable", "6 to 10", profile);
     expect(res.hardwareWeightKg).toBe(7.5);
     expect(res.displayNote).toContain("7.5 kg");
+    expect(res.displayNote).toContain("สลักพิน");
+    expect(res.displayNote).toContain("ต่อฝั่ง");
   });
 
   // Case 4: M 70kg Inter 45° Leg Press -> 85 kg plates total (no double angle)
