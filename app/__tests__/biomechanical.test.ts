@@ -163,5 +163,20 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(dual.isPerHand).toBe(true);
     expect(dual.pulleyRatio).toBe(2);
   });
+
+  it("allows cable pulley ratio to be configured independently of single/dual execution", () => {
+    const profile: UserProfile = {
+      gender: "male", age: 26, heightCm: 175, weightKg: 70, expMonths: 18,
+      daysPerWeek: 4, goal: "hypertrophy", injuries: [], preferredWeightUnit: "kg",
+      updatedAt: new Date().toISOString(),
+    };
+    const direct = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 1);
+    const standard = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 2);
+    const highAdvantage = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 3);
+    expect(direct.hardwareWeightKg).toBeGreaterThan(standard.hardwareWeightKg);
+    expect(highAdvantage.hardwareWeightKg).toBeLessThan(standard.hardwareWeightKg);
+    expect(standard.displayNote).toContain("2:1");
+    expect(direct.displayNote).toContain("1:1");
+  });
 });
 
