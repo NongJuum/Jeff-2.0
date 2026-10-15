@@ -4560,42 +4560,22 @@ export default function Page() {
   }, [day, compactList, activeExerciseIndex]);
 
 
-  const pageMeta = {
-    dashboard: {
-      eyebrow: "Home",
-      title: "Dashboard",
-      description: "ภาพรวมกิจกรรมและสถิติการฝึก",
-    },
-    today: {
-      eyebrow: "Workout",
-      title: "Today",
-      description: "เล่นทีละท่าแบบง่ายๆ",
-    },
-    preset: {
-      eyebrow: "Preset",
-      title: "Program",
-      description: "เลือกโปรแกรมที่ต้องการ",
-    },
-    custom: {
-      eyebrow: "Builder",
-      title: "Custom",
-      description: "สร้างและแก้ตารางเอง",
-    },
-    history: {
-      eyebrow: "Permanent",
-      title: "History",
-      description: "ประวัติการฝึกและสถิติ",
-    },
-    library: {
-      eyebrow: "Exercise",
-      title: "Library",
-      description: "รวมท่าที่มีใน gym",
-    },
-    programs: {
-      eyebrow: "Jeff Nippard",
-      title: "Programs",
-      description: "เลือกโปรแกรมและตารางฝึกตามวิทยาศาสตร์",
-    },
+  const pageMeta = appLanguage === "th" ? {
+    dashboard: { eyebrow: "หน้าหลัก", title: "ภาพรวม", description: "ภาพรวมกิจกรรมและสถิติการฝึก" },
+    today: { eyebrow: "การฝึก", title: "วันนี้", description: "ฝึกตามลำดับทีละท่า" },
+    preset: { eyebrow: "โปรแกรม", title: "ตารางฝึก", description: "เลือกตารางฝึกที่ต้องการ" },
+    custom: { eyebrow: "สร้างตาราง", title: "ตารางของฉัน", description: "สร้างและแก้ตารางฝึกเอง" },
+    history: { eyebrow: "ประวัติ", title: "ประวัติการฝึก", description: "ประวัติการฝึกและสถิติ" },
+    library: { eyebrow: "ท่าออกกำลังกาย", title: "คลังท่า", description: "รวมท่าออกกำลังกาย" },
+    programs: { eyebrow: "Jeff Nippard", title: "โปรแกรมฝึก", description: "เลือกโปรแกรมตามเป้าหมายและพื้นฐาน" },
+  }[mode] : {
+    dashboard: { eyebrow: "Home", title: "Dashboard", description: "Your training overview and stats" },
+    today: { eyebrow: "Workout", title: "Today", description: "Follow your workout one exercise at a time" },
+    preset: { eyebrow: "Program", title: "Training Plan", description: "Choose a training split" },
+    custom: { eyebrow: "Builder", title: "Custom Plan", description: "Build and edit your own plan" },
+    history: { eyebrow: "History", title: "Workout History", description: "Training history and statistics" },
+    library: { eyebrow: "Exercises", title: "Exercise Library", description: "Browse available exercises" },
+    programs: { eyebrow: "Jeff Nippard", title: "Programs", description: "Choose a program based on your goals and background" },
   }[mode];
 
   return (
@@ -7393,12 +7373,12 @@ export default function Page() {
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
         <div className="mx-auto grid max-w-5xl grid-cols-6 gap-1">
           {[
-            ["dashboard", "Home", Home],
-            ["workout", "Workout", Dumbbell],
-            ["programs", "Programs", BookOpen],
-            ["stats", "Stats", Trophy],
-            ["library", "Library", Library],
-            ["profile", "Profile", User],
+            ["dashboard", appLanguage === "th" ? "หน้าหลัก" : "Home", Home],
+            ["workout", appLanguage === "th" ? "ฝึกวันนี้" : "Workout", Dumbbell],
+            ["programs", appLanguage === "th" ? "โปรแกรม" : "Programs", BookOpen],
+            ["stats", appLanguage === "th" ? "สถิติ" : "Stats", Trophy],
+            ["library", appLanguage === "th" ? "คลังท่า" : "Library", Library],
+            ["profile", appLanguage === "th" ? "โปรไฟล์" : "Profile", User],
           ].map(([key, label, Icon]) => {
             const isTabActive =
               (key === "dashboard" && mode === "dashboard") ||
