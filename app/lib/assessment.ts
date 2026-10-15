@@ -341,12 +341,12 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
     return {
       leverageRatio: 1.0,
       camModifier: 1.0,
-      pulleyRatio: 1.0,
+      pulleyRatio: STANDARD_EQUIPMENT_DEFAULTS.standardStackPulleyRatio,
       frictionCoeff: 0.05,
       angleThetaDeg: 0,
       isPerHand: false,
       bilateralDeficit: false,
-      minHardwareStep: 5.0,
+      minHardwareStep: STANDARD_EQUIPMENT_DEFAULTS.selectorizedStackStepKg,
       tareWeight: 0,
     };
   }
