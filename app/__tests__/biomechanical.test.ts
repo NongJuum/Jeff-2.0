@@ -5,6 +5,7 @@ import {
   getDefaultMechanicalProfile,
   type UserProfile,
   getExerciseStrengthCategory,
+  getIntelligentWarmup,
 } from "../lib/assessment";
 
 describe("Biomechanical Engine & Hardware Quantization", () => {
@@ -265,5 +266,30 @@ describe("Hardware quantization safety and unit invariants", () => {
     expect(result.hardwareWeightKg).toBe(20);
     expect(result.hardwareExceedsTarget).toBe(true);
     expect(result.displayNote).toContain("เลือกอุปกรณ์/โหลดที่เบากว่า");
+  });
+});
+
+
+describe("Warmup recommendations stay within feasible loads", () => {
+  const exercise = { id: "1", name: "Bench Press", group: "Chest", movement: "compound", muscles: ["chest"], warmup: true, load: "barbell" };
+
+  it("does not prescribe a barbell warmup lighter than the bar itself", () => {
+    const result = getIntelligentWarmup(exercise, 0, [exercise], 15, "kg", "barbell");
+    expect(result.type).toBe("skip");
+    expect(result.note).toContain("คานเปล่าหนักกว่า");
+    expect(result.steps).toHaveLength(0);
+  });
+
+  it("never rounds warmup loads above the working load", () => {
+    const result = getIntelligentWarmup(exercise, 0, [exercise], 30, "kg", "barbell");
+    expect(result.steps.every((step) => step.weight <= 30)).toBe(true);
+    expect(result.steps.every((step) => step.weight >= 20)).toBe(true);
+  });
+
+  it("does not invent a lighter warmup load when the stack's minimum equals the work weight", () => {
+    const machineExercise = { ...exercise, load: "selectorized" };
+    const result = getIntelligentWarmup(machineExercise, 0, [machineExercise], 2.5, "kg", "selectorized");
+    expect(result.type).toBe("skip");
+    expect(result.steps).toHaveLength(0);
   });
 });
