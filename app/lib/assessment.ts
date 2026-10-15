@@ -756,14 +756,14 @@ export function getSafetyFactor(
     const backSensitive = new Set([
       "Deadlift", "Squat", "RDL", "Row", "ChestSupportedRow",
       "SeatedCableRow", "IsoLateralHighRow", "IsoLateralLowRow",
-      "HipThrust", "LegPress",
+      "HipThrust", "LegPress", "HipHinge",
     ]);
     const shoulderSensitive = new Set([
       "Bench", "OHP", "Incline", "InclineMachinePress",
       "DeclineMachinePress", "Flye", "LatRaise", "RearDelt",
       "LatPull", "Tricep",
     ]);
-    const kneeSensitive = new Set(["Squat", "LegPress", "LegExt", "LegCurl"]);
+    const kneeSensitive = new Set(["Squat", "LegPress", "LegPressCalf", "LegExt", "LegCurl"]);
     const wristSensitive = new Set([
       "Bench", "OHP", "Incline", "InclineMachinePress",
       "DeclineMachinePress", "Bicep", "Tricep", "Row",
