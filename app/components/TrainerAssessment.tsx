@@ -514,6 +514,7 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                 <div className="border-b border-zinc-800 bg-zinc-900 px-4 py-2 text-xs font-bold uppercase text-zinc-400">
                   น้ำหนักเริ่มต้นแนะนำตามเครื่องเล่นจริง (Hardware Snapped)
                 </div>
+                <p className="px-4 pb-2 text-[11px] leading-relaxed text-amber-300/90">น้ำหนักนี้เป็นค่าประเมินเริ่มต้น ไม่ใช่การวัดความแข็งแรงหรือการรับรองความปลอดภัย หากโหลดขั้นต่ำของเครื่องสูงกว่าค่าประเมิน ให้ทำตามคำเตือนและเลือกโหลดที่เบากว่า</p>
                 <div className="divide-y divide-zinc-800/80 max-h-64 overflow-y-auto">
                   {SAMPLE_EXERCISES.map((ex) => {
                     const calc = calculatePrescriptionWeight(
@@ -530,8 +531,11 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                           <p className="font-bold text-zinc-200">{ex.name}</p>
                           <p className="text-[11px] text-zinc-500 mt-0.5">{calc.displayNote}</p>
                         </div>
-                        <div className="text-right">
-                          <span className="rounded-lg bg-zinc-800 px-2.5 py-1 text-xs font-black text-emerald-300">
+                        <div className="text-right max-w-[45%]">
+                          <span className="block text-[10px] leading-tight font-bold text-zinc-400 mb-1">
+                            {calc.hardwareLoadLabel}
+                          </span>
+                          <span className={`inline-block rounded-lg px-2.5 py-1 text-xs font-black ${calc.hardwareExceedsTarget ? "bg-amber-950 text-amber-300" : "bg-zinc-800 text-emerald-300"}`}>
                             {preferredWeightUnit === "lbs"
                               ? `${Math.round(calc.hardwareWeightKg * 2.20462 * 10) / 10} lbs`
                               : `${calc.hardwareWeightKg} kg`}

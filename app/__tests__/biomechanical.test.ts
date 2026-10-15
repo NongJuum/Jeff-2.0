@@ -5,6 +5,12 @@ import {
   getDefaultMechanicalProfile,
   type UserProfile,
   getExerciseStrengthCategory,
+  getIntelligentWarmup,
+  STANDARD_EQUIPMENT_DEFAULTS,
+  PLATE_LOADED_MACHINE_DEFAULTS,
+  getPlateLoadedMachineDefault,
+  getPinLoadedMachineDefault,
+  PIN_LOADED_MACHINE_DEFAULTS,
 } from "../lib/assessment";
 
 describe("Biomechanical Engine & Hardware Quantization", () => {
@@ -47,11 +53,12 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
 
     const res = calculatePrescriptionWeight("Flat DB Press", "dumbbell", "6 to 10", profile);
     expect(res.isPerHand).toBe(true);
-    expect(res.hardwareWeightKg).toBe(10);
-    expect(res.displayNote).toContain("10 kg");
+    expect(res.hardwareWeightKg).toBe(7.5);
+    expect(res.hardwareWeightKg).toBeLessThanOrEqual(res.targetWeightKg);
+    expect(res.displayNote).toContain("7.5 kg");
   });
 
-  // Case 3: M 70kg Inter Cable Lat Raise (2:1) -> 7.5 kg pin per side
+  // Case 3: M 70kg Inter Cable Lat Raise (2:1) -> conservatively snapped down to 5 kg pin per side
   it("Case 3: M 70kg Inter Cable Lat Raise (2:1) -> 7.5 kg pin per side", () => {
     const profile: UserProfile = {
       gender: "male",
@@ -67,14 +74,14 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     };
 
     const res = calculatePrescriptionWeight("Cable Lat Raise", "cable", "6 to 10", profile);
-    expect(res.hardwareWeightKg).toBe(7.5);
-    expect(res.displayNote).toContain("7.5 kg");
+    expect(res.hardwareWeightKg).toBe(5);
+    expect(res.displayNote).toContain("5 kg");
     expect(res.displayNote).toContain("สลักพิน");
     expect(res.displayNote).toContain("ต่อฝั่ง");
   });
 
-  // Case 4: M 70kg Inter (8m) 45° Leg Press -> 80 kg plates total (with 8% safety margin)
-  it("Case 4: M 70kg Inter 45° Leg Press -> 80 kg plates total", () => {
+  // Case 4: Leg press target is converted into added plates after subtracting the built-in sled resistance.
+  it("Case 4: 45° Leg Press subtracts its estimated starting resistance before recommending plates", () => {
     const profile: UserProfile = {
       gender: "male",
       age: 26,
@@ -89,8 +96,11 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     };
 
     const res = calculatePrescriptionWeight("45° Leg Press", "plate-loaded", "8 to 12", profile);
-    expect(res.hardwareWeightKg).toBe(80);
-    expect(res.displayNote).toContain("80 kg");
+    expect(res.hardwareWeightKg).toBe(0);
+    expect(res.effectiveHardwareWeightKg).toBe(50);
+    expect(res.tareWeightKg).toBe(50);
+    expect(res.displayNote).toContain("แรงต้านเริ่มต้นประมาณ 50 kg");
+    expect(res.hardwareLoadLabel).toBe("เพลตรวมทั้งหมด");
   });
 
   // Case 5: F 60kg Novice DB Lat Raise -> hits 2.0-2.5 kg floor
@@ -136,6 +146,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(barbellRes.tareWeightKg).toBe(20);
     expect(smithRes.tareWeightKg).toBe(11);
     expect(cableRes.tareWeightKg).toBe(0);
+    expect(barbellRes.hardwareLoadLabel).toBe("น้ำหนักรวมคาน");
+    expect(smithRes.hardwareLoadLabel).toBe("น้ำหนักรวมบาร์สมิท");
 
     // Ensure weights differ and do not blindly carry over incompatible values
     expect(barbellRes.hardwareWeightKg).not.toBe(cableRes.hardwareWeightKg);
@@ -205,3 +217,171 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
   });
 });
 
+
+
+describe("Safety factor covers machine-specific exercise categories", () => {
+  it("applies the back-injury reduction to chest-supported and cable row categories", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["lowerBack"], "ChestSupportedRow").safetyFactor).toBe(0.88);
+    expect(getSafetyFactor(30, ["lowerBack"], "SeatedCableRow").safetyFactor).toBe(0.88);
+  });
+
+  it("applies the shoulder-injury reduction to machine incline press", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["shoulder"], "InclineMachinePress").safetyFactor).toBe(0.88);
+  });
+
+  it("applies the wrist-injury reduction to triceps work", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["wrist"], "Tricep").safetyFactor).toBe(0.92);
+  });
+
+
+  it("applies back and shoulder reductions to additional relevant categories", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["lowerBack"], "HipThrust").safetyFactor).toBe(0.88);
+    expect(getSafetyFactor(30, ["lowerBack"], "LegPress").safetyFactor).toBe(0.88);
+    expect(getSafetyFactor(30, ["shoulder"], "LatPull").safetyFactor).toBe(0.88);
+  });
+
+  it("does not apply injury adjustments to unrelated categories", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["lowerBack"], "Bicep").safetyFactor).toBe(1.0);
+  });
+});
+
+
+describe("Hardware quantization safety and unit invariants", () => {
+  const profile = {
+    leverageRatio: 1, camModifier: 1, pulleyRatio: 1, frictionCoeff: 0,
+    angleThetaDeg: 0, isPerHand: false, bilateralDeficit: false,
+    minHardwareStep: 2.5, tareWeight: 0,
+  };
+
+  it("rounds machine loads down rather than up when a suitable increment exists", () => {
+    const result = quantizeToHardware(9.9, profile, false, false, "kg");
+    expect(result.hardwareWeightKg).toBe(7.5);
+    expect(result.hardwareExceedsTarget).toBe(false);
+  });
+
+  it("warns when the minimum available load exceeds the target", () => {
+    const result = quantizeToHardware(1.2, profile, true, false, "kg");
+    expect(result.hardwareWeightKg).toBe(2.5);
+    expect(result.hardwareExceedsTarget).toBe(true);
+    expect(result.displayNote).toContain("ห้ามฝืน");
+  });
+
+  it("keeps per-side plate mass in kg even when display unit is lbs", () => {
+    const bar = { ...profile, tareWeight: 20, minHardwareStep: 1.25 };
+    const result = quantizeToHardware(60, bar, false, false, "lbs");
+    expect(result.platesPerSideKg).toBeCloseTo(42.5 * 0.45359237, 2);
+    expect(result.displayNote).toContain("lbs");
+  });
+
+  it("warns when an empty bar exceeds the calculated target", () => {
+    const bar = { ...profile, tareWeight: 20 };
+    const result = quantizeToHardware(14, bar, false, false, "kg");
+    expect(result.hardwareWeightKg).toBe(20);
+    expect(result.hardwareExceedsTarget).toBe(true);
+    expect(result.displayNote).toContain("เลือกอุปกรณ์/โหลดที่เบากว่า");
+  });
+});
+
+
+describe("Warmup recommendations stay within feasible loads", () => {
+  const exercise = { id: "1", name: "Bench Press", group: "Chest", movement: "compound", muscles: ["chest"], warmup: true, load: "barbell" };
+
+  it("does not prescribe a barbell warmup lighter than the bar itself", () => {
+    const result = getIntelligentWarmup(exercise, 0, [exercise], 15, "kg", "barbell");
+    expect(result.type).toBe("skip");
+    expect(result.note).toContain("คานเปล่าหนักกว่า");
+    expect(result.steps).toHaveLength(0);
+  });
+
+  it("never rounds warmup loads above the working load", () => {
+    const result = getIntelligentWarmup(exercise, 0, [exercise], 30, "kg", "barbell");
+    expect(result.steps.every((step) => step.weight <= 30)).toBe(true);
+    expect(result.steps.every((step) => step.weight >= 20)).toBe(true);
+  });
+
+  it("does not invent a lighter warmup load when the stack's minimum equals the work weight", () => {
+    const machineExercise = { ...exercise, load: "selectorized" };
+    const result = getIntelligentWarmup(machineExercise, 0, [machineExercise], 2.5, "kg", "selectorized");
+    expect(result.type).toBe("skip");
+    expect(result.steps).toHaveLength(0);
+  });
+});
+
+
+describe("Standard commercial equipment midpoint defaults", () => {
+  it("uses consistent baseline assumptions for common commercial machines", () => {
+    expect(STANDARD_EQUIPMENT_DEFAULTS.olympicBarKg).toBe(20);
+    expect(STANDARD_EQUIPMENT_DEFAULTS.smithEffectiveBarKg).toBe(11);
+    expect(STANDARD_EQUIPMENT_DEFAULTS.standardStackPulleyRatio).toBe(1);
+    expect(STANDARD_EQUIPMENT_DEFAULTS.functionalTrainerPulleyRatio).toBe(2);
+    expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").leverageRatio).toBe(1);
+    expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").minHardwareStep).toBe(5);
+    expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").tareWeight).toBe(5);
+    expect(getDefaultMechanicalProfile("selectorized", "Life Fitness Chest Press").minHardwareStep).toBe(5);
+    expect(PLATE_LOADED_MACHINE_DEFAULTS.length).toBeGreaterThanOrEqual(10);
+    expect(getPlateLoadedMachineDefault("Life Fitness Plate Loaded Incline Press").startingResistanceKg).toBe(5);
+    expect(getPlateLoadedMachineDefault("Hammer Strength Iso-Lateral Wide Chest").startingResistanceKg).toBe(5);
+    expect(getPlateLoadedMachineDefault("Unlisted Plate-Loaded Machine").startingResistanceKg).toBeGreaterThan(0);
+    expect(PIN_LOADED_MACHINE_DEFAULTS.length).toBeGreaterThanOrEqual(6);
+    expect(getPinLoadedMachineDefault("Machine Chest Press").stackStepKg).toBe(5);
+    expect(getPinLoadedMachineDefault("Machine Chest Press").configuration).toBe("single-stack");
+    expect(getPinLoadedMachineDefault("One Arm Lat Pull Down").configuration).toBe("independent-arms");
+    expect(getDefaultMechanicalProfile("specialty", "Hack Squat").isPlateLoaded).toBe(true);
+  });
+
+  it("labels Hammer-style plate-loaded machine loads as plates per side", () => {
+    const profile: UserProfile = {
+      gender: "male", age: 28, heightCm: 180, weightKg: 80, expMonths: 24,
+      daysPerWeek: 4, goal: "hypertrophy", injuries: [], preferredWeightUnit: "kg",
+      updatedAt: new Date().toISOString(),
+    };
+    const result = calculatePrescriptionWeight("Hammer Strength Chest Press", "plate-loaded", "8 to 12", profile);
+    expect(result.hardwareLoadLabel).toBe("เพลตต่อข้าง");
+    expect(result.tareWeightKg).toBe(5);
+    expect(result.effectiveHardwareWeightKg).toBeGreaterThanOrEqual(5);
+    expect(result.displayNote).toContain("ต่อข้าง");
+    expect(result.displayNote).toContain("แรงต้านเริ่มต้นประมาณ");
+  });
+
+  it("uses 1:1 for common pulldown stacks and 2:1 for functional-trainer isolation cables", () => {
+    const pulldown = getDefaultMechanicalProfile("cable", "Lat Pulldown");
+    const curl = getDefaultMechanicalProfile("cable", "Cable Curl");
+    expect(pulldown.pulleyRatio).toBe(1);
+    expect(curl.pulleyRatio).toBe(2);
+  });
+
+  it("covers machine exercises in the library with automatic pin or plate defaults", () => {
+    const plateMachines = [
+      "Plate-Loaded Chest Press", "Iso-Lateral Chest Press", "Iso-Lateral Incline Press",
+      "Machine High Row", "Chest Supported T-Bar Row", "Iso-Lateral Low Row",
+      "Iso-Lateral Pulldown", "45° Leg Press", "45° Leg Press High Foot",
+      "Hack Squat", "Belt Squat", "Pendulum Squat", "V-Squat Machine", "Leg Press Calf Raise",
+    ];
+    for (const name of plateMachines) {
+      const load = ["Hack Squat", "Belt Squat", "Pendulum Squat", "V-Squat Machine"].includes(name) ? "specialty" : "plate-loaded";
+      const profile = getDefaultMechanicalProfile(load, name);
+      expect(profile.isPlateLoaded, name).toBe(true);
+      expect(profile.tareWeight, name).toBeGreaterThan(0);
+      expect(profile.minHardwareStep, name).toBeGreaterThan(0);
+    }
+
+    const pinMachines = [
+      "Machine Chest Press", "Pin-Loaded Chest Press", "Incline Machine Bench",
+      "Decline Machine Press", "Pec Deck", "Reverse Pec Deck", "Neutral Grip Lat Pull Down",
+      "Widegrip Lat Pull Down", "Assisted Pull Up Machine", "Leg Extension",
+      "Seated Hamstring Curl", "Lying Leg Curl", "Machine Hip Thrust",
+      "Machine Shoulder Press", "Machine Triceps Extension", "Machine Preacher Curl",
+      "Machine Abs Crunch", "Seated Calf Raise", "Standing Calf Raise",
+    ];
+    for (const name of pinMachines) {
+      const profile = getDefaultMechanicalProfile("selectorized", name);
+      expect(profile.minHardwareStep, name).toBe(5);
+      expect(profile.tareWeight, name).toBe(0);
+    }
+  });
+});
