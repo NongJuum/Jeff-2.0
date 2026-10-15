@@ -673,7 +673,7 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   if (name.includes("incline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "InclineMachinePress";
   if (name.includes("decline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "DeclineMachinePress";
   // rear delt before flye: "DB Rear Delt Flye" → RearDelt not Flye
-  if (name.includes("rear delt") || name.includes("face pull")) return "RearDelt";
+  if (name.includes("rear delt") || name.includes("face pull") || name.includes("reverse pec deck") || name.includes("reverse cable crossover")) return "RearDelt";
   if (name.includes("flye") || name.includes("crossover") || name.includes("pec deck")) return "Flye";
   if (name.includes("bench") || name.includes("chest press") || name.includes("dip")) return "Bench";
   if (name.includes("lat pull") || name.includes("pull up") || name.includes("pulldown") || name.includes("pullover")) return "LatPull";
