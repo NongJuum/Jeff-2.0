@@ -268,9 +268,7 @@ function ProgramSetupModal({
     );
   };
 
-  const isDayCountValid =
-    selectedDays.length === program.daysPerWeek ||
-    Math.abs(selectedDays.length - program.daysPerWeek) <= 1;
+  const isDayCountValid = selectedDays.length === program.daysPerWeek;
 
   const handleConfirm = () => {
     const state: ActiveJeffProgramState = {
@@ -326,10 +324,10 @@ function ProgramSetupModal({
               วันออกกำลังกาย
             </label>
             <p className="text-[11px] text-zinc-500 mb-3">
-              แนะนำ {program.daysPerWeek} วัน/สัปดาห์ — เลือก {selectedDays.length} วัน
+              ต้องเลือก {program.daysPerWeek} วัน/สัปดาห์ — เลือกอยู่ {selectedDays.length} วัน
               {!isDayCountValid && (
                 <span className="text-amber-400 ml-1">
-                  (แนะนำ {program.daysPerWeek} วัน)
+                  (ต้องเลือกให้ครบ {program.daysPerWeek} วัน)
                 </span>
               )}
             </p>
@@ -414,7 +412,8 @@ function ProgramSetupModal({
           </button>
           <button
             onClick={handleConfirm}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
+            disabled={!isDayCountValid || !startDate}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition disabled:cursor-not-allowed disabled:opacity-40`}
           >
             <Zap size={15} />
             เริ่มโปรแกรม!
