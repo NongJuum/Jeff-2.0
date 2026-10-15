@@ -661,7 +661,7 @@ export function quantizeToHardware(
       };
     }
 
-    const plateStepDisplay = isLbs ? 2.5 : Math.max(0.1, profile.minHardwareStep || 1.25);
+    const plateStepDisplay = isLbs ? 2.5 : Math.max(0.1, (profile.minHardwareStep || 2.5) / 2);
     const addedDisplay = Math.max(0, rawDisplay - tareDisplay);
     const platesPerSideDisplay = Math.floor((addedDisplay / 2 + 1e-9) / plateStepDisplay) * plateStepDisplay;
     const totalDisplay = tareDisplay + platesPerSideDisplay * 2;
