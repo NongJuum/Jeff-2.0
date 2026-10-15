@@ -3447,7 +3447,7 @@ export default function Page() {
 
   const isTodayScheduledRest = useMemo(() => {
     if (activeJeffProgram) {
-      return !jeffCalendarStatus?.isTrainingDay;
+      return isJeffProgramComplete(activeJeffProgram) || !jeffCalendarStatus?.isTrainingDay;
     }
     return !weeklySchedule[todayDayOfWeek];
   }, [activeJeffProgram, jeffCalendarStatus, weeklySchedule, todayDayOfWeek]);
@@ -4615,7 +4615,7 @@ export default function Page() {
         </div>
 
         {/* 1. Sticky Active Session Topbar (Hevy/Strong Style) */}
-        {["today", "preset", "custom"].includes(mode) && day && (
+        {["today", "preset", "custom"].includes(mode) && day && !(activeJeffProgram && isJeffProgramComplete(activeJeffProgram)) && (
           <div className="mt-2.5 pt-2 border-t border-zinc-800/80 mx-auto flex max-w-5xl items-center justify-between gap-3">
             {/* Left: Overview label / workout badge */}
             <div className="flex items-center gap-2">
@@ -5496,7 +5496,22 @@ export default function Page() {
           </details>
         )}
 
-        {(mode === "today" || mode === "preset" || mode === "custom") && day && (
+        {mode === "today" && activeJeffProgram && isJeffProgramComplete(activeJeffProgram) && (
+          <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center">
+            <p className="text-3xl mb-2">🏆</p>
+            <h3 className="text-lg font-black text-emerald-300">โปรแกรม Jeff Nippard เสร็จสมบูรณ์แล้ว</h3>
+            <p className="mt-1 text-sm text-zinc-400">ความคืบหน้าถูกบันทึกไว้แล้ว คุณสามารถเลือกโปรแกรมใหม่ได้จากเมนู Programs</p>
+            <button
+              type="button"
+              onClick={() => setMode("programs")}
+              className="mt-4 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-emerald-300"
+            >
+              เลือกโปรแกรมใหม่
+            </button>
+          </div>
+        )}
+
+        {(mode === "today" || mode === "preset" || mode === "custom") && day && !(activeJeffProgram && isJeffProgramComplete(activeJeffProgram)) && (
           <>
             {mode === "today" && isTodayScheduledRest && (
               <div className="mt-3 rounded-2xl border border-yellow-500/30 bg-gradient-to-r from-zinc-950 via-zinc-900 to-black p-4 shadow-xl">
