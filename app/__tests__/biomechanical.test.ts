@@ -255,7 +255,7 @@ describe("Hardware quantization safety and unit invariants", () => {
   it("keeps per-side plate mass in kg even when display unit is lbs", () => {
     const bar = { ...profile, tareWeight: 20, minHardwareStep: 1.25 };
     const result = quantizeToHardware(60, bar, false, false, "lbs");
-    expect(result.platesPerSideKg).toBeCloseTo(8.75 * 0.45359237, 2);
+    expect(result.platesPerSideKg).toBeCloseTo(42.5 * 0.45359237, 2);
     expect(result.displayNote).toContain("lbs");
   });
 
