@@ -19,7 +19,7 @@ export type OnboardingResult = {
   profile: UserProfile;
 };
 
-export const ONBOARDING_KEY = "haitOnboardingV1";
+export const ONBOARDING_KEY = "haitOnboardingV2";
 export const APP_LANGUAGE_KEY = "haitAppLanguageV1";
 export const FONT_SCALE_KEY = "haitFontScaleV1";
 
