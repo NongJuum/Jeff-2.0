@@ -206,16 +206,21 @@ export interface PlateLoadedMachineDefault {
  * These values are owned by the app, never required from the user.
  */
 export const PLATE_LOADED_MACHINE_DEFAULTS: PlateLoadedMachineDefault[] = [
+  // Named machine families in the exercise library. Values are per working arm
+  // for independent-arm machines, and total for bilateral sled/carriage machines.
   { aliases: ["life fitness plate loaded incline press", "life fitness incline press"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "manufacturer-spec" },
   { aliases: ["hammer strength iso-lateral wide chest", "hammer strength wide chest"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "manufacturer-spec" },
-  { aliases: ["45° leg press", "45 degree leg press", "linear leg press", "leg press"], startingResistanceKg: 50, perSide: false, plateStepKg: 10, source: "category-estimate" },
-  { aliases: ["hack squat", "v-squat", "pendulum squat"], startingResistanceKg: 25, perSide: false, plateStepKg: 10, source: "category-estimate" },
-  { aliases: ["calf raise", "standing calf"], startingResistanceKg: 15, perSide: false, plateStepKg: 10, source: "category-estimate" },
-  { aliases: ["shoulder press", "overhead press"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
-  { aliases: ["chest press", "bench press", "incline press", "decline press", "wide chest"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
-  { aliases: ["row", "high row", "low row", "pulldown", "pullover"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
-  { aliases: ["hip thrust", "glute drive"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
-  { aliases: ["leg extension", "leg curl", "hamstring curl"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["45° leg press high foot", "45 degree leg press high foot", "45° leg press", "45 degree leg press", "linear leg press", "leg press calf raise", "leg press"], startingResistanceKg: 50, perSide: false, plateStepKg: 10, source: "category-estimate" },
+  { aliases: ["hack squat", "v-squat machine", "v-squat", "pendulum squat"], startingResistanceKg: 25, perSide: false, plateStepKg: 10, source: "category-estimate" },
+  { aliases: ["belt squat"], startingResistanceKg: 15, perSide: false, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["standing calf raise", "seated calf raise", "calf raise"], startingResistanceKg: 15, perSide: false, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["iso-lateral incline press", "incline converging chest press", "incline machine bench"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["iso-lateral chest press", "plate-loaded chest press", "machine chest press", "pin-loaded chest press", "chest press", "bench press", "incline press", "decline press", "wide chest"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["machine high row", "chest supported t-bar row", "iso-lateral low row", "iso-lateral pulldown", "high row", "low row", "pulldown", "pullover", "row"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["machine hip thrust", "hip thrust", "glute drive"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["leg extension", "seated hamstring curl", "lying leg curl", "hamstring curl"], startingResistanceKg: 5, perSide: false, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["machine shoulder press", "shoulder press", "overhead press"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["atlantis machine lat raise", "machine lat raise", "reverse pec deck", "pec deck", "machine preacher curl", "machine triceps extension", "machine abs crunch", "machine hip abduction", "machine hip adduction"], startingResistanceKg: 0, perSide: false, plateStepKg: 5, source: "category-estimate" },
 ];
 
 export function getPlateLoadedMachineDefault(exerciseName: string, machineTag = ""): PlateLoadedMachineDefault {
