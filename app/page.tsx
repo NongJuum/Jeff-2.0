@@ -2851,7 +2851,7 @@ export default function Page() {
   const [historyRange, setHistoryRange] = useState<"all" | "30d" | "14d">("all");
   const [machineTags, setMachineTags] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_TAGS_KEY, {}));
   const [machineStartingResistances, setMachineStartingResistances] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_STARTING_RESISTANCES_KEY, {}));
-  const [pulleyRatios, setPulleyRatios] = useState<Record<string, "1" | "2" | "3">>(() => readJson<Record<string, "1" | "2" | "3">(PULLEY_RATIOS_KEY, {}));
+  const [pulleyRatios, setPulleyRatios] = useState<Record<string, "1" | "2" | "3">>(() => readJson<Record<string, "1" | "2" | "3">>(PULLEY_RATIOS_KEY, {}));
   const [favoriteMachines, setFavoriteMachines] = useState<Record<string, string>>(() => readJson<Record<string, string>>(FAVORITE_MACHINES_KEY, {}));
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
   const [restTimer, setRestTimer] = useState<RestTimerState>(() => {
