@@ -5938,6 +5938,7 @@ export default function Page() {
                   ? mapMachineVariantToLoad(currentMachine, exercise.load)
                   : (exercise.load || getLoadType(exercise));
                 const effectiveKey = getEffectiveExerciseKey(exercise.name, currentMachine);
+                 const machineResistanceKey = `${baseExercise.id}::${currentMachine || "default"}`;
                 const records = recordsMap[effectiveKey] ?? (currentMachine ? {} : recordsMap[exercise.name]) ?? {};
                 const pr = records.maxWeight ?? prMap[effectiveKey] ?? (currentMachine ? undefined : prMap[exercise.name]);
                 const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
@@ -5957,7 +5958,7 @@ export default function Page() {
       const muscleMode = userProfile.muscleMassMode ?? "smm";
       const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
       const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined, undefined, machineStartingResistances[baseExercise.id]?.trim() ? Number(machineStartingResistances[baseExercise.id]) : undefined);
+      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined, undefined, machineStartingResistances[machineResistanceKey]?.trim() ? Number(machineStartingResistances[machineResistanceKey]) : undefined);
       return effectiveUnit === "lbs"
         ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
         : bioRes.hardwareWeightKg;
@@ -6208,12 +6209,12 @@ export default function Page() {
                             max="1000"
                             step="0.5"
                             inputMode="decimal"
-                            value={machineStartingResistances[baseExercise.id] ?? ""}
-                            onChange={(e) => updateMachineStartingResistance(baseExercise.id, e.target.value)}
+                            value={machineStartingResistances[machineResistanceKey] ?? ""}
+                            onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)
                             placeholder="ไม่ทราบ? ใช้ค่าประมาณของแอป"
                             className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-100 outline-none focus:border-yellow-400"
                           />
-                          <p className="text-[10px] leading-relaxed text-zinc-500">เว้นว่างเพื่อใช้ค่าประมาณมาตรฐานของแอป หรือกรอกแรงต้านเริ่มต้นจริงของเครื่องนี้ ระบบจะจำค่าไว้สำหรับท่านี้</p>
+                          <p className="text-[10px] leading-relaxed text-zinc-500">เว้นว่างเพื่อใช้ค่าประมาณมาตรฐานของแอป หรือกรอกแรงต้านเริ่มต้นจริงของเครื่องนี้ ระบบจะจำค่าแยกตามเครื่องที่เลือก</p>
                         </div>
                       )}
 
@@ -6371,7 +6372,7 @@ export default function Page() {
                             const muscleMode = userProfile.muscleMassMode ?? "smm";
                             const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
                             const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined, undefined, machineStartingResistances[baseExercise.id]?.trim() ? Number(machineStartingResistances[baseExercise.id]) : undefined);
+                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined, undefined, machineStartingResistances[machineResistanceKey]?.trim() ? Number(machineStartingResistances[machineResistanceKey]) : undefined);
                             return effectiveUnit === "lbs"
                               ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
                               : bioRes.hardwareWeightKg;
