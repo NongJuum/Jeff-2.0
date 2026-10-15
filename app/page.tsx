@@ -2028,7 +2028,7 @@ function WeeklyPerformanceMiniChart({ trends }: { trends: WeeklyTrendPoint[] }) 
   );
 }
 
-function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
+function WeeklyPerformanceCard({ report, isProgramBased = false, language = "th" }: { report: PerformanceReport; isProgramBased?: boolean; language?: AppLanguage }) {
   return (
     <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -2049,7 +2049,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
       </div>
 
       {/* Fatigue Warning Banner */}
-      {report.fatigueWarning && (
+      {!isProgramBased && report.fatigueWarning && (
         <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-400/50 bg-amber-950/40 p-2.5 text-xs text-amber-200">
           <span className="text-base shrink-0">⚠️</span>
           <div>
@@ -2062,7 +2062,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
       )}
 
       {/* Deload Week Suggestion */}
-      {report.deloadSuggestion && (
+      {!isProgramBased && report.deloadSuggestion && (
         <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-sky-400/50 bg-sky-950/40 p-2.5 text-xs text-sky-200">
           <span className="text-base shrink-0">🔄</span>
           <div>
@@ -2076,18 +2076,30 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
 
       {report.hasData && (
         <>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            <ScoreBar label="Strength ↑" value={report.progress} />
-            <ScoreBar label="Volume" value={report.volume} />
-            <ScoreBar label="Consistency" value={report.consistency} />
-            <ScoreBar label="Completion" value={report.completion} />
-            <ScoreBar label="Recovery 😴" value={report.recovery} />
-            <ScoreBar label="Streak 🔥" value={report.streakBonus} />
-          </div>
+          {isProgramBased ? (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-2.5">
+                <ScoreBar label={language === "th" ? "ทำตามแผนสัปดาห์นี้" : "Weekly adherence"} value={report.consistency} />
+                <ScoreBar label={language === "th" ? "ความคืบหน้าทั้งโปรแกรม" : "Program progress"} value={report.progress} />
+              </div>
+              <p className="mt-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+                {language === "th" ? "คะแนนโปรแกรมคำนวณจากการทำเซสชันตามแผนรายสัปดาห์ 70% และความคืบหน้ารวมของโปรแกรม 30% โดยใช้จำนวนวันฝึกและระยะเวลาของโปรแกรมที่เลือก" : "Program score = 70% weekly session adherence + 30% overall program progress, using the selected program's training frequency and duration."}
+              </p>
+            </>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <ScoreBar label="Strength ↑" value={report.progress} />
+              <ScoreBar label="Volume" value={report.volume} />
+              <ScoreBar label="Consistency" value={report.consistency} />
+              <ScoreBar label="Completion" value={report.completion} />
+              <ScoreBar label="Recovery 😴" value={report.recovery} />
+              <ScoreBar label="Streak 🔥" value={report.streakBonus} />
+            </div>
+          )}
 
-          <WeeklyPerformanceMiniChart trends={report.weeklyTrends} />
+          {!isProgramBased && <WeeklyPerformanceMiniChart trends={report.weeklyTrends} />}
 
-          <div className="mt-3 space-y-2">
+          {!isProgramBased && <div className="mt-3 space-y-2">
             {report.challenges.map((c) => (
               <div
                 key={c.name}
@@ -2097,7 +2109,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
                 <span className="text-[10px] font-black">{c.progress}</span>
               </div>
             ))}
-          </div>
+          </div>}
         </>
       )}
 
@@ -7187,7 +7199,7 @@ export default function Page() {
             <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
               {/* Section A: Performance Card */}
               <div>
-                <WeeklyPerformanceCard report={performanceReport} />
+                <WeeklyPerformanceCard report={performanceReport} isProgramBased={Boolean(activeJeffProgram)} language={appLanguage} />
               </div>
 
               {/* Section B: Scoring Methodology */}
