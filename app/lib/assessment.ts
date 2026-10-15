@@ -680,9 +680,7 @@ export function quantizeToHardware(
   }
 
   // Machines, cable stacks and dumbbells: round DOWN to avoid recommending more than the target.
-  const minimumDisplay = isIsolation
-    ? (isLbs ? 5 : Math.max(2.5, Math.min(step, 2.5)))
-    : step;
+  const minimumDisplay = Math.max(step, isIsolation ? (isLbs ? 5 : 2.5) : step);
   const snappedDisplay = Math.max(minimumDisplay, Math.floor((rawDisplay + 1e-9) / step) * step);
   const actualKg = Math.round(toKg(snappedDisplay) * 10) / 10;
   const exceeds = actualKg > safeRawKg + 0.05;
@@ -905,11 +903,20 @@ export function getIntelligentWarmup(
     movement.includes("pressdown") ||
     movement.includes("ext");
 
-  if (!currentExercise.warmup || isIsolation || workingWeight <= 0) {
+  if (!currentExercise.warmup || workingWeight <= 0) {
     return {
       type: "skip",
-      headline: "พร้อมเริ่มเซตจริงได้ทันที",
-      note: "ท่า Isolation มักไม่ต้องวอร์มหลายเซต แต่ควรเริ่มด้วยน้ำหนักเบาและเพิ่มโหลดเมื่อฟอร์ม/ข้อต่อพร้อม หากมีอาการเจ็บให้หยุดและอย่าฝืน",
+      headline: "ไม่ต้องเพิ่มเซตวอร์มตามแผน",
+      note: "เริ่มด้วยเซตเบาและควบคุมฟอร์มก่อนเพิ่มโหลด หากมีอาการเจ็บให้หยุดและอย่าฝืน",
+      steps: [],
+    };
+  }
+
+  if (isIsolation) {
+    return {
+      type: "skip",
+      headline: "ท่า Isolation: วอร์มตามความพร้อม",
+      note: "โดยทั่วไปไม่จำเป็นต้องวอร์มหลายเซต แต่ควรเริ่มเบาและค่อยเพิ่มโหลด หากข้อต่อไม่พร้อมหรือมีอาการเจ็บ ให้หยุดและอย่าฝืน",
       steps: [],
     };
   }
@@ -928,6 +935,14 @@ export function getIntelligentWarmup(
 
   const step = effectiveUnit === "kg" ? 2.5 : 5;
   const snap = (w: number) => Math.max(step, Math.floor((Math.max(0, w) + 1e-9) / step) * step);
+  if (workingWeight <= step) {
+    return {
+      type: "skip",
+      headline: "ไม่มีโหลดเบาพอสำหรับเซตวอร์ม",
+      note: "ขั้นน้ำหนักต่ำสุดเท่ากับหรือสูงกว่าน้ำหนักทำงานแล้ว อย่าเพิ่มโหลดเพื่อวอร์ม ให้เริ่มเบาอย่างระมัดระวังหรือเลือกอุปกรณ์ที่ปรับได้ละเอียดกว่า",
+      steps: [],
+    };
+  }
 
   if (hasPriorCompoundSameMuscle) {
     return {
@@ -980,17 +995,34 @@ export function getIntelligentWarmup(
     };
   }
 
-  // Barbell compound warmups
-  if (isBarbell && workingWeight > barWeight * 1.3) {
-    steps.push({ label: "W1 (คานเปล่า)", weight: barWeight, reps: "8–10", note: "เปิดข้อต่อ" });
-  } else {
-    steps.push({ label: "W1", weight: snap(workingWeight * 0.4), reps: "8–10", note: "หมุนเวียนเลือด" });
+  // Barbell compound warmups must never prescribe a total load below the bar's tare.
+  if (isBarbell && workingWeight < barWeight) {
+    return {
+      type: "skip",
+      headline: "น้ำหนักทำงานต่ำกว่าคานเปล่า",
+      note: "คานเปล่าหนักกว่าค่าที่คำนวณไว้ เลือกบาร์ที่เบากว่าหรืออุปกรณ์อื่น อย่าฝืนใช้คานมาตรฐาน",
+      steps: [],
+    };
   }
-  steps.push({ label: "W2", weight: snap(workingWeight * 0.6), reps: "5–6", note: "ปรับฟอร์ม" });
-  steps.push({ label: "W3", weight: snap(workingWeight * 0.8), reps: "2–3", note: "กระตุ้น CNS" });
 
-  if (workingWeight >= (effectiveUnit === "kg" ? 75 : 165)) {
-    steps.push({ label: "W4", weight: snap(workingWeight * 0.9), reps: "1", note: "จับแรงต้านจริง" });
+  if (isBarbell) {
+    steps.push({ label: "W1 (คานเปล่า)", weight: barWeight, reps: "5–8", note: "คานเปล่าเพื่อเช็กฟอร์ม" });
+    if (workingWeight > barWeight * 1.3) {
+      const w2 = Math.min(workingWeight, Math.max(barWeight, snap(workingWeight * 0.6)));
+      const w3 = Math.min(workingWeight, Math.max(barWeight, snap(workingWeight * 0.8)));
+      if (w2 > barWeight) steps.push({ label: "W2", weight: w2, reps: "5–6", note: "ปรับฟอร์ม" });
+      if (w3 > w2) steps.push({ label: "W3", weight: w3, reps: "2–3", note: "เตรียมก่อนเซตทำงาน" });
+      if (workingWeight >= (effectiveUnit === "kg" ? 75 : 165)) {
+        const w4 = Math.min(workingWeight, Math.max(barWeight, snap(workingWeight * 0.9)));
+        if (w4 > w3) steps.push({ label: "W4", weight: w4, reps: "1", note: "เช็กความพร้อมด้วยโหลดใกล้เคียง" });
+      }
+    }
+  } else {
+    steps.push({ label: "W1", weight: Math.min(workingWeight, snap(workingWeight * 0.4)), reps: "8–10", note: "หมุนเวียนเลือด" });
+    const w2 = Math.min(workingWeight, snap(workingWeight * 0.6));
+    const w3 = Math.min(workingWeight, snap(workingWeight * 0.8));
+    if (w2 > steps[0].weight) steps.push({ label: "W2", weight: w2, reps: "5–6", note: "ปรับฟอร์ม" });
+    if (w3 > (steps[steps.length - 1]?.weight ?? 0)) steps.push({ label: "W3", weight: w3, reps: "2–3", note: "เตรียมก่อนเซตทำงาน" });
   }
 
   return {
