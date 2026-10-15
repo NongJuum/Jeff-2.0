@@ -1353,23 +1353,29 @@ export function getProgramCurrentWeek(state: ActiveJeffProgramState): JeffProgra
   return matchedWeek;
 }
 
+export function getProgramDateKey(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function getProgramScheduledDates(
   startDate: string,
   scheduleDays: number[],
   totalWeeks: number
 ): string[] {
   const dates: string[] = [];
-  const start = new Date(startDate);
+  // Parse at local noon to avoid UTC date shifts around midnight and DST boundaries.
+  const start = new Date(`${startDate}T12:00:00`);
+  if (!Number.isFinite(start.getTime()) || totalWeeks <= 0) return dates;
   const end = new Date(start);
   end.setDate(end.getDate() + totalWeeks * 7);
 
   const current = new Date(start);
   while (current < end) {
-    // getDay() returns 0=Sun, 1=Mon...6=Sat; Mon=0 format:
-    const dayOfWeek = (current.getDay() + 6) % 7;
-    if (scheduleDays.includes(dayOfWeek)) {
-      dates.push(current.toISOString().split("T")[0]);
-    }
+    const dayOfWeek = (current.getDay() + 6) % 7; // Mon=0 ... Sun=6
+    if (scheduleDays.includes(dayOfWeek)) dates.push(getProgramDateKey(current));
     current.setDate(current.getDate() + 1);
   }
   return dates;
@@ -1384,20 +1390,18 @@ export function resolveProgramDayForDate(
   state: ActiveJeffProgramState,
   date: Date = new Date()
 ): { isTrainingDay: boolean; scheduledDayIndex: number; isCompleted: boolean; dateKey: string } {
-  const dateKey = date.toISOString().split("T")[0];
+  const dateKey = getProgramDateKey(date);
   const dayOfWeek0to6 = (date.getDay() + 6) % 7; // Mon=0 ... Sun=6
-
-  const sortedSchedule = [...state.scheduleDays].sort((a, b) => a - b);
-  const scheduleIndex = sortedSchedule.indexOf(dayOfWeek0to6);
-
-  const isTrainingDay = scheduleIndex !== -1;
+  const scheduleDays = Array.isArray(state.scheduleDays) ? state.scheduleDays : [];
+  const isAfterStartDate = !state.startDate || dateKey >= state.startDate;
+  const isTrainingDay = isAfterStartDate && scheduleDays.includes(dayOfWeek0to6);
   const isCompleted = state.completedDays.includes(dateKey);
 
-  // If it's a scheduled training day, map it to the corresponding day in the week
-  // Otherwise default to currentDayIndex so the user can inspect or workout anyway
-  const scheduledDayIndex = isTrainingDay
-    ? (scheduleIndex % (findProgramById(state.programId)?.daysPerWeek || sortedSchedule.length || 1))
-    : state.currentDayIndex;
+  // Calendar decides whether today is a training day; workout progression stays sequential.
+  // Never map Monday back to Day 1 every week: currentDayIndex advances only on completion.
+  const weekData = getProgramCurrentWeek(state);
+  const dayCount = weekData?.days.length || 1;
+  const scheduledDayIndex = Math.max(0, Math.min(state.currentDayIndex || 0, dayCount - 1));
 
   return {
     isTrainingDay,
@@ -1415,13 +1419,13 @@ export function advanceJeffProgramAfterFinish(
   currentState: ActiveJeffProgramState,
   completedDateKey: string
 ): ActiveJeffProgramState {
+  // A duplicate Finish action on the same local date must not advance twice.
+  if (currentState.completedDays.includes(completedDateKey)) return currentState;
+
   const program = findProgramById(currentState.programId);
   const weekData = getProgramCurrentWeek(currentState);
   const totalDaysInWeek = weekData?.days.length || currentState.scheduleDays.length || 4;
-
-  const updatedCompleted = currentState.completedDays.includes(completedDateKey)
-    ? currentState.completedDays
-    : [...currentState.completedDays, completedDateKey];
+  const updatedCompleted = [...currentState.completedDays, completedDateKey];
 
   let nextDayIdx = currentState.currentDayIndex + 1;
   let nextWeek = currentState.currentWeek;
