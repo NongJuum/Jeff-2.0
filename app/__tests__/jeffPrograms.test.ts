@@ -8,6 +8,8 @@ import {
   isJeffProgramComplete,
   type ActiveJeffProgramState,
 } from "../lib/jeffPrograms";
+import { getExerciseDisplayName } from "../components/JeffProgramPicker";
+
 
 describe("Jeff Nippard Calendar Schedule & Program Progression", () => {
   const mockProgram = findProgramById("fundamentals_full_body");
@@ -144,4 +146,22 @@ describe("Jeff Nippard Calendar Schedule & Program Progression", () => {
     expect(recsWithBackInjury.length).toBeGreaterThan(0);
     expect(recsWithBackInjury[0].program.id).not.toBe("powerbuilding_3_0");
   });
+
+  it("preserves standard English exercise names across Thai and English UI", () => {
+    const sampleExercises = [
+      "Seated Calf Raise",
+      "45° Leg Press",
+      "Hammer Strength Chest Press",
+      "Cable Lat Pulldown",
+      "Romanian Deadlift",
+      "Bulgarian Split Squat",
+      "Pec Deck Fly",
+    ];
+
+    sampleExercises.forEach((name) => {
+      expect(getExerciseDisplayName(name, "th")).toBe(name);
+      expect(getExerciseDisplayName(name, "en")).toBe(name);
+    });
+  });
 });
+
