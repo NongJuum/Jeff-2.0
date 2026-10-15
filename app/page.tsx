@@ -181,6 +181,7 @@ const REST_TIMER_KEY = "haitRestTimerV1";
 const PERMANENT_RECORDS_KEY = "haitPermanentRecordsV1";
 const LEGACY_STATS_KEY = "trainingStatsV2";
 const MACHINE_TAGS_KEY = "haitMachineTagsV1";
+const MACHINE_STARTING_RESISTANCES_KEY = "haitMachineStartingResistancesV1";
 const PULLEY_RATIOS_KEY = "haitPulleyRatiosV1";
 const FAVORITE_MACHINES_KEY = "haitFavoriteMachinesV1";
 const PRESET_SETS_KEY = "haitPresetSetsV1";
@@ -2849,7 +2850,8 @@ export default function Page() {
   const [recordsMap, setRecordsMap] = useState<Record<string, ExerciseRecords>>(() => loadPermanentRecords());
   const [historyRange, setHistoryRange] = useState<"all" | "30d" | "14d">("all");
   const [machineTags, setMachineTags] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_TAGS_KEY, {}));
-  const [pulleyRatios, setPulleyRatios] = useState<Record<string, "1" | "2" | "3">>(() => readJson<Record<string, "1" | "2" | "3">>(PULLEY_RATIOS_KEY, {}));
+  const [machineStartingResistances, setMachineStartingResistances] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_STARTING_RESISTANCES_KEY, {}));
+  const [pulleyRatios, setPulleyRatios] = useState<Record<string, "1" | "2" | "3">>(() => readJson<Record<string, "1" | "2" | "3">(PULLEY_RATIOS_KEY, {}));
   const [favoriteMachines, setFavoriteMachines] = useState<Record<string, string>>(() => readJson<Record<string, string>>(FAVORITE_MACHINES_KEY, {}));
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
   const [restTimer, setRestTimer] = useState<RestTimerState>(() => {
@@ -3568,6 +3570,7 @@ export default function Page() {
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
   useEffect(() => writeLocalJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
   useEffect(() => writeLocalJson(MACHINE_TAGS_KEY, machineTags), [machineTags]);
+  useEffect(() => writeLocalJson(MACHINE_STARTING_RESISTANCES_KEY, machineStartingResistances), [machineStartingResistances]);
   useEffect(() => writeLocalJson(PULLEY_RATIOS_KEY, pulleyRatios), [pulleyRatios]);
   useEffect(() => writeLocalJson(PRESET_SETS_KEY, presetSetsMap), [presetSetsMap]);
   useEffect(() => {
@@ -3639,6 +3642,16 @@ export default function Page() {
     setMachineTags((old) => {
       const next = { ...old, [exerciseId]: tag };
       writeLocalJson(MACHINE_TAGS_KEY, next);
+      return next;
+    });
+  }
+
+  function updateMachineStartingResistance(exerciseId: string, value: string) {
+    setMachineStartingResistances((old) => {
+      const next = { ...old };
+      if (value.trim() === "") delete next[exerciseId];
+      else next[exerciseId] = value;
+      writeLocalJson(MACHINE_STARTING_RESISTANCES_KEY, next);
       return next;
     });
   }
@@ -5944,7 +5957,7 @@ export default function Page() {
       const muscleMode = userProfile.muscleMassMode ?? "smm";
       const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
       const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined);
+      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined, undefined, machineStartingResistances[baseExercise.id]?.trim() ? Number(machineStartingResistances[baseExercise.id]) : undefined);
       return effectiveUnit === "lbs"
         ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
         : bioRes.hardwareWeightKg;
@@ -6184,6 +6197,26 @@ export default function Page() {
                         </div>
                       </div>
 
+                      {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "plate-loaded" || (currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "specialty") && (
+                        <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2">
+                          <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>แรงต้านเริ่มต้นของเครื่อง (kg) ถ้าทราบ</label>
+                          <input
+                            id={`machine-start-resistance-${baseExercise.id}`}
+                            aria-label="แรงต้านเริ่มต้นของเครื่อง (kg)"
+                            type="number"
+                            min="0"
+                            max="1000"
+                            step="0.5"
+                            inputMode="decimal"
+                            value={machineStartingResistances[baseExercise.id] ?? ""}
+                            onChange={(e) => updateMachineStartingResistance(baseExercise.id, e.target.value)}
+                            placeholder="ไม่ทราบ? ใช้ค่าประมาณของแอป"
+                            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-100 outline-none focus:border-yellow-400"
+                          />
+                          <p className="text-[10px] leading-relaxed text-zinc-500">เว้นว่างเพื่อใช้ค่าประมาณมาตรฐานของแอป หรือกรอกแรงต้านเริ่มต้นจริงของเครื่องนี้ ระบบจะจำค่าไว้สำหรับท่านี้</p>
+                        </div>
+                      )}
+
                       {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "cable") && (
                         <div className="flex items-center gap-2 min-w-0 w-full">
                           <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">อัตราทดรอก:</span>
@@ -6338,7 +6371,7 @@ export default function Page() {
                             const muscleMode = userProfile.muscleMassMode ?? "smm";
                             const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
                             const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined);
+                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined, undefined, machineStartingResistances[baseExercise.id]?.trim() ? Number(machineStartingResistances[baseExercise.id]) : undefined);
                             return effectiveUnit === "lbs"
                               ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
                               : bioRes.hardwareWeightKg;
