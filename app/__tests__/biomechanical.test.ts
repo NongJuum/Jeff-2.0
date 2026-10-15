@@ -7,6 +7,7 @@ import {
   getExerciseStrengthCategory,
   getIntelligentWarmup,
   STANDARD_EQUIPMENT_DEFAULTS,
+  STRENGTH_RATIOS,
   PLATE_LOADED_MACHINE_DEFAULTS,
   getPlateLoadedMachineDefault,
   getPinLoadedMachineDefault,
