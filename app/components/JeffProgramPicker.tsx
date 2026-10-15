@@ -41,8 +41,25 @@ import {
 } from "../lib/jeffPrograms";
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getUserProfile } from "../lib/assessment";
+import type { AppLanguage } from "./OnboardingWizard";
 
 const DAY_LABELS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
+
+const PROGRAM_THAI_COPY: Record<string, { description: string; focus: string; benefit: string; difficulty: string }> = {
+  fundamentals_full_body: { description: "ฝึกกล้ามเนื้อทั่วร่างกาย 3 วันต่อสัปดาห์", focus: "พื้นฐานท่าหลักและเพิ่มกล้ามเนื้อทั่วร่างกาย", benefit: "สร้างพื้นฐานที่ดี ฝึกทักษะสม่ำเสมอ และเพิ่มปริมาณฝึกอย่างเป็นระบบ", difficulty: "เริ่มต้นถึงปานกลาง" },
+  fundamentals_upper_lower: { description: "แบ่งวันฝึกช่วงบนและช่วงล่าง", focus: "เพิ่มกล้ามเนื้อด้วยการแบ่ง Upper/Lower", benefit: "กระจายปริมาณฝึกได้ดีและมีเวลาฟื้นตัวระหว่างกลุ่มกล้ามเนื้อ", difficulty: "ปานกลาง" },
+  fundamentals_bodypart: { description: "แยกฝึกตามกลุ่มกล้ามเนื้อ", focus: "เน้นรายละเอียดและปริมาณฝึกของแต่ละกลุ่มกล้าม", benefit: "เหมาะกับผู้ที่ต้องการจัดปริมาณฝึกเป็นรายกลุ่มกล้ามเนื้อ", difficulty: "ปานกลางถึงสูง" },
+  powerbuilding_30: { description: "ผสมการเพิ่มแรงกับการสร้างกล้ามเนื้อ", focus: "Squat, Bench Press, Deadlift และท่าเสริม", benefit: "พัฒนาความแข็งแรงควบคู่กับขนาดกล้ามเนื้อด้วยการแบ่งช่วงฝึก", difficulty: "สูง" },
+  comeback_ppl: { description: "กลับมาฝึกหลังหยุดพัก ด้วย Push/Pull/Legs", focus: "ค่อย ๆ เพิ่มความหนักและปริมาณฝึกกลับสู่ระดับเดิม", benefit: "ช่วยกลับเข้าสู่กิจวัตรโดยไม่เริ่มด้วยความหนักเต็มทันที", difficulty: "ปานกลางถึงสูง" },
+  comeback_upper_lower: { description: "โปรแกรมกลับมาฝึกแบบ Upper/Lower 4 วัน", focus: "ฟื้นจังหวะฝึกช่วงบนและช่วงล่าง", benefit: "เหมาะกับผู้ที่กลับมาฝึกและต้องการฝึก 4 วันต่อสัปดาห์", difficulty: "ปานกลาง" },
+  essentials_3x: { description: "ท่าหลักที่จำเป็น ฝึก 3 วันต่อสัปดาห์", focus: "ท่าคุ้มค่า ครอบคลุมกล้ามเนื้อหลัก", benefit: "ประหยัดเวลาและรักษาความสม่ำเสมอได้ง่าย", difficulty: "เริ่มต้นถึงปานกลาง" },
+  pure_bodybuilding_p2: { description: "โปรแกรมเพาะกายที่เน้นปริมาณและรายละเอียด", focus: "สร้างกล้ามเนื้อหลายกลุ่มด้วยการจัดปริมาณฝึกสูง", benefit: "เหมาะกับผู้มีพื้นฐานที่ต้องการเพิ่มรายละเอียดและปริมาณฝึก", difficulty: "สูง" },
+  bb_transformation_beginner: { description: "ระบบเริ่มต้นสร้างพื้นฐานการเพาะกาย", focus: "เรียนรู้รูปแบบการเคลื่อนไหวและสร้างแรงพื้นฐาน", benefit: "มีโครงสร้างชัดเจนสำหรับเริ่มฝึกอย่างเป็นระบบ", difficulty: "เริ่มต้น" },
+  bb_transformation_int_adv: { description: "ระบบสร้างกล้ามเนื้อสำหรับผู้มีประสบการณ์", focus: "พัฒนากล้ามเนื้อด้วยโปรแกรมที่ซับซ้อนขึ้น", benefit: "ต่อยอดจากพื้นฐานด้วยการวางแผนฝึกระดับกลางถึงสูง", difficulty: "สูง" },
+  card_workout: { description: "ฝึกด้วยน้ำหนักตัวโดยไม่ต้องใช้อุปกรณ์มาก", focus: "ท่าพื้นฐานช่วงบน ช่วงล่าง และ Full Body", benefit: "ฝึกที่บ้านหรือพื้นที่จำกัดได้สะดวก", difficulty: "ปรับได้ตามระดับ" },
+  muscle_ladder: { description: "เรียนรู้หลักการสร้างกล้ามเนื้อแบบเป็นขั้น", focus: "หลักการฝึกที่มีหลักฐานรองรับและการเพิ่มความก้าวหน้า", benefit: "ช่วยทำความเข้าใจการฝึกและนำหลักการไปปรับใช้ระยะยาว", difficulty: "ปานกลางถึงสูง" },
+};
+
 const DAY_FULL_LABELS = ["จันทร์", "อังคาร", "พุธ", "พฤหัสฯ", "ศุกร์", "เสาร์", "อาทิตย์"];
 const SPLIT_LABELS: Record<string, string> = {
   full_body: "Full Body",
@@ -76,13 +93,16 @@ function ProgramCard({
   recommendation,
   onSelect,
   isActive,
+  language = "th",
 }: {
   program: JeffProgram;
   recommendation?: ProgramRecommendation;
   onSelect: (p: JeffProgram) => void;
   isActive?: boolean;
+  language?: AppLanguage;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const thaiCopy = PROGRAM_THAI_COPY[program.id];
 
   return (
     <div
@@ -126,7 +146,7 @@ function ProgramCard({
           </div>
           <div className="min-w-0 flex-1 pr-16">
             <h3 className="font-black text-white leading-tight">{program.name}</h3>
-            <p className="mt-0.5 text-xs text-zinc-400">{program.description}</p>
+            <p className="mt-0.5 text-xs text-zinc-400">{language === "th" ? thaiCopy?.description ?? program.description : program.description}</p>
           </div>
         </div>
 
@@ -187,9 +207,15 @@ function ProgramCard({
 
         {expanded && (
           <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2 text-xs text-zinc-400">
-            <p>{program.longDescription}</p>
+            <p>{language === "th" && thaiCopy ? thaiCopy.benefit : program.longDescription}</p>
+            {language === "th" && thaiCopy && (
+              <div className="space-y-1.5">
+                <p><span className="font-bold text-zinc-200">เน้น:</span> {thaiCopy.focus}</p>
+                <p><span className="font-bold text-zinc-200">ระดับความยาก:</span> {thaiCopy.difficulty}</p>
+              </div>
+            )}
             <div className="mt-2">
-              <p className="text-[10px] font-bold uppercase text-zinc-500 mb-1">Highlights</p>
+              <p className="text-[10px] font-bold uppercase text-zinc-500 mb-1">{language === "th" ? "จุดเด่นของโปรแกรม" : "Highlights"}</p>
               {program.highlights.map((h, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-zinc-300">
                   <Sparkles size={9} className="text-yellow-400" />
@@ -198,21 +224,21 @@ function ProgramCard({
               ))}
             </div>
             <div className="mt-2">
-              <span className="text-[10px] font-bold uppercase text-emerald-500">✓ Best for: </span>
+              <span className="text-[10px] font-bold uppercase text-emerald-500">✓ {language === "th" ? "เหมาะกับ:" : "Best for:"} </span>
               <span className="text-zinc-300">{program.bestFor}</span>
             </div>
             {program.notFor && (
               <div>
-                <span className="text-[10px] font-bold uppercase text-red-500">✗ Not for: </span>
+                <span className="text-[10px] font-bold uppercase text-red-500">✗ {language === "th" ? "ไม่เหมาะกับ:" : "Not for:"} </span>
                 <span className="text-zinc-300">{program.notFor}</span>
               </div>
             )}
             <div>
-              <span className="text-[10px] font-bold uppercase text-zinc-500">Equipment: </span>
+              <span className="text-[10px] font-bold uppercase text-zinc-500">{language === "th" ? "อุปกรณ์:" : "Equipment:"} </span>
               <span className="text-zinc-300">{EQUIPMENT_LABELS[program.equipment]}</span>
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase text-zinc-500">Goal: </span>
+              <span className="text-[10px] font-bold uppercase text-zinc-500">{language === "th" ? "เป้าหมาย:" : "Goal:"} </span>
               <span className="text-zinc-300">{program.goals.map((g) => GOAL_LABELS[g]).join(", ")}</span>
             </div>
           </div>
@@ -547,10 +573,12 @@ export function JeffProgramPicker({
   onProgramActivated,
   onProgramStopped,
   onClose,
+  language = "th",
 }: {
   onProgramActivated: (state: ActiveJeffProgramState) => void;
   onProgramStopped: () => void;
   onClose?: () => void;
+  language?: AppLanguage;
 }) {
   const [filter, setFilter] = useState<"recommended" | "all" | "beginner" | "intermediate" | "advanced">("recommended");
   const [setupProgram, setSetupProgram] = useState<JeffProgram | null>(null);
@@ -630,10 +658,10 @@ export function JeffProgramPicker({
         <div>
           <h2 className="text-lg font-black text-white flex items-center gap-2">
             <BookOpen size={18} className="text-yellow-400" />
-            Jeff Nippard Programs
+            {language === "th" ? "โปรแกรมฝึก Jeff Nippard" : "Jeff Nippard Programs"}
           </h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            {JEFF_PROGRAMS.length} โปรแกรมจาก PDF ทั้งหมด
+            {JEFF_PROGRAMS.length} {language === "th" ? "โปรแกรมให้เลือก" : "programs available"}
           </p>
         </div>
         {onClose && (
@@ -739,6 +767,7 @@ export function JeffProgramPicker({
               recommendation={recommendation}
               onSelect={handleSelectProgram}
               isActive={activeState?.programId === program.id}
+              language={language}
             />
           ))
         )}
