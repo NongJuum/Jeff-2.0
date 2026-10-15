@@ -802,15 +802,22 @@ export function quantizeToHardware(
     const platesKg = toKg(snappedPlatesDisplay);
     const effectiveKg = toKg(effectiveDisplay);
     const exceeds = effectiveKg > safeRawKg + 0.05;
-    const plateLabel = profile.isPerHand ? "ต่อข้าง" : "รวมทั้งหมด";
-    const startLabel = profile.isPerHand ? "ต่อข้าง" : "รวม";
-    const note = snappedPlatesDisplay > 0
-      ? `ใส่เพลต ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} ${plateLabel} + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} ${startLabel} = โหลดรวม ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`
-      : `ไม่ต้องใส่เพลต; แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} ${startLabel} = โหลดรวม ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`;
+    // UI/logging convention: hardwareWeightKg is total added plate mass across both sides.
+    // The target and tare are per-side for iso-lateral machines, so report bilateral totals separately.
+    const displayedPlateTotal = profile.isPerHand ? snappedPlatesDisplay * 2 : snappedPlatesDisplay;
+    const displayedEffectiveTotal = profile.isPerHand ? effectiveDisplay * 2 : effectiveDisplay;
+    const displayedStartingTotal = profile.isPerHand ? startDisplay * 2 : startDisplay;
+    const note = profile.isPerHand
+      ? (snappedPlatesDisplay > 0
+        ? `ใส่เพลตข้างละ ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} (เพลตรวมสองข้าง ${roundDisplay(displayedPlateTotal)} ${unitLabel}) + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel}/ข้าง (รวม ${roundDisplay(displayedStartingTotal)} ${unitLabel}) = โหลดรวมโดยประมาณ ${roundDisplay(displayedEffectiveTotal)} ${unitLabel}${warning(effectiveKg)}`
+        : `ไม่ต้องใส่เพลต; แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel}/ข้าง (รวม ${roundDisplay(displayedStartingTotal)} ${unitLabel}) = โหลดรวมโดยประมาณ ${roundDisplay(displayedEffectiveTotal)} ${unitLabel}${warning(effectiveKg)}`)
+      : (snappedPlatesDisplay > 0
+        ? `ใส่เพลตเพิ่ม ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} (ไม่รวมแรงต้านเครื่อง) + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`
+        : `ไม่ต้องใส่เพลต; แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`);
     return {
-      hardwareWeightKg: Math.round(platesKg * 100) / 100,
+      hardwareWeightKg: Math.round(toKg(displayedPlateTotal) * 100) / 100,
       platesPerSideKg: profile.isPerHand ? Math.round(platesKg * 100) / 100 : undefined,
-      effectiveHardwareWeightKg: Math.round(effectiveKg * 100) / 100,
+      effectiveHardwareWeightKg: Math.round(toKg(displayedEffectiveTotal) * 100) / 100,
       hardwareExceedsTarget: exceeds,
       displayNote: note,
     };
@@ -944,7 +951,7 @@ export function calculatePrescriptionWeight(
       exerciseName,
       targetWeightKg: Math.round(rawWeightKg * 10) / 10,
       hardwareWeightKg: quantized.hardwareWeightKg,
-      hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : (load === "plate-loaded" || mechProfile.isPlateLoaded) ? (mechProfile.isPerHand ? "เพลตต่อข้าง" : "เพลตรวมทั้งหมด") : load === "cable" ? (mechProfile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : "น้ำหนักเครื่อง",
+      hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : (load === "plate-loaded" || mechProfile.isPlateLoaded) ? (mechProfile.isPerHand ? "เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)" : "เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)") : load === "cable" ? (mechProfile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : "น้ำหนักเครื่อง",
       platesPerSideKg: quantized.platesPerSideKg,
       effectiveHardwareWeightKg: quantized.effectiveHardwareWeightKg,
       hardwareExceedsTarget: quantized.hardwareExceedsTarget,
@@ -1001,7 +1008,7 @@ export function calculatePrescriptionWeight(
     exerciseName,
     targetWeightKg: Math.round(rawWeightKg * 10) / 10,
     hardwareWeightKg: quantized.hardwareWeightKg,
-    hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : (load === "plate-loaded" || profile.isPlateLoaded) ? (profile.isPerHand ? "เพลตต่อข้าง" : "เพลตรวมทั้งหมด") : load === "cable" ? (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : load === "selectorized" ? "น้ำหนักสลักพิน" : "น้ำหนักอุปกรณ์",
+    hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : (load === "plate-loaded" || profile.isPlateLoaded) ? (profile.isPerHand ? "เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)" : "เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)") : load === "cable" ? (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : load === "selectorized" ? "น้ำหนักสลักพิน" : "น้ำหนักอุปกรณ์",
     platesPerSideKg: quantized.platesPerSideKg,
     effectiveHardwareWeightKg: quantized.effectiveHardwareWeightKg,
     hardwareExceedsTarget: quantized.hardwareExceedsTarget,
