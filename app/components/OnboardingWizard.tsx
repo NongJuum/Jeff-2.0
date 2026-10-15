@@ -54,14 +54,21 @@ function readSaved<T>(key: string, fallback: T): T {
 
 export function getAppLanguage(): AppLanguage {
   if (typeof window === "undefined") return "th";
-  const value = window.localStorage.getItem(APP_LANGUAGE_KEY);
-  return value === "en" ? "en" : "th";
+  try {
+    return window.localStorage.getItem(APP_LANGUAGE_KEY) === "en" ? "en" : "th";
+  } catch {
+    return "th";
+  }
 }
 
 export function getFontScale(): FontScale {
   if (typeof window === "undefined") return "medium";
-  const value = window.localStorage.getItem(FONT_SCALE_KEY);
-  return value === "small" || value === "large" ? value : "medium";
+  try {
+    const value = window.localStorage.getItem(FONT_SCALE_KEY);
+    return value === "small" || value === "large" ? value : "medium";
+  } catch {
+    return "medium";
+  }
 }
 
 export function hasCompletedOnboarding(): boolean {
