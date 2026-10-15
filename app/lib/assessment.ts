@@ -129,7 +129,8 @@ export const STRENGTH_RATIOS: Record<string, { male: number; female: number }> =
   // Seated calf machines have model-dependent lever arms and pad geometry.
   // Use a deliberately conservative working-load baseline, distinct from standing calf raises.
   SeatedCalf: { male: 0.45, female: 0.30 },
-  Calf: { male: 1.25, female: 0.85 },
+  Calf: { male: 0.65, female: 0.45 },
+  LegPressCalf: { male: 0.70, female: 0.45 },
   HipThrust: { male: 1.60, female: 1.20 },
   HipHinge: { male: 0.75, female: 0.50 },
   HipIsolation: { male: 0.35, female: 0.25 },
@@ -652,6 +653,7 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   if (name.includes("romanian") || name.includes("rdl")) return "RDL";
   if (name.includes("deadlift")) return "Deadlift";
   if (name.includes("cable lat prayer") || name.includes("straight arm pulldown")) return "LatPull";
+  if (name.includes("leg press calf")) return "LegPressCalf";
   if (name.includes("seated calf")) return "SeatedCalf";
   if (name.includes("reverse nordic") || name.includes("sissy squat") || name.includes("sissy")) return "LegExt";
   if (name.includes("cable pull through") || name.includes("back extension") || name.includes("hyperextension")) return "HipHinge";
