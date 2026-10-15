@@ -501,10 +501,12 @@ export function ActiveProgramDashboard({
   activeState,
   onNavigateToPrograms,
   onStopProgram,
+  language = "th",
 }: {
   activeState: ActiveJeffProgramState;
   onNavigateToPrograms: () => void;
   onStopProgram: () => void;
+  language?: AppLanguage;
 }) {
   const program = findProgramById(activeState.programId);
   if (!program) return null;
@@ -518,7 +520,8 @@ export function ActiveProgramDashboard({
   const nextTrainingLabel = nextTrainingDate
     ? (() => {
         const nextDate = new Date(`${nextTrainingDate}T12:00:00`);
-        return `${DAY_FULL_LABELS[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
+        const dayNames = language === "th" ? DAY_FULL_LABELS : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        return `${dayNames[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
       })()
     : null;
   const currentWorkout = currentWeekData?.days[
@@ -577,8 +580,8 @@ export function ActiveProgramDashboard({
           <div className="mt-3">
             {isProgramComplete ? (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
-                <p className="text-sm font-black text-emerald-300">🎉 ทำโปรแกรมครบแล้ว</p>
-                <p className="mt-1 text-xs text-zinc-400">เลือกโปรแกรมใหม่ได้ หรือทบทวนประวัติการฝึก</p>
+                <p className="text-sm font-black text-emerald-300">{language === "th" ? "🎉 ทำโปรแกรมครบแล้ว" : "🎉 Program completed"}</p>
+                <p className="mt-1 text-xs text-zinc-400">{language === "th" ? "เลือกโปรแกรมใหม่ได้ หรือทบทวนประวัติการฝึก" : "Choose another program or review your training history."}</p>
               </div>
             ) : isCompletedToday ? (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
@@ -880,7 +883,7 @@ export function JeffProgramTodayCard({
     return (
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-center">
         <p className="text-2xl mb-2">😴</p>
-        <p className="font-black text-white">{language === "th" ? "วันพัก" : "Rest day"}</p>
+        <p className="font-black text-white">{language === "th" ? "วันนี้เป็นวันพัก" : "Today is a rest day"}</p>
         <p className="text-xs text-zinc-400 mt-1">
           {program.shortName} — วันฝึกถัดไป: {nextTrainingLabel ?? "ยังไม่ได้เลือกวันฝึก"}
         </p>
