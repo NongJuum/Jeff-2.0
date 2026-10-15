@@ -168,6 +168,25 @@ export function getGoalModifier(goal: FitnessGoal): number {
 /**
  * Mechanical Profile for gym equipment
  */
+/**
+ * Standardized midpoint assumptions for common commercial gym equipment.
+ * These are starting defaults for Hammer Strength / Life Fitness-class gyms,
+ * not manufacturer-specific resistance measurements. Override only when the
+ * actual machine's stack ratio, unloaded carriage/bar, or plate increments are known.
+ */
+export const STANDARD_EQUIPMENT_DEFAULTS = {
+  olympicBarKg: 20,
+  smithEffectiveBarKg: 11, // midpoint estimate; counterbalance differs by model
+  barbellTotalLoadStepKg: 2.5,
+  selectorizedStackStepKg: 5,
+  functionalTrainerStepKg: 2.5,
+  plateLoadedStepKg: 5,
+  standardStackPulleyRatio: 1,
+  functionalTrainerPulleyRatio: 2,
+  plateLoadedLeverageRatio: 1,
+  legPressLeverageRatio: 1,
+} as const;
+
 export interface MechanicalProfile {
   leverageRatio: number;
   camModifier: number;
@@ -237,9 +256,11 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
     (lowerName.includes("45° leg press") || lowerName.includes("leg press")) &&
     !lowerName.includes("calf")
   ) {
-    // 45° Leg press: leverageRatio 1.414 (hypotenuse force component)
+    // Standardized external-load estimate: keep the plate load in the same units as prescribed.
+    // The sled angle alone is insufficient to infer effective resistance; exercise-specific
+    // strength ratios already model the movement category. Avoid multiplying by 1.414.
     return {
-      leverageRatio: 1.414,
+      leverageRatio: STANDARD_EQUIPMENT_DEFAULTS.legPressLeverageRatio,
       camModifier: 1.0,
       pulleyRatio: 1.0,
       frictionCoeff: 0.05,
@@ -362,8 +383,8 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
         angleThetaDeg: 0,
         isPerHand: false,
         bilateralDeficit: false,
-        minHardwareStep: 2.5,
-        tareWeight: 20.0, // standard Olympic bar 20kg
+        minHardwareStep: STANDARD_EQUIPMENT_DEFAULTS.barbellTotalLoadStepKg,
+        tareWeight: STANDARD_EQUIPMENT_DEFAULTS.olympicBarKg,
       };
     case "dumbbell":
       return {
@@ -386,19 +407,19 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
         angleThetaDeg: 0,
         isPerHand: false,
         bilateralDeficit: false,
-        minHardwareStep: 2.5,
-        tareWeight: 11.0, // counterbalanced smith bar ~11kg
+        minHardwareStep: STANDARD_EQUIPMENT_DEFAULTS.barbellTotalLoadStepKg,
+        tareWeight: STANDARD_EQUIPMENT_DEFAULTS.smithEffectiveBarKg,
       };
     case "plate-loaded":
       return {
-        leverageRatio: 1.15,
+        leverageRatio: STANDARD_EQUIPMENT_DEFAULTS.plateLoadedLeverageRatio,
         camModifier: 1.0,
         pulleyRatio: 1.0,
         frictionCoeff: 0.05,
         angleThetaDeg: 0,
         isPerHand: true, // plate loaded levers usually per side
         bilateralDeficit: false,
-        minHardwareStep: 5.0,
+        minHardwareStep: STANDARD_EQUIPMENT_DEFAULTS.plateLoadedStepKg,
         tareWeight: 0,
       };
     case "selectorized":
@@ -410,7 +431,7 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
         angleThetaDeg: 0,
         isPerHand: false,
         bilateralDeficit: false,
-        minHardwareStep: 5.0,
+        minHardwareStep: STANDARD_EQUIPMENT_DEFAULTS.selectorizedStackStepKg,
         tareWeight: 0,
       };
     case "cable": {
@@ -431,7 +452,7 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
         return {
           leverageRatio: 1.0,
           camModifier: 1.0,
-          pulleyRatio: 2.0, // 2:1 functional trainer; cancels isPerHand÷2
+          pulleyRatio: STANDARD_EQUIPMENT_DEFAULTS.functionalTrainerPulleyRatio, // 2:1 functional trainer; cancels isPerHand÷2
           frictionCoeff: 0.05,
           angleThetaDeg: 0,
           isPerHand: true,
@@ -455,11 +476,12 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
           tareWeight: 0,
         };
       }
-      // Default bilateral cable stack (lat pulldown, cable row, etc.)
+      // Default cable fallback: use a common 2:1 functional-trainer assumption.
+      // Lat pulldown and seated-row stacks are matched explicitly above at 1:1.
       return {
         leverageRatio: 1.0,
         camModifier: 1.0,
-        pulleyRatio: 2.0,
+        pulleyRatio: STANDARD_EQUIPMENT_DEFAULTS.functionalTrainerPulleyRatio,
         frictionCoeff: 0.05,
         angleThetaDeg: 0,
         isPerHand: false,
