@@ -2461,7 +2461,8 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   // 1. CHEST PRESS & FLYES (All Variations & Dynamic Machines)
   // -------------------------------------------------------------
-  const isChestMovement = n.includes("bench") || n.includes("chest press") || (n.includes("press") && !n.includes("overhead") && !n.includes("shoulder") && !n.includes("leg press")) || n.includes("flye") || n.includes("pec deck") || n.includes("crossover") || n.includes("dip");
+  const isRearDeltFlye = n.includes("reverse pec deck") || n.includes("reverse cable crossover") || n.includes("db rear delt flye");
+  const isChestMovement = !isRearDeltFlye && (n.includes("bench") || n.includes("chest press") || (n.includes("press") && !n.includes("overhead") && !n.includes("shoulder") && !n.includes("leg press")) || n.includes("flye") || n.includes("pec deck") || n.includes("crossover") || n.includes("dip"));
 
   if (isChestMovement) {
     if (n.includes("weighted dip")) {
@@ -2555,7 +2556,7 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   // 3. LEGS & LOWER BODY
   // -------------------------------------------------------------
-  } else if (n.includes("squat") || n.includes("leg press") || n.includes("lunge") || n.includes("step up") || n.includes("leg extension") || (n.includes("curl") && (n.includes("hamstring") || n.includes("leg"))) || n.includes("deadlift") || n.includes("rdl") || n.includes("hip thrust") || n.includes("kickback") || n.includes("pull through") || n.includes("abduction") || n.includes("adduction") || (n.includes("extension") && n.includes("back")) || n.includes("nordic") || n.includes("sissy")) {
+  } else if (n.includes("squat") || n.includes("leg press") || n.includes("lunge") || n.includes("step up") || n.includes("leg extension") || (n.includes("curl") && (n.includes("hamstring") || n.includes("leg"))) || n.includes("deadlift") || n.includes("rdl") || n.includes("hip thrust") || n.includes("kickback") || n.includes("pull through") || n.includes("abduction") || n.includes("adduction") || n.includes("hyperextension") || (n.includes("extension") && n.includes("back")) || n.includes("nordic") || n.includes("sissy")) {
     if (n.includes("leg press") && !n.includes("calf")) {
       baseThresholds = (n.includes("high foot") || currentMachineName.includes("high foot")) ? [1.20, 1.75, 2.30] : [1.30, 1.90, 2.50];
     } else if (n.includes("hack") || currentMachineName.includes("hack") || n.includes("pendulum") || currentMachineName.includes("pendulum")) {
