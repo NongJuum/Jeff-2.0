@@ -256,7 +256,7 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
   // Keep the prescription expressed as pin weight PER SIDE; pulley ratio remains
   // a separate machine assumption and defaults to 2:1 for these cable variants.
   if (
-    (lowerName.includes("(single-arm)") || lowerName.includes("(dual-arm)")) &&
+    (lowerName.includes("(single-arm)") || lowerName.includes("(dual-arm")) &&
     load === "cable"
   ) {
     return {
@@ -555,7 +555,8 @@ export interface BiomechanicalResult {
 export function quantizeToHardware(
   rawWeightKg: number,
   profile: MechanicalProfile,
-  isIsolation: boolean
+  isIsolation: boolean,
+  isCable: boolean = false
 ): { hardwareWeightKg: number; platesPerSideKg?: number; displayNote: string } {
   const tare = profile.tareWeight;
   const step = profile.minHardwareStep;
@@ -606,7 +607,14 @@ export function quantizeToHardware(
   snapped = Math.round(snapped * 100) / 100;
 
   // Cable profiles may be per-side without being dumbbells. Report the actual
-  // hardware interface first so single-arm cable work never gets a dumbbell label.
+  // hardware interface first so cable work is labeled correctly even at 1:1.
+  if (isCable && profile.isPerHand) {
+    return {
+      hardwareWeightKg: snapped,
+      displayNote: `เสียบสลักพิน ${snapped} kg ต่อฝั่ง (รอกทด ${profile.pulleyRatio}:1)`,
+    };
+  }
+
   if (profile.isPerHand && profile.pulleyRatio > 1.0) {
     return {
       hardwareWeightKg: snapped,
@@ -720,8 +728,9 @@ export function calculatePrescriptionWeight(
   const lowerName = exerciseName.toLowerCase();
   const radAngle = (profile.angleThetaDeg * Math.PI) / 180;
   const denominator = Math.cos(radAngle) + profile.frictionCoeff;
+  const baselinePulleyRatio = getDefaultMechanicalProfile(load, exerciseName).pulleyRatio;
   const pulleyMultiplier = pulleyRatioOverride && load === "cable"
-    ? profile.pulleyRatio * (2 / pulleyRatioOverride)
+    ? baselinePulleyRatio * (2 / pulleyRatioOverride)
     : profile.pulleyRatio;
   let rawWeightKg = force * profile.leverageRatio * profile.camModifier * (pulleyMultiplier / denominator);
 
@@ -738,7 +747,7 @@ export function calculatePrescriptionWeight(
   const quantizeProfile = pulleyRatioOverride && load === "cable"
     ? { ...profile, pulleyRatio: pulleyRatioOverride }
     : profile;
-  const quantized = quantizeToHardware(rawWeightKg, quantizeProfile, isIsolation);
+  const quantized = quantizeToHardware(rawWeightKg, quantizeProfile, isIsolation, load === "cable");
 
   return {
     exerciseName,
