@@ -989,7 +989,7 @@ export function calculatePrescriptionWeight(
     exerciseName,
     targetWeightKg: Math.round(rawWeightKg * 10) / 10,
     hardwareWeightKg: quantized.hardwareWeightKg,
-    hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : (load === "plate-loaded" || profile.isPlateLoaded) ? (profile.isPerHand ? "เพลตต่อข้าง" : "น้ำหนักเพลตรวม") : load === "cable" ? (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : load === "selectorized" ? "น้ำหนักสลักพิน" : "น้ำหนักอุปกรณ์",
+    hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : (load === "plate-loaded" || profile.isPlateLoaded) ? (profile.isPerHand ? "เพลตต่อข้าง" : "เพลตรวมทั้งหมด") : load === "cable" ? (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : load === "selectorized" ? "น้ำหนักสลักพิน" : "น้ำหนักอุปกรณ์",
     platesPerSideKg: quantized.platesPerSideKg,
     effectiveHardwareWeightKg: quantized.effectiveHardwareWeightKg,
     hardwareExceedsTarget: quantized.hardwareExceedsTarget,
