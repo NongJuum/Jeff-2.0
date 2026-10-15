@@ -5219,22 +5219,37 @@ export default function Page() {
               <div className="pt-2 border-t border-zinc-800/80">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-yellow-300">
-                    📊 การคำนวณคะแนน 6 องค์ประกอบ (Scoring Breakdown)
+                    {activeJeffProgram
+                      ? (appLanguage === "th" ? "📊 คะแนนตามโปรแกรมที่เลือก" : "📊 Active program score")
+                      : (appLanguage === "th" ? "📊 คะแนน 6 องค์ประกอบ" : "📊 Six-factor score breakdown")}
                   </p>
-                  <span className="text-[10px] text-zinc-500 font-mono">100% Total Weight</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">{activeJeffProgram ? "70% + 30%" : "100% Total Weight"}</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  <ScoreBar label="Strength (25%)" value={performanceReport.progress} />
-                  <ScoreBar label="Volume (25%)" value={performanceReport.volume} />
-                  <ScoreBar label="Consistency (20%)" value={performanceReport.consistency} />
-                  <ScoreBar label="Completion (15%)" value={performanceReport.completion} />
-                  <ScoreBar label="Recovery 😴 (10%)" value={performanceReport.recovery} />
-                  <ScoreBar label="Streak 🔥 (5%)" value={performanceReport.streakBonus} />
-                </div>
-
-                {/* 4-Week Mini Trend Chart */}
-                <WeeklyPerformanceMiniChart trends={performanceReport.weeklyTrends} />
+                {activeJeffProgram ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <ScoreBar label={appLanguage === "th" ? "ทำตามตารางที่ถึงกำหนด (70%)" : "Scheduled sessions due (70%)"} value={performanceReport.consistency} />
+                      <ScoreBar label={appLanguage === "th" ? "ความคืบหน้ารวม (30%)" : "Overall program progress (30%)"} value={performanceReport.progress} />
+                    </div>
+                    <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
+                      {appLanguage === "th" ? "ใช้วันฝึกต่อสัปดาห์และจำนวนสัปดาห์ของโปรแกรมจริง ไม่ใช้เกณฑ์คะแนนของ Preset Split" : "Uses the selected program's training frequency and duration, not the generic preset-split rubric."}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      <ScoreBar label="Strength (25%)" value={performanceReport.progress} />
+                      <ScoreBar label="Volume (25%)" value={performanceReport.volume} />
+                      <ScoreBar label="Consistency (20%)" value={performanceReport.consistency} />
+                      <ScoreBar label="Completion (15%)" value={performanceReport.completion} />
+                      <ScoreBar label="Recovery 😴 (10%)" value={performanceReport.recovery} />
+                      <ScoreBar label="Streak 🔥 (5%)" value={performanceReport.streakBonus} />
+                    </div>
+                    {/* 4-Week Mini Trend Chart */}
+                    <WeeklyPerformanceMiniChart trends={performanceReport.weeklyTrends} />
+                  </>
+                )}
               </div>
             </div>
 
@@ -5251,7 +5266,7 @@ export default function Page() {
               <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Weekly Target</p>
                 <p className="mt-1 text-lg font-black text-yellow-300 font-mono">
-                  {days} Days / Week
+                  {activeJeffProgram ? (findProgramById(activeJeffProgram.programId)?.daysPerWeek ?? days) : days} {appLanguage === "th" ? "วัน/สัปดาห์" : "Days / Week"}
                 </p>
               </div>
 
