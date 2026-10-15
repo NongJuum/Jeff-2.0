@@ -2891,9 +2891,13 @@ export default function Page() {
     setMode("today");
   }
 
-  function handleMarkJeffDayComplete(dateStr: string) {
+  function handleMarkJeffDayComplete(dateStr: string, completedDayIndex?: number) {
     if (!activeJeffProgram) return;
-    const updatedState = advanceJeffProgramAfterFinish(activeJeffProgram, dateStr);
+    const updatedState = advanceJeffProgramAfterFinish(
+      activeJeffProgram,
+      dateStr,
+      completedDayIndex ?? activeJeffProgram.currentDayIndex
+    );
     saveActiveJeffProgram(updatedState);
     setActiveJeffProgram(updatedState);
     setSelectedDay(updatedState.currentDayIndex);
@@ -3074,7 +3078,7 @@ export default function Page() {
 
     // Auto-advance to next workout day & mark completion
     if (activeJeffProgram) {
-      handleMarkJeffDayComplete(todayKey);
+      handleMarkJeffDayComplete(todayKey, activeDayIndex);
     } else if (isPresetLike) {
       setSelectedDay((prev) => (prev + 1) % activePlan.length);
       setActiveExerciseIndex(0);
