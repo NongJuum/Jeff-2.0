@@ -880,7 +880,8 @@ export function calculatePrescriptionWeight(
   mMusc: number = 1.0,
   machineTag: string = "",
   pulleyRatioOverride?: number,
-  safetyFactorOverride?: number
+  safetyFactorOverride?: number,
+  startingResistanceOverrideKg?: number
 ): BiomechanicalResult {
   const bw = userProfile.weightKg;
   const isFemale = userProfile.gender === "female";
@@ -956,6 +957,11 @@ export function calculatePrescriptionWeight(
   let force = bw * s_ratio * e_exp * r_rep * g_goal * m_musc * safety_factor;
 
   const profile = getDefaultMechanicalProfile(load, exerciseName, pulleyRatioOverride);
+  // Optional user-provided machine resistance overrides the app's category/model estimate.
+  // Only apply it to plate-loaded equipment; selectorized stack values are already the selected load.
+  if (profile.isPlateLoaded && startingResistanceOverrideKg !== undefined && Number.isFinite(startingResistanceOverrideKg) && startingResistanceOverrideKg >= 0) {
+    profile.tareWeight = startingResistanceOverrideKg;
+  }
 
   if (profile.isPerHand) {
     force = (force / 2) * (profile.bilateralDeficit ? 0.88 : 1.0);
