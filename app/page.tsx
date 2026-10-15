@@ -6422,7 +6422,9 @@ export default function Page() {
                                   {(() => {
                                     const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
                                     const lowerName = exercise.name.toLowerCase();
-                                    const isIsoPlate = effectiveLoad === "plate-loaded" && (lowerName.includes("iso-lateral") || lowerName.includes("iso ")) && !lowerName.includes("t-bar");
+                                    const machineNameLower = (currentMachine || "").toLowerCase();
+                                    const isPlateLoaded = effectiveLoad === "plate-loaded" || effectiveLoad === "specialty";
+                                    const isIsoPlate = effectiveLoad === "plate-loaded" && (lowerName.includes("iso-lateral") || lowerName.includes("iso ") || machineNameLower.includes("iso-lateral") || machineNameLower.includes("iso ")) && !lowerName.includes("t-bar") && !machineNameLower.includes("t-bar");
                                     const isDumbbell = effectiveLoad === "dumbbell";
                                     const isBarbell = effectiveLoad === "barbell" || effectiveLoad === "smith";
                                     const isCable = effectiveLoad === "cable";
@@ -6432,7 +6434,14 @@ export default function Page() {
                                       const perSideW = Math.round((totalW / 2) * 10) / 10;
                                       return (
                                         <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
-                                          {totalW > 0 ? `(แผ่นข้างละ ${perSideW} ${effectiveUnit})` : `(Iso: แผ่นต่อข้าง)`}
+                                          {totalW > 0 ? `(เพลตรวมสองข้าง; ข้างละ ${perSideW} ${effectiveUnit}, ไม่รวมแรงต้านเครื่อง)` : `(เพลตรวมสองข้าง ไม่รวมแรงต้านเครื่อง)`}
+                                        </span>
+                                      );
+                                    }
+                                    if (isPlateLoaded && !isIsoPlate) {
+                                      return (
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                          (เพลตที่ใส่เพิ่ม ไม่รวมแรงต้านเริ่มต้นของเครื่อง)
                                         </span>
                                       );
                                     }
