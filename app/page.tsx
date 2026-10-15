@@ -3988,7 +3988,7 @@ export default function Page() {
     let plannedSessionsToDate = 0;
     const cursor = new Date(weekStart);
     while (cursor <= now) {
-      const dateKey = getProgramDateKey(cursor);
+      const dateKey = getLocalDateKey(cursor);
       const dayIndex = (cursor.getDay() + 6) % 7;
       if (activeJeffProgram.scheduleDays.includes(dayIndex) && (!activeJeffProgram.startDate || dateKey >= activeJeffProgram.startDate)) {
         plannedSessionsToDate += 1;
