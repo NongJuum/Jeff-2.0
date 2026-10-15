@@ -189,6 +189,11 @@ function ProgramCard({
           <div className="min-w-0 flex-1 pr-16">
             <h3 className="font-black text-white leading-tight">{program.name}</h3>
             <p className="mt-0.5 text-xs text-zinc-400">{language === "th" ? thaiCopy?.description ?? program.description : program.description}</p>
+            <div className="mt-2 space-y-1 text-xs leading-relaxed text-zinc-400">
+              <p><span className="font-bold text-zinc-200">{language === "th" ? "เน้น:" : "Focus:"}</span> {language === "th" ? thaiCopy?.focus ?? program.bestFor : program.goals.join(", ")}</p>
+              <p className="line-clamp-2"><span className="font-bold text-zinc-200">{language === "th" ? "ช่วย:" : "Benefits:"}</span> {language === "th" ? thaiCopy?.benefit ?? program.bestFor : program.longDescription}</p>
+              <p><span className="font-bold text-zinc-200">{language === "th" ? "ระดับความยาก:" : "Difficulty:"}</span> {language === "th" ? thaiCopy?.difficulty ?? "ปานกลาง" : program.level.map((l) => LEVEL_LABELS_EN[l]).join(" / ")}</p>
+            </div>
           </div>
         </div>
 
@@ -249,13 +254,6 @@ function ProgramCard({
 
         {expanded && (
           <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2 text-xs text-zinc-400">
-            <p>{language === "th" && thaiCopy ? thaiCopy.benefit : program.longDescription}</p>
-            {language === "th" && thaiCopy && (
-              <div className="space-y-1.5">
-                <p><span className="font-bold text-zinc-200">เน้น:</span> {thaiCopy.focus}</p>
-                <p><span className="font-bold text-zinc-200">ระดับความยาก:</span> {thaiCopy.difficulty}</p>
-              </div>
-            )}
             <div className="mt-2">
               <p className="text-[10px] font-bold uppercase text-zinc-500 mb-1">{language === "th" ? "จุดเด่นของโปรแกรม" : "Highlights"}</p>
               {program.highlights.map((h, i) => (
