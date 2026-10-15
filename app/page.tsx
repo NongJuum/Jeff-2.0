@@ -41,11 +41,12 @@ import {
   User,
   X,
 } from "lucide-react";
-import { OnboardingWizard, hasCompletedOnboarding } from "./components/OnboardingWizard";
+import { OnboardingWizard, hasCompletedOnboarding, getAppLanguage, getFontScale, APP_LANGUAGE_KEY, FONT_SCALE_KEY, type AppLanguage, type FontScale } from "./components/OnboardingWizard";
 import {
   JeffProgramPicker,
   ActiveProgramDashboard,
   JeffProgramTodayCard,
+  getExerciseDisplayName,
 } from "./components/JeffProgramPicker";
 import {
   type ActiveJeffProgramState,
@@ -56,6 +57,7 @@ import {
   getProgramCurrentWeek,
   resolveProgramDayForDate,
   advanceJeffProgramAfterFinish,
+  isJeffProgramComplete,
 } from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
@@ -2026,7 +2028,7 @@ function WeeklyPerformanceMiniChart({ trends }: { trends: WeeklyTrendPoint[] }) 
   );
 }
 
-function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
+function WeeklyPerformanceCard({ report, isProgramBased = false, language = "th" }: { report: PerformanceReport; isProgramBased?: boolean; language?: AppLanguage }) {
   return (
     <div className="mt-3 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -2047,7 +2049,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
       </div>
 
       {/* Fatigue Warning Banner */}
-      {report.fatigueWarning && (
+      {!isProgramBased && report.fatigueWarning && (
         <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-amber-400/50 bg-amber-950/40 p-2.5 text-xs text-amber-200">
           <span className="text-base shrink-0">⚠️</span>
           <div>
@@ -2060,7 +2062,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
       )}
 
       {/* Deload Week Suggestion */}
-      {report.deloadSuggestion && (
+      {!isProgramBased && report.deloadSuggestion && (
         <div className="mt-3 flex items-start gap-2.5 rounded-xl border border-sky-400/50 bg-sky-950/40 p-2.5 text-xs text-sky-200">
           <span className="text-base shrink-0">🔄</span>
           <div>
@@ -2074,18 +2076,30 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
 
       {report.hasData && (
         <>
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            <ScoreBar label="Strength ↑" value={report.progress} />
-            <ScoreBar label="Volume" value={report.volume} />
-            <ScoreBar label="Consistency" value={report.consistency} />
-            <ScoreBar label="Completion" value={report.completion} />
-            <ScoreBar label="Recovery 😴" value={report.recovery} />
-            <ScoreBar label="Streak 🔥" value={report.streakBonus} />
-          </div>
+          {isProgramBased ? (
+            <>
+              <div className="mt-3 grid grid-cols-2 gap-2.5">
+                <ScoreBar label={language === "th" ? "ทำตามแผนสัปดาห์นี้" : "Weekly adherence"} value={report.consistency} />
+                <ScoreBar label={language === "th" ? "ความคืบหน้าทั้งโปรแกรม" : "Program progress"} value={report.progress} />
+              </div>
+              <p className="mt-2 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-[11px] leading-relaxed text-zinc-400">
+                {language === "th" ? "คะแนนโปรแกรมคำนวณจากการทำเซสชันตามแผนรายสัปดาห์ 70% และความคืบหน้ารวมของโปรแกรม 30% โดยใช้จำนวนวันฝึกและระยะเวลาของโปรแกรมที่เลือก" : "Program score = 70% weekly session adherence + 30% overall program progress, using the selected program's training frequency and duration."}
+              </p>
+            </>
+          ) : (
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <ScoreBar label="Strength ↑" value={report.progress} />
+              <ScoreBar label="Volume" value={report.volume} />
+              <ScoreBar label="Consistency" value={report.consistency} />
+              <ScoreBar label="Completion" value={report.completion} />
+              <ScoreBar label="Recovery 😴" value={report.recovery} />
+              <ScoreBar label="Streak 🔥" value={report.streakBonus} />
+            </div>
+          )}
 
-          <WeeklyPerformanceMiniChart trends={report.weeklyTrends} />
+          {!isProgramBased && <WeeklyPerformanceMiniChart trends={report.weeklyTrends} />}
 
-          <div className="mt-3 space-y-2">
+          {!isProgramBased && <div className="mt-3 space-y-2">
             {report.challenges.map((c) => (
               <div
                 key={c.name}
@@ -2095,7 +2109,7 @@ function WeeklyPerformanceCard({ report }: { report: PerformanceReport }) {
                 <span className="text-[10px] font-black">{c.progress}</span>
               </div>
             ))}
-          </div>
+          </div>}
         </>
       )}
 
@@ -2870,24 +2884,33 @@ export default function Page() {
   // Active Jeff Nippard Scientific Workout Program State
   const [activeJeffProgram, setActiveJeffProgram] = useState<ActiveJeffProgramState | null>(() => getActiveJeffProgram());
 
+  // Keep the visible day aligned with persisted program progression after reloads and Finish.
+  useEffect(() => {
+    if (activeJeffProgram) setSelectedDay(activeJeffProgram.currentDayIndex);
+  }, [activeJeffProgram?.programId, activeJeffProgram?.currentWeek, activeJeffProgram?.currentDayIndex]);
+
   function handleSelectJeffProgram(activatedState: ActiveJeffProgramState) {
     const program = findProgramById(activatedState.programId);
     if (!program) return;
-    const resolved = resolveProgramDayForDate(activatedState, new Date());
+    // A newly activated program starts at its first workout; the calendar gates rest/training days.
     const newState: ActiveJeffProgramState = {
       ...activatedState,
-      currentDayIndex: resolved.scheduledDayIndex,
+      currentDayIndex: 0,
     };
     saveActiveJeffProgram(newState);
     setActiveJeffProgram(newState);
-    setSelectedDay(resolved.scheduledDayIndex);
+    setSelectedDay(0);
     setActiveExerciseIndex(0);
     setMode("today");
   }
 
-  function handleMarkJeffDayComplete(dateStr: string) {
+  function handleMarkJeffDayComplete(dateStr: string, completedDayIndex?: number) {
     if (!activeJeffProgram) return;
-    const updatedState = advanceJeffProgramAfterFinish(activeJeffProgram, dateStr);
+    const updatedState = advanceJeffProgramAfterFinish(
+      activeJeffProgram,
+      dateStr,
+      completedDayIndex ?? activeJeffProgram.currentDayIndex
+    );
     saveActiveJeffProgram(updatedState);
     setActiveJeffProgram(updatedState);
     setSelectedDay(updatedState.currentDayIndex);
@@ -2901,6 +2924,8 @@ export default function Page() {
   function handleResetProgram() {
     clearActiveJeffProgram();
     setActiveJeffProgram(null);
+    setSelectedDay(0);
+    setActiveExerciseIndex(0);
   }
 
   // Active Session Engine & Accordion States (Hevy/Strong Style)
@@ -2963,6 +2988,8 @@ export default function Page() {
   }
 
   function handleTriggerFinishWorkout(dayTitle: string, currentDayExercises: PlanExercise[]) {
+    if (activeJeffProgram && isPresetLike && isJeffProgramComplete(activeJeffProgram)) return;
+
     let totalSetsDone = 0;
     let totalVol = 0;
     const allCompletedSets: LogSet[] = [];
@@ -3063,8 +3090,8 @@ export default function Page() {
     setShowFinishCelebration(true);
 
     // Auto-advance to next workout day & mark completion
-    if (activeJeffProgram) {
-      handleMarkJeffDayComplete(todayKey);
+    if (activeJeffProgram && isPresetLike) {
+      handleMarkJeffDayComplete(todayKey, activeDayIndex);
     } else if (isPresetLike) {
       setSelectedDay((prev) => (prev + 1) % activePlan.length);
       setActiveExerciseIndex(0);
@@ -3261,6 +3288,26 @@ export default function Page() {
   }
 
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>("th");
+  const [fontScale, setFontScale] = useState<FontScale>("medium");
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+
+  useEffect(() => {
+    setAppLanguage(getAppLanguage());
+    setFontScale(getFontScale());
+    setPreferencesLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    const root = document.documentElement;
+    root.lang = appLanguage;
+    root.style.fontSize = fontScale === "small" ? "14px" : fontScale === "large" ? "18px" : "16px";
+    try {
+      window.localStorage.setItem(APP_LANGUAGE_KEY, appLanguage);
+      window.localStorage.setItem(FONT_SCALE_KEY, fontScale);
+    } catch {}
+  }, [preferencesLoaded, appLanguage, fontScale]);
 
   // Migration State (M2)
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
@@ -3437,7 +3484,7 @@ export default function Page() {
 
   const isTodayScheduledRest = useMemo(() => {
     if (activeJeffProgram) {
-      return !jeffCalendarStatus?.isTrainingDay;
+      return isJeffProgramComplete(activeJeffProgram) || !jeffCalendarStatus?.isTrainingDay;
     }
     return !weeklySchedule[todayDayOfWeek];
   }, [activeJeffProgram, jeffCalendarStatus, weeklySchedule, todayDayOfWeek]);
@@ -3917,10 +3964,62 @@ export default function Page() {
 
   const weeklyVolumeSummary = useMemo(() => getWeeklyVolumeSummary(activePlan), [activePlan]);
 
-  const performanceReport = useMemo(
+  const basePerformanceReport = useMemo(
     () => computeWeeklyPerformance(logs, days, activePlan),
     [logs, days, activePlan]
   );
+
+  // When a Jeff program is active, score adherence against that program's planned sessions
+  // and overall program progression rather than the generic preset-split rubric.
+  const performanceReport = useMemo(() => {
+    if (!activeJeffProgram) return basePerformanceReport;
+    const program = findProgramById(activeJeffProgram.programId);
+    if (!program) return basePerformanceReport;
+
+    const now = new Date();
+    const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+    const nextWeekStart = new Date(weekStart);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+    const sessionsThisWeek = activeJeffProgram.completedDays.filter((key) => {
+      const date = new Date(`${key}T12:00:00`);
+      return Number.isFinite(date.getTime()) && date >= weekStart && date < nextWeekStart;
+    }).length;
+    let plannedSessionsToDate = 0;
+    const cursor = new Date(weekStart);
+    while (cursor <= now) {
+      const dateKey = getLocalDateKey(cursor);
+      const dayIndex = (cursor.getDay() + 6) % 7;
+      if (activeJeffProgram.scheduleDays.includes(dayIndex) && (!activeJeffProgram.startDate || dateKey >= activeJeffProgram.startDate)) {
+        plannedSessionsToDate += 1;
+      }
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    const weeklyAdherence = plannedSessionsToDate > 0
+      ? Math.min(100, (sessionsThisWeek / plannedSessionsToDate) * 100)
+      : 0;
+    const totalSessions = Math.max(1, program.durationWeeks * program.daysPerWeek);
+    const overallProgress = Math.min(100, (activeJeffProgram.completedDays.length / totalSessions) * 100);
+    const score = Math.round(weeklyAdherence * 0.7 + overallProgress * 0.3);
+    const info = score >= 90
+      ? { rank: "S+", emoji: "🏆", message: appLanguage === "th" ? "ทำตามแผนโปรแกรมได้ยอดเยี่ยมมาก" : "Excellent adherence to your program." }
+      : score >= 80
+        ? { rank: "S", emoji: "🔥", message: appLanguage === "th" ? "ทำได้ดีมาก รักษาความสม่ำเสมอต่อไป" : "Great work. Keep your consistency going." }
+        : score >= 60
+          ? { rank: "A", emoji: "💪", message: appLanguage === "th" ? "กำลังเดินหน้า ทำตามตารางฝึกต่อเนื่อง" : "Good progress. Stay with your training schedule." }
+          : { rank: "B", emoji: "🌱", message: appLanguage === "th" ? "ค่อย ๆ สร้างความสม่ำเสมอ ไม่จำเป็นต้องรีบ" : "Build consistency at a sustainable pace." };
+
+    return {
+      ...basePerformanceReport,
+      score,
+      ...info,
+      progress: overallProgress,
+      volume: weeklyAdherence,
+      consistency: weeklyAdherence,
+      completion: overallProgress,
+      hasData: true,
+    };
+  }, [basePerformanceReport, activeJeffProgram, appLanguage]);
 
   // บันทึก weekly score ทุกครั้งที่ performanceReport เปลี่ยน (สัปดาห์ละครั้ง) (T2)
   useEffect(() => {
@@ -4496,42 +4595,22 @@ export default function Page() {
   }, [day, compactList, activeExerciseIndex]);
 
 
-  const pageMeta = {
-    dashboard: {
-      eyebrow: "Home",
-      title: "Dashboard",
-      description: "ภาพรวมกิจกรรมและสถิติการฝึก",
-    },
-    today: {
-      eyebrow: "Workout",
-      title: "Today",
-      description: "เล่นทีละท่าแบบง่ายๆ",
-    },
-    preset: {
-      eyebrow: "Preset",
-      title: "Program",
-      description: "เลือกโปรแกรมที่ต้องการ",
-    },
-    custom: {
-      eyebrow: "Builder",
-      title: "Custom",
-      description: "สร้างและแก้ตารางเอง",
-    },
-    history: {
-      eyebrow: "Permanent",
-      title: "History",
-      description: "ประวัติการฝึกและสถิติ",
-    },
-    library: {
-      eyebrow: "Exercise",
-      title: "Library",
-      description: "รวมท่าที่มีใน gym",
-    },
-    programs: {
-      eyebrow: "Jeff Nippard",
-      title: "Programs",
-      description: "เลือกโปรแกรมและตารางฝึกตามวิทยาศาสตร์",
-    },
+  const pageMeta = appLanguage === "th" ? {
+    dashboard: { eyebrow: "หน้าหลัก", title: "ภาพรวม", description: "ภาพรวมกิจกรรมและสถิติการฝึก" },
+    today: { eyebrow: "การฝึก", title: "วันนี้", description: "ฝึกตามลำดับทีละท่า" },
+    preset: { eyebrow: "โปรแกรม", title: "ตารางฝึก", description: "เลือกตารางฝึกที่ต้องการ" },
+    custom: { eyebrow: "สร้างตาราง", title: "ตารางของฉัน", description: "สร้างและแก้ตารางฝึกเอง" },
+    history: { eyebrow: "ประวัติ", title: "ประวัติการฝึก", description: "ประวัติการฝึกและสถิติ" },
+    library: { eyebrow: "ท่าออกกำลังกาย", title: "คลังท่า", description: "รวมท่าออกกำลังกาย" },
+    programs: { eyebrow: "Jeff Nippard", title: "โปรแกรมฝึก", description: "เลือกโปรแกรมตามเป้าหมายและพื้นฐาน" },
+  }[mode] : {
+    dashboard: { eyebrow: "Home", title: "Dashboard", description: "Your training overview and stats" },
+    today: { eyebrow: "Workout", title: "Today", description: "Follow your workout one exercise at a time" },
+    preset: { eyebrow: "Program", title: "Training Plan", description: "Choose a training split" },
+    custom: { eyebrow: "Builder", title: "Custom Plan", description: "Build and edit your own plan" },
+    history: { eyebrow: "History", title: "Workout History", description: "Training history and statistics" },
+    library: { eyebrow: "Exercises", title: "Exercise Library", description: "Browse available exercises" },
+    programs: { eyebrow: "Jeff Nippard", title: "Programs", description: "Choose a program based on your goals and background" },
   }[mode];
 
   return (
@@ -4544,7 +4623,7 @@ export default function Page() {
               <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-yellow-300">
                 <Dumbbell size={14} /> HA IT
               </p>
-              <h1 className="text-base font-black leading-tight sm:text-lg">Workout Tracker</h1>
+              <h1 className="text-base font-black leading-tight sm:text-lg">{appLanguage === "th" ? "บันทึกการฝึก" : "Workout Tracker"}</h1>
             </div>
           </div>
 
@@ -4605,7 +4684,7 @@ export default function Page() {
         </div>
 
         {/* 1. Sticky Active Session Topbar (Hevy/Strong Style) */}
-        {["today", "preset", "custom"].includes(mode) && day && (
+        {["today", "preset", "custom"].includes(mode) && day && !(activeJeffProgram && isPresetLike && isJeffProgramComplete(activeJeffProgram)) && (
           <div className="mt-2.5 pt-2 border-t border-zinc-800/80 mx-auto flex max-w-5xl items-center justify-between gap-3">
             {/* Left: Overview label / workout badge */}
             <div className="flex items-center gap-2">
@@ -4665,7 +4744,9 @@ export default function Page() {
             <button
               type="button"
               onClick={() => handleTriggerFinishWorkout(day.title, day.exercises)}
-              className="flex items-center gap-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-3.5 py-1.5 text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.35)] transition active:scale-95"
+              disabled={Boolean(activeJeffProgram && isPresetLike && isJeffProgramComplete(activeJeffProgram))}
+              title={activeJeffProgram && isPresetLike && isJeffProgramComplete(activeJeffProgram) ? "โปรแกรมนี้เสร็จสมบูรณ์แล้ว" : "Finish workout"}
+              className="flex items-center gap-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-3.5 py-1.5 text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.35)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Check size={15} className="stroke-[3]" />
               <span>Finish</span>
@@ -5000,12 +5081,14 @@ export default function Page() {
                 <JeffProgramTodayCard
                   activeState={activeJeffProgram}
                   onMarkDayComplete={handleMarkJeffDayComplete}
+                  language={appLanguage}
                 />
               </div>
             )}
 
             {/* B. "Today's Workout" Visual Hero Card or Rest Day Card */}
-            {isTodayScheduledRest ? (
+            {!activeJeffProgram && (
+            isTodayScheduledRest ? (
               <div className="rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-5 shadow-2xl relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -5119,7 +5202,8 @@ export default function Page() {
                   </div>
                 </div>
               </div>
-            ) : null}
+            ) : null
+            )}
 
             {/* C. Performance Overview with Apple-Style Activity Ring & Embedded 6-Component Breakdown */}
             <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4 sm:p-5 shadow-2xl space-y-4">
@@ -5135,22 +5219,37 @@ export default function Page() {
               <div className="pt-2 border-t border-zinc-800/80">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-yellow-300">
-                    📊 การคำนวณคะแนน 6 องค์ประกอบ (Scoring Breakdown)
+                    {activeJeffProgram
+                      ? (appLanguage === "th" ? "📊 คะแนนตามโปรแกรมที่เลือก" : "📊 Active program score")
+                      : (appLanguage === "th" ? "📊 คะแนน 6 องค์ประกอบ" : "📊 Six-factor score breakdown")}
                   </p>
-                  <span className="text-[10px] text-zinc-500 font-mono">100% Total Weight</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">{activeJeffProgram ? "70% + 30%" : "100% Total Weight"}</span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  <ScoreBar label="Strength (25%)" value={performanceReport.progress} />
-                  <ScoreBar label="Volume (25%)" value={performanceReport.volume} />
-                  <ScoreBar label="Consistency (20%)" value={performanceReport.consistency} />
-                  <ScoreBar label="Completion (15%)" value={performanceReport.completion} />
-                  <ScoreBar label="Recovery 😴 (10%)" value={performanceReport.recovery} />
-                  <ScoreBar label="Streak 🔥 (5%)" value={performanceReport.streakBonus} />
-                </div>
-
-                {/* 4-Week Mini Trend Chart */}
-                <WeeklyPerformanceMiniChart trends={performanceReport.weeklyTrends} />
+                {activeJeffProgram ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <ScoreBar label={appLanguage === "th" ? "ทำตามตารางที่ถึงกำหนด (70%)" : "Scheduled sessions due (70%)"} value={performanceReport.consistency} />
+                      <ScoreBar label={appLanguage === "th" ? "ความคืบหน้ารวม (30%)" : "Overall program progress (30%)"} value={performanceReport.progress} />
+                    </div>
+                    <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
+                      {appLanguage === "th" ? "ใช้วันฝึกต่อสัปดาห์และจำนวนสัปดาห์ของโปรแกรมจริง ไม่ใช้เกณฑ์คะแนนของ Preset Split" : "Uses the selected program's training frequency and duration, not the generic preset-split rubric."}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                      <ScoreBar label="Strength (25%)" value={performanceReport.progress} />
+                      <ScoreBar label="Volume (25%)" value={performanceReport.volume} />
+                      <ScoreBar label="Consistency (20%)" value={performanceReport.consistency} />
+                      <ScoreBar label="Completion (15%)" value={performanceReport.completion} />
+                      <ScoreBar label="Recovery 😴 (10%)" value={performanceReport.recovery} />
+                      <ScoreBar label="Streak 🔥 (5%)" value={performanceReport.streakBonus} />
+                    </div>
+                    {/* 4-Week Mini Trend Chart */}
+                    <WeeklyPerformanceMiniChart trends={performanceReport.weeklyTrends} />
+                  </>
+                )}
               </div>
             </div>
 
@@ -5167,7 +5266,7 @@ export default function Page() {
               <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Weekly Target</p>
                 <p className="mt-1 text-lg font-black text-yellow-300 font-mono">
-                  {days} Days / Week
+                  {activeJeffProgram ? (findProgramById(activeJeffProgram.programId)?.daysPerWeek ?? days) : days} {appLanguage === "th" ? "วัน/สัปดาห์" : "Days / Week"}
                 </p>
               </div>
 
@@ -5394,7 +5493,7 @@ export default function Page() {
                           rel="noreferrer"
                           className="rounded-2xl bg-zinc-900 px-3 py-3 text-sm text-zinc-300"
                         >
-                          <span className="font-bold">{item.name}</span>
+                          <span className="font-bold">{getExerciseDisplayName(item.name, appLanguage)}</span>
                           <span className="mt-1 block text-xs text-zinc-500">
                             {item.movement} · {LOAD_LABELS[getLoadType(item)]} · {item.tier}
                           </span>
@@ -5418,10 +5517,13 @@ export default function Page() {
                 activeState={activeJeffProgram}
                 onNavigateToPrograms={handleSwitchProgram}
                 onStopProgram={handleResetProgram}
+                language={appLanguage}
               />
             )}
             <JeffProgramPicker
               onProgramActivated={handleSelectJeffProgram}
+              onProgramStopped={handleResetProgram}
+              language={appLanguage}
             />
           </div>
         )}
@@ -5481,7 +5583,22 @@ export default function Page() {
           </details>
         )}
 
-        {(mode === "today" || mode === "preset" || mode === "custom") && day && (
+        {mode === "today" && activeJeffProgram && isJeffProgramComplete(activeJeffProgram) && (
+          <div className="mt-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-5 text-center">
+            <p className="text-3xl mb-2">🏆</p>
+            <h3 className="text-lg font-black text-emerald-300">โปรแกรม Jeff Nippard เสร็จสมบูรณ์แล้ว</h3>
+            <p className="mt-1 text-sm text-zinc-400">ความคืบหน้าถูกบันทึกไว้แล้ว คุณสามารถเลือกโปรแกรมใหม่ได้จากเมนู Programs</p>
+            <button
+              type="button"
+              onClick={() => setMode("programs")}
+              className="mt-4 rounded-xl bg-emerald-400 px-4 py-2.5 text-sm font-black text-zinc-950 transition hover:bg-emerald-300"
+            >
+              เลือกโปรแกรมใหม่
+            </button>
+          </div>
+        )}
+
+        {(mode === "today" || mode === "preset" || mode === "custom") && day && !(activeJeffProgram && isJeffProgramComplete(activeJeffProgram)) && (
           <>
             {mode === "today" && isTodayScheduledRest && (
               <div className="mt-3 rounded-2xl border border-yellow-500/30 bg-gradient-to-r from-zinc-950 via-zinc-900 to-black p-4 shadow-xl">
@@ -5676,7 +5793,7 @@ export default function Page() {
                           <span className={`line-clamp-2 text-xs font-bold leading-4 transition ${
                             isSelected ? "text-yellow-300 font-black" : "text-zinc-300 group-hover:text-white"
                           }`}>
-                            {substituteMap[item.id] || item.name}
+                            {getExerciseDisplayName(substituteMap[item.id] || item.name, appLanguage)}
                           </span>
                         </button>
 
@@ -5770,7 +5887,7 @@ export default function Page() {
                         className="flex w-full items-center justify-between gap-3 rounded-2xl bg-zinc-950 px-3 py-3 text-left"
                       >
                         <span>
-                          <span className="block font-bold">{item.name}</span>
+                          <span className="block font-bold">{getExerciseDisplayName(item.name, appLanguage)}</span>
                           <span className="text-xs text-zinc-500">
                             {item.group} · {item.movement} · {LOAD_LABELS[getLoadType(item)]} · {item.tier}
                           </span>
@@ -5905,7 +6022,7 @@ export default function Page() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[11px] font-mono font-bold text-zinc-500">#{index + 1}</span>
                           <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white font-mono break-words leading-snug">
-                            {exercise.name}
+                            {getExerciseDisplayName(exercise.name, appLanguage)}
                           </h3>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
@@ -6927,7 +7044,7 @@ export default function Page() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm text-zinc-100">{candidate.name}</p>
+                          <p className="font-bold text-sm text-zinc-100">{getExerciseDisplayName(candidate.name, appLanguage)}</p>
                           <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${tierStyles}`}>
                             {candidate.tier}
                           </span>
@@ -7051,7 +7168,12 @@ export default function Page() {
         <OnboardingWizard
           onComplete={(result) => {
             setDays(result.days);
+            setUserProfile(result.profile);
+            setUserName(result.name);
+            setAppLanguage(result.language);
+            setFontScale(result.fontScale);
             setShowOnboarding(false);
+            setMode("programs");
           }}
         />
       )}
@@ -7069,6 +7191,10 @@ export default function Page() {
         onOpenAssessment={() => setShowAssessmentModal(true)}
         currentGender={userProfile?.gender || "male"}
         onGenderChange={handleSetGender}
+        language={appLanguage}
+        fontScale={fontScale}
+        onLanguageChange={setAppLanguage}
+        onFontScaleChange={setFontScale}
       />
 
       {/* Trainer Assessment Modal (Stage 2) */}
@@ -7102,7 +7228,7 @@ export default function Page() {
             <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
               {/* Section A: Performance Card */}
               <div>
-                <WeeklyPerformanceCard report={performanceReport} />
+                <WeeklyPerformanceCard report={performanceReport} isProgramBased={Boolean(activeJeffProgram)} language={appLanguage} />
               </div>
 
               {/* Section B: Scoring Methodology */}
@@ -7300,12 +7426,12 @@ export default function Page() {
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
         <div className="mx-auto grid max-w-5xl grid-cols-6 gap-1">
           {[
-            ["dashboard", "Home", Home],
-            ["workout", "Workout", Dumbbell],
-            ["programs", "Programs", BookOpen],
-            ["stats", "Stats", Trophy],
-            ["library", "Library", Library],
-            ["profile", "Profile", User],
+            ["dashboard", appLanguage === "th" ? "หน้าหลัก" : "Home", Home],
+            ["workout", appLanguage === "th" ? "ฝึกวันนี้" : "Workout", Dumbbell],
+            ["programs", appLanguage === "th" ? "โปรแกรม" : "Programs", BookOpen],
+            ["stats", appLanguage === "th" ? "สถิติ" : "Stats", Trophy],
+            ["library", appLanguage === "th" ? "คลังท่า" : "Library", Library],
+            ["profile", appLanguage === "th" ? "โปรไฟล์" : "Profile", User],
           ].map(([key, label, Icon]) => {
             const isTabActive =
               (key === "dashboard" && mode === "dashboard") ||

@@ -34,11 +34,73 @@ import {
   findProgramById,
   getProgramCurrentWeek,
   getProgramScheduledDates,
+  getProgramDateKey,
+  getNextProgramTrainingDate,
+  isJeffProgramComplete,
+  resolveProgramDayForDate,
 } from "../lib/jeffPrograms";
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getUserProfile } from "../lib/assessment";
+import type { AppLanguage } from "./OnboardingWizard";
 
 const DAY_LABELS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
+const DAY_LABELS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+export function getExerciseDisplayName(name: string, language: AppLanguage = "th"): string {
+  if (language !== "th") return name;
+  const replacements: [RegExp, string][] = [
+    [/Bulgarian Split Squat/gi, "บัลแกเรียนสปลิตสควอต"],
+    [/Romanian Deadlift/gi, "โรมาเนียนเดดลิฟต์"],
+    [/Hanging Knee Raise/gi, "แฮงกิงนีเรส"],
+    [/Chest Supported/gi, "เชสต์ซัพพอร์ตเต็ด"],
+    [/Shoulder Press/gi, "โชลเดอร์เพรส"],
+    [/Bench Press/gi, "เบนช์เพรส"],
+    [/Incline/gi, "อินไคลน์"],
+    [/Deadlift/gi, "เดดลิฟต์"],
+    [/Squat/gi, "สควอต"],
+    [/Dumbbell|\bDB\b/gi, "ดัมเบล"],
+    [/Barbell/gi, "บาร์เบล"],
+    [/Cable/gi, "เคเบิล"],
+    [/Machine/gi, "แมชชีน"],
+    [/Pulldown/gi, "พูลดาวน์"],
+    [/Pull Up/gi, "พูลอัป"],
+    [/Lat Raise/gi, "แลทเรส"],
+    [/Lateral Raise/gi, "แลเทอรัลเรส"],
+    [/Pec Deck/gi, "เพคเด็ค"],
+    [/Leg Extension/gi, "เลกเอ็กซ์เทนชัน"],
+    [/Hamstring Curl/gi, "แฮมสตริงเคิร์ล"],
+    [/Tricep/gi, "ไตรเซปส์"],
+    [/Bicep/gi, "ไบเซปส์"],
+    [/Pushdown/gi, "พุชดาวน์"],
+    [/Push-ups/gi, "พุชอัป"],
+    [/Curl/gi, "เคิร์ล"],
+    [/Row/gi, "โรว์"],
+    [/Press/gi, "เพรส"],
+    [/Flye|Fly/gi, "ฟลาย"],
+    [/Raise/gi, "เรส"],
+    [/Reverse/gi, "รีเวิร์ส"],
+    [/Weighted/gi, "เวตเต็ด"],
+    [/Bodyweight/gi, "บอดีเวต"],
+    [/Full Body/gi, "ฟูลบอดี"],
+  ];
+  return replacements.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), name);
+}
+
+const PROGRAM_THAI_COPY: Record<string, { description: string; focus: string; benefit: string; difficulty: string }> = {
+  fundamentals_full_body: { description: "ฝึกกล้ามเนื้อทั่วร่างกาย 3 วันต่อสัปดาห์", focus: "พื้นฐานท่าหลักและเพิ่มกล้ามเนื้อทั่วร่างกาย", benefit: "สร้างพื้นฐานที่ดี ฝึกทักษะสม่ำเสมอ และเพิ่มปริมาณฝึกอย่างเป็นระบบ", difficulty: "เริ่มต้นถึงปานกลาง" },
+  fundamentals_upper_lower: { description: "แบ่งวันฝึกช่วงบนและช่วงล่าง", focus: "เพิ่มกล้ามเนื้อด้วยการแบ่ง Upper/Lower", benefit: "กระจายปริมาณฝึกได้ดีและมีเวลาฟื้นตัวระหว่างกลุ่มกล้ามเนื้อ", difficulty: "ปานกลาง" },
+  fundamentals_bodypart: { description: "แยกฝึกตามกลุ่มกล้ามเนื้อ", focus: "เน้นรายละเอียดและปริมาณฝึกของแต่ละกลุ่มกล้าม", benefit: "เหมาะกับผู้ที่ต้องการจัดปริมาณฝึกเป็นรายกลุ่มกล้ามเนื้อ", difficulty: "ปานกลางถึงสูง" },
+  powerbuilding_30: { description: "ผสมการเพิ่มแรงกับการสร้างกล้ามเนื้อ", focus: "Squat, Bench Press, Deadlift และท่าเสริม", benefit: "พัฒนาความแข็งแรงควบคู่กับขนาดกล้ามเนื้อด้วยการแบ่งช่วงฝึก", difficulty: "สูง" },
+  comeback_ppl: { description: "กลับมาฝึกหลังหยุดพัก ด้วย Push/Pull/Legs", focus: "ค่อย ๆ เพิ่มความหนักและปริมาณฝึกกลับสู่ระดับเดิม", benefit: "ช่วยกลับเข้าสู่กิจวัตรโดยไม่เริ่มด้วยความหนักเต็มทันที", difficulty: "ปานกลางถึงสูง" },
+  comeback_upper_lower: { description: "โปรแกรมกลับมาฝึกแบบ Upper/Lower 4 วัน", focus: "ฟื้นจังหวะฝึกช่วงบนและช่วงล่าง", benefit: "เหมาะกับผู้ที่กลับมาฝึกและต้องการฝึก 4 วันต่อสัปดาห์", difficulty: "ปานกลาง" },
+  essentials_3x: { description: "ท่าหลักที่จำเป็น ฝึก 3 วันต่อสัปดาห์", focus: "ท่าคุ้มค่า ครอบคลุมกล้ามเนื้อหลัก", benefit: "ประหยัดเวลาและรักษาความสม่ำเสมอได้ง่าย", difficulty: "เริ่มต้นถึงปานกลาง" },
+  pure_bodybuilding_p2: { description: "โปรแกรมเพาะกายที่เน้นปริมาณและรายละเอียด", focus: "สร้างกล้ามเนื้อหลายกลุ่มด้วยการจัดปริมาณฝึกสูง", benefit: "เหมาะกับผู้มีพื้นฐานที่ต้องการเพิ่มรายละเอียดและปริมาณฝึก", difficulty: "สูง" },
+  bb_transformation_beginner: { description: "ระบบเริ่มต้นสร้างพื้นฐานการเพาะกาย", focus: "เรียนรู้รูปแบบการเคลื่อนไหวและสร้างแรงพื้นฐาน", benefit: "มีโครงสร้างชัดเจนสำหรับเริ่มฝึกอย่างเป็นระบบ", difficulty: "เริ่มต้น" },
+  bb_transformation_int_adv: { description: "ระบบสร้างกล้ามเนื้อสำหรับผู้มีประสบการณ์", focus: "พัฒนากล้ามเนื้อด้วยโปรแกรมที่ซับซ้อนขึ้น", benefit: "ต่อยอดจากพื้นฐานด้วยการวางแผนฝึกระดับกลางถึงสูง", difficulty: "สูง" },
+  card_workout: { description: "ฝึกด้วยน้ำหนักตัวโดยไม่ต้องใช้อุปกรณ์มาก", focus: "ท่าพื้นฐานช่วงบน ช่วงล่าง และ Full Body", benefit: "ฝึกที่บ้านหรือพื้นที่จำกัดได้สะดวก", difficulty: "ปรับได้ตามระดับ" },
+  muscle_ladder: { description: "เรียนรู้หลักการสร้างกล้ามเนื้อแบบเป็นขั้น", focus: "หลักการฝึกที่มีหลักฐานรองรับและการเพิ่มความก้าวหน้า", benefit: "ช่วยทำความเข้าใจการฝึกและนำหลักการไปปรับใช้ระยะยาว", difficulty: "ปานกลางถึงสูง" },
+};
+
 const DAY_FULL_LABELS = ["จันทร์", "อังคาร", "พุธ", "พฤหัสฯ", "ศุกร์", "เสาร์", "อาทิตย์"];
 const SPLIT_LABELS: Record<string, string> = {
   full_body: "Full Body",
@@ -58,7 +120,9 @@ const LEVEL_LABELS: Record<string, string> = {
   beginner: "มือใหม่",
   intermediate: "กลาง",
   advanced: "ขั้นสูง",
+  all: "ทุกระดับ",
 };
+const LEVEL_LABELS_EN: Record<string, string> = { beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced", all: "All levels" };
 const GOAL_LABELS: Record<string, string> = {
   strength: "Strength 💪",
   hypertrophy: "Hypertrophy 📈",
@@ -72,13 +136,16 @@ function ProgramCard({
   recommendation,
   onSelect,
   isActive,
+  language = "th",
 }: {
   program: JeffProgram;
   recommendation?: ProgramRecommendation;
   onSelect: (p: JeffProgram) => void;
   isActive?: boolean;
+  language?: AppLanguage;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const thaiCopy = PROGRAM_THAI_COPY[program.id];
 
   return (
     <div
@@ -92,7 +159,7 @@ function ProgramCard({
       {isActive && (
         <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-black text-black">
           <Play size={9} fill="black" />
-          โปรแกรมที่ใช้อยู่
+          {language === "th" ? "โปรแกรมที่ใช้อยู่" : "Active program"}
         </div>
       )}
 
@@ -122,7 +189,12 @@ function ProgramCard({
           </div>
           <div className="min-w-0 flex-1 pr-16">
             <h3 className="font-black text-white leading-tight">{program.name}</h3>
-            <p className="mt-0.5 text-xs text-zinc-400">{program.description}</p>
+            <p className="mt-0.5 text-xs text-zinc-400">{language === "th" ? thaiCopy?.description ?? program.description : program.description}</p>
+            <div className="mt-2 space-y-1 text-xs leading-relaxed text-zinc-400">
+              <p><span className="font-bold text-zinc-200">{language === "th" ? "เน้น:" : "Focus:"}</span> {language === "th" ? thaiCopy?.focus ?? program.bestFor : program.goals.join(", ")}</p>
+              <p className="line-clamp-2"><span className="font-bold text-zinc-200">{language === "th" ? "ช่วย:" : "Benefits:"}</span> {language === "th" ? thaiCopy?.benefit ?? program.bestFor : program.longDescription}</p>
+              <p><span className="font-bold text-zinc-200">{language === "th" ? "ระดับความยาก:" : "Difficulty:"}</span> {language === "th" ? thaiCopy?.difficulty ?? "ปานกลาง" : program.level.map((l) => LEVEL_LABELS_EN[l]).join(" / ")}</p>
+            </div>
           </div>
         </div>
 
@@ -130,11 +202,11 @@ function ProgramCard({
         <div className="mt-3 flex flex-wrap gap-1.5">
           <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-300">
             <Calendar size={10} />
-            {program.daysPerWeek} วัน/สัปดาห์
+            {language === "th" ? `${program.daysPerWeek} วัน/สัปดาห์` : `${program.daysPerWeek} days/week`}
           </span>
           <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-300">
             <Clock size={10} />
-            {program.durationWeeks} สัปดาห์
+            {language === "th" ? `${program.durationWeeks} สัปดาห์` : `${program.durationWeeks} weeks`}
           </span>
           <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-300">
             <Layers size={10} />
@@ -151,7 +223,7 @@ function ProgramCard({
                   : "bg-purple-400/15 text-purple-300"
               }`}
             >
-              {LEVEL_LABELS[l]}
+              {language === "th" ? LEVEL_LABELS[l] : LEVEL_LABELS_EN[l]}
             </span>
           ))}
         </div>
@@ -174,7 +246,7 @@ function ProgramCard({
           className="mt-3 flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition"
         >
           <Info size={11} />
-          {expanded ? "ซ่อนรายละเอียด" : "ดูรายละเอียดเพิ่ม"}
+          {expanded ? (language === "th" ? "ซ่อนรายละเอียด" : "Hide details") : (language === "th" ? "ดูรายละเอียดเพิ่ม" : "More details")}
           <ChevronDown
             size={11}
             className={`transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -183,9 +255,8 @@ function ProgramCard({
 
         {expanded && (
           <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2 text-xs text-zinc-400">
-            <p>{program.longDescription}</p>
             <div className="mt-2">
-              <p className="text-[10px] font-bold uppercase text-zinc-500 mb-1">Highlights</p>
+              <p className="text-[10px] font-bold uppercase text-zinc-500 mb-1">{language === "th" ? "จุดเด่นของโปรแกรม" : "Highlights"}</p>
               {program.highlights.map((h, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-zinc-300">
                   <Sparkles size={9} className="text-yellow-400" />
@@ -194,21 +265,21 @@ function ProgramCard({
               ))}
             </div>
             <div className="mt-2">
-              <span className="text-[10px] font-bold uppercase text-emerald-500">✓ Best for: </span>
-              <span className="text-zinc-300">{program.bestFor}</span>
+              <span className="text-[10px] font-bold uppercase text-emerald-500">✓ {language === "th" ? "เหมาะกับ:" : "Best for:"} </span>
+              <span className="text-zinc-300">{language === "th" ? program.bestFor : `For ${program.level.map((l) => LEVEL_LABELS_EN[l]).join(" / ")} lifters targeting ${program.goals.join(", ")}.`}</span>
             </div>
             {program.notFor && (
               <div>
-                <span className="text-[10px] font-bold uppercase text-red-500">✗ Not for: </span>
-                <span className="text-zinc-300">{program.notFor}</span>
+                <span className="text-[10px] font-bold uppercase text-red-500">✗ {language === "th" ? "ไม่เหมาะกับ:" : "Not for:"} </span>
+                <span className="text-zinc-300">{language === "th" ? program.notFor : "May not suit lifters outside the intended experience level or without the required equipment."}</span>
               </div>
             )}
             <div>
-              <span className="text-[10px] font-bold uppercase text-zinc-500">Equipment: </span>
+              <span className="text-[10px] font-bold uppercase text-zinc-500">{language === "th" ? "อุปกรณ์:" : "Equipment:"} </span>
               <span className="text-zinc-300">{EQUIPMENT_LABELS[program.equipment]}</span>
             </div>
             <div>
-              <span className="text-[10px] font-bold uppercase text-zinc-500">Goal: </span>
+              <span className="text-[10px] font-bold uppercase text-zinc-500">{language === "th" ? "เป้าหมาย:" : "Goal:"} </span>
               <span className="text-zinc-300">{program.goals.map((g) => GOAL_LABELS[g]).join(", ")}</span>
             </div>
           </div>
@@ -226,12 +297,12 @@ function ProgramCard({
           {isActive ? (
             <>
               <CheckCircle size={15} />
-              กำลังใช้งานอยู่
+              {language === "th" ? "กำลังใช้งานอยู่" : "Currently active"}
             </>
           ) : (
             <>
               <Play size={14} fill="white" />
-              เลือกโปรแกรมนี้
+              {language === "th" ? "เลือกโปรแกรมนี้" : "Choose this program"}
             </>
           )}
         </button>
@@ -247,15 +318,17 @@ function ProgramSetupModal({
   program,
   onConfirm,
   onCancel,
+  language = "th",
 }: {
   program: JeffProgram;
   onConfirm: (state: ActiveJeffProgramState) => void;
   onCancel: () => void;
+  language?: AppLanguage;
 }) {
   const [selectedDays, setSelectedDays] = useState<number[]>(program.defaultScheduleDays);
   const [startDate, setStartDate] = useState(() => {
     const today = new Date();
-    return today.toISOString().split("T")[0];
+    return getProgramDateKey(today);
   });
 
   const toggleDay = (day: number) => {
@@ -264,9 +337,7 @@ function ProgramSetupModal({
     );
   };
 
-  const isDayCountValid =
-    selectedDays.length === program.daysPerWeek ||
-    Math.abs(selectedDays.length - program.daysPerWeek) <= 1;
+  const isDayCountValid = selectedDays.length === program.daysPerWeek;
 
   const handleConfirm = () => {
     const state: ActiveJeffProgramState = {
@@ -292,13 +363,13 @@ function ProgramSetupModal({
             <span className="text-3xl">{program.emoji}</span>
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-white/70">
-                ตั้งค่าโปรแกรม
+                {language === "th" ? "ตั้งค่าโปรแกรม" : "Program setup"}
               </p>
               <h2 className="text-lg font-black text-white">{program.shortName}</h2>
             </div>
           </div>
           <p className="mt-2 text-sm text-white/80">
-            {program.daysPerWeek} วัน/สัปดาห์ · {program.durationWeeks} สัปดาห์ · {SPLIT_LABELS[program.split]}
+            {language === "th" ? `${program.daysPerWeek} วัน/สัปดาห์ · ${program.durationWeeks} สัปดาห์ · ${SPLIT_LABELS[program.split]}` : `${program.daysPerWeek} days/week · ${program.durationWeeks} weeks · ${program.split.replaceAll("_", " ")}`}
           </p>
         </div>
 
@@ -306,7 +377,7 @@ function ProgramSetupModal({
           {/* Start date */}
           <div>
             <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2 block">
-              วันเริ่มต้น
+              {language === "th" ? "วันเริ่มต้น" : "Start date"}
             </label>
             <input
               type="date"
@@ -319,18 +390,18 @@ function ProgramSetupModal({
           {/* Training days */}
           <div>
             <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-1 block">
-              วันออกกำลังกาย
+              {language === "th" ? "วันฝึก" : "Training days"}
             </label>
             <p className="text-[11px] text-zinc-500 mb-3">
-              แนะนำ {program.daysPerWeek} วัน/สัปดาห์ — เลือก {selectedDays.length} วัน
+              {language === "th" ? `เลือก ${program.daysPerWeek} วัน/สัปดาห์ — เลือกแล้ว ${selectedDays.length} วัน` : `Select ${program.daysPerWeek} days/week — ${selectedDays.length} selected`}
               {!isDayCountValid && (
                 <span className="text-amber-400 ml-1">
-                  (แนะนำ {program.daysPerWeek} วัน)
+                  ({language === "th" ? `ต้องเลือกให้ครบ ${program.daysPerWeek} วัน` : `Select exactly ${program.daysPerWeek} days`})
                 </span>
               )}
             </p>
             <div className="grid grid-cols-7 gap-1">
-              {DAY_LABELS.map((label, idx) => (
+              {(language === "th" ? DAY_LABELS : DAY_LABELS_EN).map((label, idx) => (
                 <button
                   key={idx}
                   onClick={() => toggleDay(idx)}
@@ -353,12 +424,13 @@ function ProgramSetupModal({
           {nextDates.length > 0 && (
             <div>
               <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2 block">
-                ตารางฝึก 2 สัปดาห์แรก
+                {language === "th" ? "ตารางฝึก 2 สัปดาห์แรก" : "First two weeks"}
               </label>
               <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
                 <div className="flex flex-wrap gap-1.5">
                   {nextDates.map((date) => {
-                    const d = new Date(date);
+                    // Parse date-only keys at local noon to avoid timezone-induced weekday shifts.
+                    const d = new Date(`${date}T12:00:00`);
                     const dayIdx = (d.getDay() + 6) % 7;
                     return (
                       <div
@@ -366,7 +438,7 @@ function ProgramSetupModal({
                         className="flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1"
                       >
                         <span className="text-[10px] font-bold text-yellow-400">
-                          {DAY_FULL_LABELS[dayIdx]}
+                          {(language === "th" ? DAY_FULL_LABELS : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])[dayIdx]}
                         </span>
                         <span className="text-[10px] text-zinc-400">
                           {d.getDate()}/{d.getMonth() + 1}
@@ -382,17 +454,17 @@ function ProgramSetupModal({
           {/* Week 1 preview */}
           <div>
             <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2 block">
-              ตัวอย่าง Week 1
+              {language === "th" ? "ตัวอย่างสัปดาห์ที่ 1" : "Week 1 preview"}
             </label>
             <div className="rounded-xl border border-zinc-800 bg-zinc-900 divide-y divide-zinc-800">
               {program.weeks[0].days.map((day, i) => (
                 <div key={i} className="px-3 py-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-white">{day.dayLabel}: {day.focusLabel}</span>
-                    <span className="text-[10px] text-zinc-500">{day.exercises.length} exercises</span>
+                    <span className="text-[10px] text-zinc-500">{day.exercises.length} {language === "th" ? "ท่า" : "exercises"}</span>
                   </div>
                   <p className="mt-0.5 text-[10px] text-zinc-500 truncate">
-                    {day.exercises.slice(0, 3).map((e) => e.name).join(" · ")}...
+                    {day.exercises.slice(0, 3).map((e) => getExerciseDisplayName(e.name, language)).join(" · ")}...
                   </p>
                 </div>
               ))}
@@ -406,11 +478,12 @@ function ProgramSetupModal({
             onClick={onCancel}
             className="flex-1 rounded-xl bg-zinc-900 py-3 text-sm font-bold text-zinc-300 border border-zinc-700 active:scale-95 transition"
           >
-            ยกเลิก
+            {language === "th" ? "ยกเลิก" : "Cancel"}
           </button>
           <button
             onClick={handleConfirm}
-            className={`flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
+            disabled={!isDayCountValid || !startDate}
+            className={`flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition disabled:cursor-not-allowed disabled:opacity-40`}
           >
             <Zap size={15} />
             เริ่มโปรแกรม!
@@ -428,19 +501,32 @@ export function ActiveProgramDashboard({
   activeState,
   onNavigateToPrograms,
   onStopProgram,
+  language = "th",
 }: {
   activeState: ActiveJeffProgramState;
   onNavigateToPrograms: () => void;
   onStopProgram: () => void;
+  language?: AppLanguage;
 }) {
   const program = findProgramById(activeState.programId);
   if (!program) return null;
 
   const currentWeekData = getProgramCurrentWeek(activeState);
-  const todayKey = new Date().toISOString().split("T")[0];
-  const dayOfWeek = (new Date().getDay() + 6) % 7;
-  const isTodayTrainingDay = activeState.scheduleDays.includes(dayOfWeek);
-  const isCompletedToday = activeState.completedDays.includes(todayKey);
+  const scheduleStatus = resolveProgramDayForDate(activeState);
+  const isTodayTrainingDay = scheduleStatus.isTrainingDay;
+  const isCompletedToday = scheduleStatus.isCompleted;
+  const isProgramComplete = isJeffProgramComplete(activeState);
+  const nextTrainingDate = getNextProgramTrainingDate(activeState);
+  const nextTrainingLabel = nextTrainingDate
+    ? (() => {
+        const nextDate = new Date(`${nextTrainingDate}T12:00:00`);
+        const dayNames = language === "th" ? DAY_FULL_LABELS : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        return `${dayNames[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
+      })()
+    : null;
+  const currentWorkout = currentWeekData?.days[
+    Math.max(0, Math.min(activeState.currentDayIndex, (currentWeekData?.days.length ?? 1) - 1))
+  ];
 
   // Progress percentage
   const totalDays = program.durationWeeks * program.daysPerWeek;
@@ -492,26 +578,31 @@ export function ActiveProgramDashboard({
         {/* Today's workout */}
         {currentWeekData && (
           <div className="mt-3">
-            {isTodayTrainingDay ? (
+            {isProgramComplete ? (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                <p className="text-sm font-black text-emerald-300">{language === "th" ? "🎉 ทำโปรแกรมครบแล้ว" : "🎉 Program completed"}</p>
+                <p className="mt-1 text-xs text-zinc-400">{language === "th" ? "เลือกโปรแกรมใหม่ได้ หรือทบทวนประวัติการฝึก" : "Choose another program or review your training history."}</p>
+              </div>
+            ) : isCompletedToday ? (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                <p className="text-sm font-black text-emerald-300">✅ {language === "th" ? "วันนี้ฝึกเสร็จแล้ว" : "Workout completed today"}</p>
+                <p className="mt-1 text-xs text-zinc-400">{language === "th" ? "ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว" : "Program progress has been saved."}</p>
+              </div>
+            ) : isTodayTrainingDay ? (
               <div className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3">
                 <p className="text-[10px] font-bold uppercase text-yellow-400 mb-1">
-                  {isCompletedToday ? "✅ วันนี้เสร็จแล้ว!" : "⚡ วันนี้มีฝึก!"}
+                  {isCompletedToday ? (language === "th" ? "✅ วันนี้เสร็จแล้ว!" : "✅ Completed today") : (language === "th" ? "⚡ วันนี้มีฝึก!" : "⚡ Training day")}
                 </p>
-                {currentWeekData.days.map((day, i) => (
-                  <div key={i} className="text-xs text-zinc-300">
-                    <span className="font-black">{day.dayLabel}:</span> {day.focusLabel}
-                    <span className="text-zinc-500 ml-1">({day.exercises.length} exercises)</span>
+                {currentWorkout && (
+                  <div className="text-xs text-zinc-300">
+                    <span className="font-black">{currentWorkout.dayLabel}:</span> {currentWorkout.focusLabel}
+                    <span className="text-zinc-500 ml-1">({currentWorkout.exercises.length} exercises)</span>
                   </div>
-                ))}
+                )}
               </div>
             ) : (
               <p className="text-xs text-zinc-500 mt-1">
-                🗓️ วันหยุดพัก — วันฝึกถัดไป:{" "}
-                {(() => {
-                  const nextDay = activeState.scheduleDays.find((d) => d > dayOfWeek) ??
-                    activeState.scheduleDays[0];
-                  return DAY_FULL_LABELS[nextDay];
-                })()}
+                🗓️ {language === "th" ? "วันพัก — วันฝึกถัดไป:" : "Rest day — next workout:"} {nextTrainingLabel ?? (language === "th" ? "ยังไม่ได้เลือกวันฝึก" : "No training day selected")}
               </p>
             )}
           </div>
@@ -526,10 +617,14 @@ export function ActiveProgramDashboard({
 // ─────────────────────────────────────────────────────────────────
 export function JeffProgramPicker({
   onProgramActivated,
+  onProgramStopped,
   onClose,
+  language = "th",
 }: {
   onProgramActivated: (state: ActiveJeffProgramState) => void;
+  onProgramStopped: () => void;
   onClose?: () => void;
+  language?: AppLanguage;
 }) {
   const [filter, setFilter] = useState<"recommended" | "all" | "beginner" | "intermediate" | "advanced">("recommended");
   const [setupProgram, setSetupProgram] = useState<JeffProgram | null>(null);
@@ -588,6 +683,7 @@ export function JeffProgramPicker({
     clearActiveJeffProgram();
     setActiveState(null);
     setConfirmStop(false);
+    onProgramStopped();
   };
 
   // Filter programs
@@ -608,10 +704,10 @@ export function JeffProgramPicker({
         <div>
           <h2 className="text-lg font-black text-white flex items-center gap-2">
             <BookOpen size={18} className="text-yellow-400" />
-            Jeff Nippard Programs
+            {language === "th" ? "โปรแกรมฝึก Jeff Nippard" : "Jeff Nippard Programs"}
           </h2>
           <p className="text-xs text-zinc-500 mt-0.5">
-            {JEFF_PROGRAMS.length} โปรแกรมจาก PDF ทั้งหมด
+            {JEFF_PROGRAMS.length} {language === "th" ? "โปรแกรมให้เลือก" : "programs available"}
           </p>
         </div>
         {onClose && (
@@ -628,12 +724,12 @@ export function JeffProgramPicker({
             <div className="flex items-center gap-2">
               <span className="text-2xl">{findProgramById(activeState.programId)?.emoji}</span>
               <div>
-                <p className="text-[10px] font-bold uppercase text-yellow-400">กำลังใช้งาน</p>
+                <p className="text-[10px] font-bold uppercase text-yellow-400">{language === "th" ? "กำลังใช้งาน" : "Active program"}</p>
                 <p className="text-sm font-black text-white">
                   {findProgramById(activeState.programId)?.shortName}
                 </p>
                 <p className="text-xs text-zinc-400">
-                  สัปดาห์ {activeState.currentWeek} · {activeState.completedDays.length} sessions ✅
+                  {language === "th" ? `สัปดาห์ ${activeState.currentWeek} · ${activeState.completedDays.length} ครั้งที่ฝึก` : `Week ${activeState.currentWeek} · ${activeState.completedDays.length} sessions`} ✅
                 </p>
               </div>
             </div>
@@ -642,7 +738,7 @@ export function JeffProgramPicker({
               className="flex items-center gap-1 rounded-xl bg-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-700 border border-zinc-700 transition"
             >
               <RotateCcw size={12} />
-              หยุด
+              {language === "th" ? "หยุด" : "Stop"}
             </button>
           </div>
         </div>
@@ -651,20 +747,20 @@ export function JeffProgramPicker({
       {/* Confirm Stop */}
       {confirmStop && (
         <div className="rounded-2xl border border-red-500/40 bg-red-900/20 p-4">
-          <p className="text-sm font-bold text-red-300 mb-3">⚠️ หยุดโปรแกรมปัจจุบัน?</p>
-          <p className="text-xs text-zinc-400 mb-3">ประวัติการฝึกจะยังอยู่ แต่ progress จะถูก reset</p>
+          <p className="text-sm font-bold text-red-300 mb-3">{language === "th" ? "⚠️ หยุดโปรแกรมปัจจุบัน?" : "⚠️ Stop the current program?"}</p>
+          <p className="text-xs text-zinc-400 mb-3">{language === "th" ? "ประวัติการฝึกจะยังอยู่ แต่ความคืบหน้าโปรแกรมจะเริ่มใหม่" : "Workout history stays saved, but program progress will reset."}</p>
           <div className="flex gap-2">
             <button
               onClick={() => setConfirmStop(false)}
               className="flex-1 rounded-xl bg-zinc-800 py-2 text-sm font-bold text-zinc-300 border border-zinc-700"
             >
-              ยกเลิก
+              {language === "th" ? "ยกเลิก" : "Cancel"}
             </button>
             <button
               onClick={handleStopProgram}
               className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-black text-white"
             >
-              ยืนยันหยุด
+              {language === "th" ? "ยืนยันหยุด" : "Confirm stop"}
             </button>
           </div>
         </div>
@@ -673,11 +769,11 @@ export function JeffProgramPicker({
       {/* Filter tabs */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
         {[
-          { key: "recommended", label: "⭐ แนะนำ" },
-          { key: "all", label: "ทั้งหมด" },
-          { key: "beginner", label: "🌱 มือใหม่" },
-          { key: "intermediate", label: "💪 กลาง" },
-          { key: "advanced", label: "🔥 ขั้นสูง" },
+          { key: "recommended", label: language === "th" ? "⭐ แนะนำ" : "⭐ Recommended" },
+          { key: "all", label: language === "th" ? "ทั้งหมด" : "All" },
+          { key: "beginner", label: language === "th" ? "🌱 มือใหม่" : "🌱 Beginner" },
+          { key: "intermediate", label: language === "th" ? "💪 กลาง" : "💪 Intermediate" },
+          { key: "advanced", label: language === "th" ? "🔥 ขั้นสูง" : "🔥 Advanced" },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -698,7 +794,7 @@ export function JeffProgramPicker({
         <div className="flex items-center gap-2 rounded-xl bg-emerald-900/20 border border-emerald-500/30 px-3 py-2">
           <Sparkles size={14} className="text-emerald-400" />
           <p className="text-xs text-emerald-300">
-            แนะนำตามข้อมูลส่วนตัวของคุณ — ระดับ · เป้าหมาย · วันว่าง
+            {language === "th" ? "แนะนำตามโปรไฟล์ของคุณ: ระดับ · เป้าหมาย · วันฝึก" : "Recommended for your profile: experience · goal · availability"}
           </p>
         </div>
       )}
@@ -707,7 +803,7 @@ export function JeffProgramPicker({
       <div className="space-y-3">
         {filteredPrograms.length === 0 ? (
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-            <p className="text-zinc-500 text-sm">ไม่พบโปรแกรม</p>
+            <p className="text-zinc-500 text-sm">{language === "th" ? "ไม่พบโปรแกรม" : "No programs found"}</p>
           </div>
         ) : (
           filteredPrograms.map(({ program, recommendation }) => (
@@ -717,6 +813,7 @@ export function JeffProgramPicker({
               recommendation={recommendation}
               onSelect={handleSelectProgram}
               isActive={activeState?.programId === program.id}
+              language={language}
             />
           ))
         )}
@@ -728,6 +825,7 @@ export function JeffProgramPicker({
           program={setupProgram}
           onConfirm={handleConfirmSetup}
           onCancel={() => setSetupProgram(null)}
+          language={language}
         />
       )}
     </div>
@@ -740,37 +838,62 @@ export function JeffProgramPicker({
 export function JeffProgramTodayCard({
   activeState,
   onMarkDayComplete,
+  language = "th",
 }: {
   activeState: ActiveJeffProgramState;
   onMarkDayComplete: (date: string) => void;
+  language?: AppLanguage;
 }) {
   const program = findProgramById(activeState.programId);
   const currentWeekData = getProgramCurrentWeek(activeState);
-  const todayKey = new Date().toISOString().split("T")[0];
-  const isCompletedToday = activeState.completedDays.includes(todayKey);
+  const todayKey = getProgramDateKey(new Date());
+  const scheduleStatus = resolveProgramDayForDate(activeState);
+  const isCompletedToday = scheduleStatus.isCompleted;
 
   if (!program || !currentWeekData) return null;
 
-  const dayOfWeek = (new Date().getDay() + 6) % 7;
-  const isTodayTrainingDay = activeState.scheduleDays.includes(dayOfWeek);
+  if (isJeffProgramComplete(activeState)) {
+    return (
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
+        <p className="text-2xl mb-2">🏆</p>
+        <p className="font-black text-emerald-300">{language === "th" ? `ทำโปรแกรม ${program.shortName} ครบแล้ว` : `${program.shortName} completed`}</p>
+        <p className="text-xs text-zinc-400 mt-1">{language === "th" ? "เลือกโปรแกรมใหม่ได้จากเมนูโปรแกรม" : "Choose another program from the Programs menu."}</p>
+      </div>
+    );
+  }
 
-  if (!isTodayTrainingDay) {
+  if (isCompletedToday) {
+    return (
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
+        <p className="text-2xl mb-2">✅</p>
+        <p className="font-black text-emerald-300">{language === "th" ? "วันนี้ฝึกเสร็จแล้ว" : "Workout completed today"}</p>
+        <p className="text-xs text-zinc-400 mt-1">{language === "th" ? `บันทึกความคืบหน้าของ ${program.shortName} เรียบร้อย` : `Progress for ${program.shortName} has been saved.`}</p>
+      </div>
+    );
+  }
+
+  if (!scheduleStatus.isTrainingDay) {
+    const nextTrainingDate = getNextProgramTrainingDate(activeState);
+    const nextTrainingLabel = nextTrainingDate
+      ? (() => {
+          const nextDate = new Date(`${nextTrainingDate}T12:00:00`);
+          const dayNames = language === "th" ? DAY_FULL_LABELS : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        return `${dayNames[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
+        })()
+      : null;
     return (
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-center">
         <p className="text-2xl mb-2">😴</p>
-        <p className="font-black text-white">วันพักผ่อน</p>
+        <p className="font-black text-white">{language === "th" ? "วันนี้เป็นวันพัก" : "Today is a rest day"}</p>
         <p className="text-xs text-zinc-400 mt-1">
-          {program.shortName} — วันฝึกถัดไป:{" "}
-          {DAY_FULL_LABELS[activeState.scheduleDays.find((d) => d > dayOfWeek) ?? activeState.scheduleDays[0]]}
+          {program.shortName} — {language === "th" ? "วันฝึกถัดไป:" : "Next training day:"} {nextTrainingLabel ?? (language === "th" ? "ยังไม่ได้เลือกวันฝึก" : "No training day selected")}
         </p>
       </div>
     );
   }
 
-  const sortedSchedule = [...activeState.scheduleDays].sort((a, b) => a - b);
-  const dayCount = sortedSchedule.indexOf(dayOfWeek);
-  const safeDayIndex = dayCount !== -1 ? dayCount : activeState.currentDayIndex;
-  const todayWorkout = currentWeekData.days[safeDayIndex % currentWeekData.days.length];
+  const safeDayIndex = Math.max(0, Math.min(activeState.currentDayIndex, currentWeekData.days.length - 1));
+  const todayWorkout = currentWeekData.days[safeDayIndex];
 
   return (
     <div className={`rounded-2xl border border-zinc-700 overflow-hidden`}>
@@ -795,7 +918,7 @@ export function JeffProgramTodayCard({
           <div key={i} className="px-4 py-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-white">{exercise.name}</p>
+                <p className="text-sm font-black text-white">{getExerciseDisplayName(exercise.name, language)}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   <span className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2 py-0.5 text-[10px] font-bold text-zinc-300">
                     {exercise.sets} sets × {exercise.reps}
@@ -834,7 +957,7 @@ export function JeffProgramTodayCard({
         {isCompletedToday ? (
           <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 py-3">
             <CheckCircle size={16} className="text-emerald-400" />
-            <span className="text-sm font-black text-emerald-300">ฝึกเสร็จแล้ววันนี้! 💪</span>
+            <span className="text-sm font-black text-emerald-300">{language === "th" ? "ฝึกเสร็จแล้ววันนี้! 💪" : "Workout completed today! 💪"}</span>
           </div>
         ) : (
           <button
@@ -842,7 +965,7 @@ export function JeffProgramTodayCard({
             className={`w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
           >
             <CheckCircle size={15} />
-            บันทึกว่าฝึกเสร็จแล้ว
+            {language === "th" ? "บันทึกว่าฝึกเสร็จแล้ว" : "Mark workout complete"}
           </button>
         )}
       </div>
