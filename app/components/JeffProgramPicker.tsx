@@ -121,6 +121,7 @@ const LEVEL_LABELS: Record<string, string> = {
   intermediate: "กลาง",
   advanced: "ขั้นสูง",
 };
+const LEVEL_LABELS_EN: Record<string, string> = { beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" };
 const GOAL_LABELS: Record<string, string> = {
   strength: "Strength 💪",
   hypertrophy: "Hypertrophy 📈",
@@ -216,7 +217,7 @@ function ProgramCard({
                   : "bg-purple-400/15 text-purple-300"
               }`}
             >
-              {LEVEL_LABELS[l]}
+              {language === "th" ? LEVEL_LABELS[l] : LEVEL_LABELS_EN[l]}
             </span>
           ))}
         </div>
@@ -885,7 +886,7 @@ export function JeffProgramTodayCard({
         <p className="text-2xl mb-2">😴</p>
         <p className="font-black text-white">{language === "th" ? "วันนี้เป็นวันพัก" : "Today is a rest day"}</p>
         <p className="text-xs text-zinc-400 mt-1">
-          {program.shortName} — วันฝึกถัดไป: {nextTrainingLabel ?? "ยังไม่ได้เลือกวันฝึก"}
+          {program.shortName} — {language === "th" ? "วันฝึกถัดไป:" : "Next training day:"} {nextTrainingLabel ?? (language === "th" ? "ยังไม่ได้เลือกวันฝึก" : "No training day selected")}
         </p>
       </div>
     );
