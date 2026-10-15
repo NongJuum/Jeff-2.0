@@ -126,7 +126,10 @@ export const STRENGTH_RATIOS: Record<string, { male: number; female: number }> =
   Shrug: { male: 1.40, female: 0.90 },
   Bicep: { male: 0.38, female: 0.24 },
   Tricep: { male: 0.42, female: 0.28 },
-  Calf: { male: 1.25, female: 0.85 },
+  // Seated calf machines have model-dependent lever arms and pad geometry.
+  // Use a deliberately conservative working-load baseline, distinct from standing calf raises.
+  SeatedCalf: { male: 0.65, female: 0.45 },
+  Calf: { male: 0.90, female: 0.60 },
   HipThrust: { male: 1.60, female: 1.20 },
 };
 
@@ -631,6 +634,8 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   const name = exerciseName.toLowerCase();
   if (name.includes("romanian") || name.includes("rdl")) return "RDL";
   if (name.includes("deadlift")) return "Deadlift";
+  // Seated calf raise uses a conservative machine-specific baseline; don't inherit leg/calf compound ratios.
+  if (name.includes("seated calf")) return "SeatedCalf";
   // Calf check before leg press: "Leg Press Calf Raise" → Calf, not LegPress
   if (name.includes("calf") || name.includes("calves")) return "Calf";
   if (name.includes("leg press")) return "LegPress";
@@ -986,7 +991,7 @@ export function calculatePrescriptionWeight(
     }
   }
 
-  const isIsolation = cat === "LatRaise" || cat === "Flye" || cat === "Bicep" || cat === "Tricep" || cat === "RearDelt" || cat === "LegExt" || cat === "LegCurl";
+  const isIsolation = cat === "LatRaise" || cat === "Flye" || cat === "Bicep" || cat === "Tricep" || cat === "RearDelt" || cat === "LegExt" || cat === "LegCurl" || cat === "SeatedCalf";
 
   const quantizeProfile = { ...profile, pulleyRatio: selectedPulleyRatio };
   const unit = userProfile.preferredWeightUnit || "kg";
