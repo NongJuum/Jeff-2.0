@@ -3997,7 +3997,7 @@ export default function Page() {
     }
     const weeklyAdherence = plannedSessionsToDate > 0
       ? Math.min(100, (sessionsThisWeek / plannedSessionsToDate) * 100)
-      : 100;
+      : 0;
     const totalSessions = Math.max(1, program.durationWeeks * program.daysPerWeek);
     const overallProgress = Math.min(100, (activeJeffProgram.completedDays.length / totalSessions) * 100);
     const score = Math.round(weeklyAdherence * 0.7 + overallProgress * 0.3);
