@@ -162,6 +162,7 @@ const REST_TIMER_KEY = "haitRestTimerV1";
 const PERMANENT_RECORDS_KEY = "haitPermanentRecordsV1";
 const LEGACY_STATS_KEY = "trainingStatsV2";
 const MACHINE_TAGS_KEY = "haitMachineTagsV1";
+const PULLEY_RATIOS_KEY = "haitPulleyRatiosV1";
 const FAVORITE_MACHINES_KEY = "haitFavoriteMachinesV1";
 const PRESET_SETS_KEY = "haitPresetSetsV1";
 const WEEK_STREAK_KEY = "haitWeekStreak";
@@ -243,6 +244,15 @@ function getLocalDateKey(value: string | Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function getDefaultPulleyRatioForExercise(exerciseName: string): "1" | "2" {
+  const lower = exerciseName.toLowerCase();
+  // Existing row/pulldown and shared-stack crossover profiles use a direct 1:1 baseline.
+  // Explicit single/dual-arm variants use independent functional-trainer stacks by default.
+  if ((lower.includes("row") || lower.includes("pulldown") || lower.includes("pull down") || lower.includes("crossover"))
+    && !lower.includes("(single-arm)") && !lower.includes("(dual-arm")) return "1";
+  return "2";
 }
 
 function getEffectiveExerciseKey(exerciseName: string, machineTag?: string) {
@@ -2775,6 +2785,7 @@ export default function Page() {
   const [recordsMap, setRecordsMap] = useState<Record<string, ExerciseRecords>>(() => loadPermanentRecords());
   const [historyRange, setHistoryRange] = useState<"all" | "30d" | "14d">("all");
   const [machineTags, setMachineTags] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_TAGS_KEY, {}));
+  const [pulleyRatios, setPulleyRatios] = useState<Record<string, "1" | "2" | "3">>(() => readJson<Record<string, "1" | "2" | "3">>(PULLEY_RATIOS_KEY, {}));
   const [favoriteMachines, setFavoriteMachines] = useState<Record<string, string>>(() => readJson<Record<string, string>>(FAVORITE_MACHINES_KEY, {}));
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
   const [restTimer, setRestTimer] = useState<RestTimerState>(() => {
@@ -3362,6 +3373,7 @@ export default function Page() {
   useEffect(() => writeLocalJson(CUSTOM_PLANS_KEY, customPlans), [customPlans]);
   useEffect(() => writeLocalJson(SUBSTITUTE_KEY, substituteMap), [substituteMap]);
   useEffect(() => writeLocalJson(MACHINE_TAGS_KEY, machineTags), [machineTags]);
+  useEffect(() => writeLocalJson(PULLEY_RATIOS_KEY, pulleyRatios), [pulleyRatios]);
   useEffect(() => writeLocalJson(PRESET_SETS_KEY, presetSetsMap), [presetSetsMap]);
   useEffect(() => {
     if (bodyweightKg !== null) writeLocalJson(CURRENT_BODYWEIGHT_KEY, bodyweightKg);
@@ -3417,6 +3429,14 @@ export default function Page() {
       const nextInputs = { ...old, [exerciseId]: updated };
       writeLocalJson(SET_INPUTS_KEY, nextInputs);
       return nextInputs;
+    });
+  }
+
+  function updatePulleyRatio(exerciseId: string, ratio: "1" | "2" | "3") {
+    setPulleyRatios((old) => {
+      const next = { ...old, [exerciseId]: ratio };
+      writeLocalJson(PULLEY_RATIOS_KEY, next);
+      return next;
     });
   }
 
@@ -4280,6 +4300,12 @@ export default function Page() {
       const copy = { ...old };
       delete copy[currentExercise.id];
       writeLocalJson(MACHINE_TAGS_KEY, copy);
+      return copy;
+    });
+    setPulleyRatios((old) => {
+      const copy = { ...old };
+      delete copy[currentExercise.id];
+      writeLocalJson(PULLEY_RATIOS_KEY, copy);
       return copy;
     });
 
@@ -5585,7 +5611,7 @@ export default function Page() {
       const muscleMode = userProfile.muscleMassMode ?? "smm";
       const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
       const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine);
+      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined);
       return effectiveUnit === "lbs"
         ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
         : bioRes.hardwareWeightKg;
@@ -5825,6 +5851,23 @@ export default function Page() {
                         </div>
                       </div>
 
+                      {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "cable") && (
+                        <div className="flex items-center gap-2 min-w-0 w-full">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">อัตราทดรอก:</span>
+                          <select
+                            aria-label="อัตราทดรอก"
+                            value={pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)}
+                            onChange={(e) => updatePulleyRatio(baseExercise.id, e.target.value as "1" | "2" | "3")}
+                            className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 px-2.5 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
+                          >
+                            <option value="1">1:1 (Direct)</option>
+                            <option value="2">2:1 (Standard functional trainer)</option>
+                            <option value="3">3:1</option>
+                          </select>
+                          <span className="text-[10px] text-zinc-500">ค่าเริ่มต้นตามประเภทท่า</span>
+                        </div>
+                      )}
+
                       {/* Auxiliary Controls (Star ⭐, Unit ⚙️, Reset) in clean compact sub-bar */}
                       {currentMachine && (
                         <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-zinc-900">
@@ -5853,7 +5896,7 @@ export default function Page() {
 
                           <button
                             type="button"
-                            onClick={() => updateMachineTag(baseExercise.id, "")}
+                            onClick={() => { updateMachineTag(baseExercise.id, ""); updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name)); }}
                             className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 py-0.5"
                             title="รีเซ็ตเครื่องเป็นค่าเริ่มต้น"
                           >
@@ -5962,7 +6005,7 @@ export default function Page() {
                             const muscleMode = userProfile.muscleMassMode ?? "smm";
                             const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
                             const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine);
+                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined);
                             return effectiveUnit === "lbs"
                               ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
                               : bioRes.hardwareWeightKg;
