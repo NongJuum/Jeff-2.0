@@ -91,6 +91,25 @@ describe("Jeff Nippard Calendar Schedule & Program Progression", () => {
     expect(advanceJeffProgramAfterFinish(state, "2026-10-12")).toEqual(state);
   });
 
+  it("advances from the selected workout day without moving progress backwards", () => {
+    const initial: ActiveJeffProgramState = {
+      programId: "fundamentals_full_body",
+      startDate: "2026-10-12",
+      currentWeek: 1,
+      currentDayIndex: 0,
+      completedDays: [],
+      scheduleDays: [0, 2, 4],
+    };
+    const afterSelectedDay3 = advanceJeffProgramAfterFinish(initial, "2026-10-12", 2);
+    expect(afterSelectedDay3.currentWeek).toBe(2);
+    expect(afterSelectedDay3.currentDayIndex).toBe(0);
+
+    const stateAtDay3: ActiveJeffProgramState = { ...initial, currentDayIndex: 2 };
+    const afterEarlierDay = advanceJeffProgramAfterFinish(stateAtDay3, "2026-10-13", 0);
+    expect(afterEarlierDay.currentWeek).toBe(2);
+    expect(afterEarlierDay.currentDayIndex).toBe(0);
+  });
+
   it("finds the next training date while respecting a future program start date", () => {
     const state: ActiveJeffProgramState = {
       programId: "fundamentals_full_body",
