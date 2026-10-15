@@ -2611,7 +2611,7 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   // 4. SHOULDERS (PRESSES & RAISES)
   // -------------------------------------------------------------
-  } else if (n.includes("shoulder") || n.includes("overhead press") || n.includes("military") || n.includes("lat raise") || n.includes("lateral raise") || n.includes("lean in db raise") || n.includes("y raise") || n.includes("face pull") || n.includes("rear delt")) {
+  } else if (n.includes("shoulder") || n.includes("overhead press") || n.includes("military") || n.includes("lat raise") || n.includes("lateral raise") || n.includes("lean in db raise") || n.includes("y raise") || n.includes("face pull") || n.includes("rear delt") || n.includes("reverse pec deck") || n.includes("reverse cable crossover")) {
     if (n.includes("behind back") || (isCable && (n.includes("lat raise") || n.includes("lateral raise")))) {
       baseThresholds = [0.06, 0.10, 0.14];
     } else if (isSelectorized && (n.includes("lat raise") || n.includes("lateral raise"))) {
@@ -2646,7 +2646,7 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   // 5. ARMS (TRICEPS & BICEPS)
   // -------------------------------------------------------------
-  } else if (n.includes("tricep") || n.includes("skullcrusher") || n.includes("pressdown") || n.includes("pushdown") || n.includes("close-grip") || n.includes("curl") || n.includes("katana") || n.includes("1 arm db overhead")) {
+  } else if (n.includes("tricep") || n.includes("skullcrusher") || n.includes("pressdown") || n.includes("pushdown") || n.includes("close-grip") || n.includes("curl") || n.includes("katana") || n.includes("1 arm db overhead") || n.includes("overhead cable extension") || n.includes("overhead cable ext")) {
     if (n.includes("close-grip")) {
       baseThresholds = [0.50, 0.72, 0.95];
     } else if (n.includes("skullcrusher")) {
