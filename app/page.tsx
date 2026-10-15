@@ -2975,7 +2975,7 @@ export default function Page() {
   }
 
   function handleTriggerFinishWorkout(dayTitle: string, currentDayExercises: PlanExercise[]) {
-    if (activeJeffProgram && isJeffProgramComplete(activeJeffProgram)) return;
+    if (activeJeffProgram && isPresetLike && isJeffProgramComplete(activeJeffProgram)) return;
 
     let totalSetsDone = 0;
     let totalVol = 0;
@@ -3077,7 +3077,7 @@ export default function Page() {
     setShowFinishCelebration(true);
 
     // Auto-advance to next workout day & mark completion
-    if (activeJeffProgram) {
+    if (activeJeffProgram && isPresetLike) {
       handleMarkJeffDayComplete(todayKey, activeDayIndex);
     } else if (isPresetLike) {
       setSelectedDay((prev) => (prev + 1) % activePlan.length);
@@ -4619,7 +4619,7 @@ export default function Page() {
         </div>
 
         {/* 1. Sticky Active Session Topbar (Hevy/Strong Style) */}
-        {["today", "preset", "custom"].includes(mode) && day && !(activeJeffProgram && isJeffProgramComplete(activeJeffProgram)) && (
+        {["today", "preset", "custom"].includes(mode) && day && !(activeJeffProgram && isPresetLike && isJeffProgramComplete(activeJeffProgram)) && (
           <div className="mt-2.5 pt-2 border-t border-zinc-800/80 mx-auto flex max-w-5xl items-center justify-between gap-3">
             {/* Left: Overview label / workout badge */}
             <div className="flex items-center gap-2">
@@ -4679,8 +4679,8 @@ export default function Page() {
             <button
               type="button"
               onClick={() => handleTriggerFinishWorkout(day.title, day.exercises)}
-              disabled={Boolean(activeJeffProgram && isJeffProgramComplete(activeJeffProgram))}
-              title={activeJeffProgram && isJeffProgramComplete(activeJeffProgram) ? "โปรแกรมนี้เสร็จสมบูรณ์แล้ว" : "Finish workout"}
+              disabled={Boolean(activeJeffProgram && isPresetLike && isJeffProgramComplete(activeJeffProgram))}
+              title={activeJeffProgram && isPresetLike && isJeffProgramComplete(activeJeffProgram) ? "โปรแกรมนี้เสร็จสมบูรณ์แล้ว" : "Finish workout"}
               className="flex items-center gap-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-3.5 py-1.5 text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.35)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Check size={15} className="stroke-[3]" />
