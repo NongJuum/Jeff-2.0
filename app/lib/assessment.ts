@@ -223,7 +223,7 @@ export const PLATE_LOADED_MACHINE_DEFAULTS: PlateLoadedMachineDefault[] = [
 ];
 
 export function getPlateLoadedMachineDefault(exerciseName: string, machineTag = ""): PlateLoadedMachineDefault {
-  const name = `${exerciseName} ${machineTag}`.toLowerCase().replace(/\\s+/g, " ").trim();
+  const name = `${exerciseName} ${machineTag}`.toLowerCase().replace(/\s+/g, " ").trim();
   // Match more specific aliases first so model names beat generic movement names.
   const matched = [...PLATE_LOADED_MACHINE_DEFAULTS]
     .sort((a, b) => Math.max(...b.aliases.map((alias) => alias.length)) - Math.max(...a.aliases.map((alias) => alias.length)))
@@ -258,7 +258,7 @@ export const PIN_LOADED_MACHINE_DEFAULTS: PinLoadedMachineDefault[] = [
 ];
 
 export function getPinLoadedMachineDefault(exerciseName: string, machineTag = ""): PinLoadedMachineDefault {
-  const name = `${exerciseName} ${machineTag}`.toLowerCase().replace(/\\s+/g, " ").trim();
+  const name = `${exerciseName} ${machineTag}`.toLowerCase().replace(/\s+/g, " ").trim();
   const matched = [...PIN_LOADED_MACHINE_DEFAULTS]
     .sort((a, b) => Math.max(...b.aliases.map((alias) => alias.length)) - Math.max(...a.aliases.map((alias) => alias.length)))
     .find((entry) => entry.aliases.some((alias) => name.includes(alias)));
