@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "npm test && npx tsc --noEmit && next build",
+    "build": "vitest run && tsc --noEmit && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run"
