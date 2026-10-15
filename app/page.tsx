@@ -94,6 +94,7 @@ import {
   saveUserProfile,
   USER_PROFILE_KEY,
   calculatePrescriptionWeight,
+  getDefaultMechanicalProfile,
   INJURY_RULES,
   evaluateMuscleMass,
   getIntelligentWarmup,
@@ -5950,6 +5951,7 @@ export default function Page() {
                   : (exercise.load || getLoadType(exercise));
                 const effectiveKey = getEffectiveExerciseKey(exercise.name, currentMachine);
                  const machineResistanceKey = `${baseExercise.id}::${currentMachine || "default"}`;
+                 const machineResistanceIsPerSide = getDefaultMechanicalProfile(effectiveLoad, `${exercise.name} ${currentMachine || ""}`).isPerHand;
                 const records = recordsMap[effectiveKey] ?? (currentMachine ? {} : recordsMap[exercise.name]) ?? {};
                 const pr = records.maxWeight ?? prMap[effectiveKey] ?? (currentMachine ? undefined : prMap[exercise.name]);
                 const warmups = exercise.warmup ? getWarmupSets(pr?.weightLbs) : [];
@@ -6211,7 +6213,7 @@ export default function Page() {
 
                       {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "plate-loaded" || (currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "specialty") && (
                         <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2">
-                          <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>แรงต้านเริ่มต้นของเครื่อง (kg) ถ้าทราบ</label>
+                          <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>{machineResistanceIsPerSide ? "แรงต้านเริ่มต้นต่อข้าง (kg) ถ้าทราบ" : "แรงต้านเริ่มต้นรวมของเครื่อง (kg) ถ้าทราบ"}</label>
                           <input
                             id={`machine-start-resistance-${baseExercise.id}`}
                             aria-label="แรงต้านเริ่มต้นของเครื่อง (kg)"
