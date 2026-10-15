@@ -2850,7 +2850,18 @@ export default function Page() {
   const [recordsMap, setRecordsMap] = useState<Record<string, ExerciseRecords>>(() => loadPermanentRecords());
   const [historyRange, setHistoryRange] = useState<"all" | "30d" | "14d">("all");
   const [machineTags, setMachineTags] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_TAGS_KEY, {}));
-  const [machineStartingResistances, setMachineStartingResistances] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_STARTING_RESISTANCES_KEY, {}));
+  const [machineStartingResistances, setMachineStartingResistances] = useState<Record<string, string>>(() => {
+    const saved = readJson<Record<string, string>>(MACHINE_STARTING_RESISTANCES_KEY, {});
+    const migrated = { ...saved };
+    // Migrate legacy per-exercise values to the default-machine key without applying them to every variant.
+    for (const [key, value] of Object.entries(saved)) {
+      if (!key.includes("::")) {
+        migrated[`${key}::default`] = value;
+        delete migrated[key];
+      }
+    }
+    return migrated;
+  });
   const [pulleyRatios, setPulleyRatios] = useState<Record<string, "1" | "2" | "3">>(() => readJson<Record<string, "1" | "2" | "3">>(PULLEY_RATIOS_KEY, {}));
   const [favoriteMachines, setFavoriteMachines] = useState<Record<string, string>>(() => readJson<Record<string, string>>(FAVORITE_MACHINES_KEY, {}));
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
