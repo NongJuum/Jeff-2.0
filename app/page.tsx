@@ -246,6 +246,15 @@ function getLocalDateKey(value: string | Date) {
   return `${year}-${month}-${day}`;
 }
 
+function getDefaultPulleyRatioForExercise(exerciseName: string): "1" | "2" {
+  const lower = exerciseName.toLowerCase();
+  // Existing row/pulldown and shared-stack crossover profiles use a direct 1:1 baseline.
+  // Explicit single/dual-arm variants use independent functional-trainer stacks by default.
+  if ((lower.includes("row") || lower.includes("pulldown") || lower.includes("pull down") || lower.includes("crossover"))
+    && !lower.includes("(single-arm)") && !lower.includes("(dual-arm")) return "1";
+  return "2";
+}
+
 function getEffectiveExerciseKey(exerciseName: string, machineTag?: string) {
   const trimmed = (machineTag ?? "").trim();
   return trimmed ? `${exerciseName} [${trimmed}]` : exerciseName;
@@ -5602,7 +5611,7 @@ export default function Page() {
       const muscleMode = userProfile.muscleMassMode ?? "smm";
       const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
       const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? "2") : undefined);
+      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined);
       return effectiveUnit === "lbs"
         ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
         : bioRes.hardwareWeightKg;
@@ -5847,7 +5856,7 @@ export default function Page() {
                           <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">อัตราทดรอก:</span>
                           <select
                             aria-label="อัตราทดรอก"
-                            value={pulleyRatios[baseExercise.id] ?? "2"}
+                            value={pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)}
                             onChange={(e) => updatePulleyRatio(baseExercise.id, e.target.value as "1" | "2" | "3")}
                             className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 px-2.5 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
                           >
@@ -5855,7 +5864,7 @@ export default function Page() {
                             <option value="2">2:1 (Standard functional trainer)</option>
                             <option value="3">3:1</option>
                           </select>
-                          <span className="text-[10px] text-zinc-500">ค่าเริ่มต้น 2:1</span>
+                          <span className="text-[10px] text-zinc-500">ค่าเริ่มต้นตามประเภทท่า</span>
                         </div>
                       )}
 
@@ -5887,7 +5896,7 @@ export default function Page() {
 
                           <button
                             type="button"
-                            onClick={() => { updateMachineTag(baseExercise.id, ""); updatePulleyRatio(baseExercise.id, "2"); }}
+                            onClick={() => { updateMachineTag(baseExercise.id, ""); updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name)); }}
                             className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 py-0.5"
                             title="รีเซ็ตเครื่องเป็นค่าเริ่มต้น"
                           >
