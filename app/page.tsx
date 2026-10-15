@@ -6383,17 +6383,46 @@ export default function Page() {
                                       className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
                                     >+</button>
                                   </div>
-                                  {effectiveLoad === "plate-loaded" && (exercise.name.toLowerCase().includes("iso-lateral") || exercise.name.toLowerCase().includes("iso ")) && !exercise.name.toLowerCase().includes("t-bar") && (
-                                    (() => {
-                                      const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
+                                  {(() => {
+                                    const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
+                                    const lowerName = exercise.name.toLowerCase();
+                                    const isIsoPlate = effectiveLoad === "plate-loaded" && (lowerName.includes("iso-lateral") || lowerName.includes("iso ")) && !lowerName.includes("t-bar");
+                                    const isDumbbell = effectiveLoad === "dumbbell";
+                                    const isBarbell = effectiveLoad === "barbell" || effectiveLoad === "smith";
+                                    const isCable = effectiveLoad === "cable";
+                                    const selectedPulley = pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name);
+
+                                    if (isIsoPlate) {
                                       const perSideW = Math.round((totalW / 2) * 10) / 10;
                                       return (
-                                        <span className="block text-[9px] font-mono text-zinc-500 text-center mt-0.5 truncate">
-                                          {totalW > 0 ? `(ข้างละ ${perSideW} ${effectiveUnit})` : ""}
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                          {totalW > 0 ? `(แผ่นข้างละ ${perSideW} ${effectiveUnit})` : `(Iso: แผ่นต่อข้าง)`}
                                         </span>
                                       );
-                                    })()
-                                  )}
+                                    }
+                                    if (isDumbbell) {
+                                      return (
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                          (ดัมเบลต่อข้าง)
+                                        </span>
+                                      );
+                                    }
+                                    if (isBarbell) {
+                                      return (
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                          (น้ำหนักรวมคาน)
+                                        </span>
+                                      );
+                                    }
+                                    if (isCable) {
+                                      return (
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                          (สลักพิน รอก {selectedPulley}:1)
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </div>
 
                                 {/* Reps Input Box */}

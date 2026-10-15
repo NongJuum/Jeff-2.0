@@ -73,14 +73,14 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(res.displayNote).toContain("ต่อฝั่ง");
   });
 
-  // Case 4: M 70kg Inter 45° Leg Press -> 85 kg plates total (no double angle)
-  it("Case 4: M 70kg Inter 45° Leg Press -> 85 kg plates total", () => {
+  // Case 4: M 70kg Inter (8m) 45° Leg Press -> 80 kg plates total (with 8% safety margin)
+  it("Case 4: M 70kg Inter 45° Leg Press -> 80 kg plates total", () => {
     const profile: UserProfile = {
       gender: "male",
       age: 26,
       heightCm: 175,
       weightKg: 70,
-      expMonths: 8, // Intermediate (6-12m) -> modifier 0.65
+      expMonths: 8, // Intermediate (6-12m) -> modifier 0.65, safety factor 0.92
       daysPerWeek: 4,
       goal: "hypertrophy",
       injuries: [],
@@ -89,8 +89,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     };
 
     const res = calculatePrescriptionWeight("45° Leg Press", "plate-loaded", "8 to 12", profile);
-    expect(res.hardwareWeightKg).toBe(85);
-    expect(res.displayNote).toContain("85 kg");
+    expect(res.hardwareWeightKg).toBe(80);
+    expect(res.displayNote).toContain("80 kg");
   });
 
   // Case 5: F 60kg Novice DB Lat Raise -> hits 2.0-2.5 kg floor
@@ -164,19 +164,44 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(dual.pulleyRatio).toBe(2);
   });
 
-  it("allows cable pulley ratio to be configured independently of single/dual execution", () => {
+  it("calculates cable pin weight with proper pulley advantage physics (2:1 requires 2x pin weight of 1:1)", () => {
     const profile: UserProfile = {
-      gender: "male", age: 26, heightCm: 175, weightKg: 70, expMonths: 18,
+      gender: "male", age: 26, heightCm: 175, weightKg: 70, expMonths: 24,
       daysPerWeek: 4, goal: "hypertrophy", injuries: [], preferredWeightUnit: "kg",
       updatedAt: new Date().toISOString(),
     };
-    const direct = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 1);
-    const standard = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 2);
-    const highAdvantage = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 3);
-    expect(direct.hardwareWeightKg).toBeGreaterThan(standard.hardwareWeightKg);
-    expect(highAdvantage.hardwareWeightKg).toBeLessThan(standard.hardwareWeightKg);
-    expect(standard.displayNote).toContain("2:1");
-    expect(direct.displayNote).toContain("1:1");
+    const direct1to1 = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 1);
+    const standard2to1 = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 2);
+    const highAdvantage3to1 = calculatePrescriptionWeight("Cable Curl (Single-Arm)", "cable", "8 to 12", profile, 1, "", 3);
+
+    // Mechanical physics: On a 2:1 pulley, each kg at the pin produces 0.5 kg of force at the handle.
+    // Therefore, to produce the required force F, pin weight must be 2 * F.
+    // On a 1:1 direct pulley, pin weight is 1 * F.
+    expect(standard2to1.targetWeightKg).toBeCloseTo(direct1to1.targetWeightKg * 2, 0);
+    expect(highAdvantage3to1.targetWeightKg).toBeCloseTo(direct1to1.targetWeightKg * 3, 0);
+    expect(standard2to1.displayNote).toContain("2:1");
+    expect(direct1to1.displayNote).toContain("1:1");
+    expect(highAdvantage3to1.displayNote).toContain("3:1");
+  });
+
+  it("applies safety factor separated from muscle mass modifier", () => {
+    const noviceProfile: UserProfile = {
+      gender: "male", age: 26, heightCm: 175, weightKg: 70, expMonths: 3,
+      daysPerWeek: 4, goal: "hypertrophy", injuries: ["lowerBack"], preferredWeightUnit: "kg",
+      updatedAt: new Date().toISOString(),
+    };
+    const advancedProfile: UserProfile = {
+      gender: "male", age: 26, heightCm: 175, weightKg: 70, expMonths: 30,
+      daysPerWeek: 4, goal: "hypertrophy", injuries: [], preferredWeightUnit: "kg",
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Novice with back injury on deadlift should receive significant safety discount
+    const noviceDeadlift = calculatePrescriptionWeight("Deadlift", "barbell", "5 to 8", noviceProfile, 1.0);
+    const advancedDeadlift = calculatePrescriptionWeight("Deadlift", "barbell", "5 to 8", advancedProfile, 1.0);
+
+    expect(noviceDeadlift.targetWeightKg).toBeLessThan(advancedDeadlift.targetWeightKg);
+    expect(noviceDeadlift.displayNote).toContain("คาน");
   });
 });
 
