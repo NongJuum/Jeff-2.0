@@ -101,6 +101,10 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(res.tareWeightKg).toBe(50);
     expect(res.displayNote).toContain("แรงต้านเริ่มต้นประมาณ 50 kg");
     expect(res.hardwareLoadLabel).toBe("เพลตรวมทั้งหมด");
+
+    const customResistance = calculatePrescriptionWeight("45° Leg Press", "plate-loaded", "8 to 12", profile, 1, "", undefined, undefined, 35);
+    expect(customResistance.tareWeightKg).toBe(35);
+    expect(customResistance.displayNote).toContain("แรงต้านเริ่มต้นประมาณ 35 kg");
   });
 
   // Case 5: F 60kg Novice DB Lat Raise -> hits 2.0-2.5 kg floor
