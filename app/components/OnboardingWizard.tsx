@@ -163,7 +163,7 @@ export function OnboardingWizard({
     beginner: "Beginner (under 6 months)",
     intermediate: "Intermediate (6 months to 2 years)",
     advanced: "Advanced (over 2 years)",
-  }, [language];
+  };
 
   const level = expMonths === null ? null : expMonths < 6 ? "beginner" : expMonths >= 24 ? "advanced" : "intermediate";
   const canContinue = step === 0
