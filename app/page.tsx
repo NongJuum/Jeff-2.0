@@ -95,6 +95,8 @@ import {
   USER_PROFILE_KEY,
   calculatePrescriptionWeight,
   getDefaultMechanicalProfile,
+  RELATIVE_STRENGTH_THRESHOLDS,
+  shouldAutoPrescribeAddedLoad,
   INJURY_RULES,
   evaluateMuscleMass,
   getIntelligentWarmup,
@@ -2433,6 +2435,7 @@ export function evaluateRelativeStrength(
   );
 
   const isWeightedBodyweight = n.includes("weighted dip") || n.includes("weighted pull up");
+  const isBodyweightOnly = !shouldAutoPrescribeAddedLoad(loadType, exerciseName);
 
   // 2. Physiological Muscle Mass Estimation (If user does not know InBody / SMM)
   const userBwKg = userBwLbs * 0.453592;
@@ -2552,7 +2555,7 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   // 3. LEGS & LOWER BODY
   // -------------------------------------------------------------
-  } else if (n.includes("squat") || n.includes("leg press") || n.includes("lunge") || n.includes("step up") || n.includes("leg extension") || (n.includes("curl") && (n.includes("hamstring") || n.includes("leg"))) || n.includes("deadlift") || n.includes("rdl") || n.includes("hip thrust") || n.includes("kickback") || n.includes("abduction") || n.includes("adduction") || (n.includes("extension") && n.includes("back")) || n.includes("nordic") || n.includes("sissy")) {
+  } else if (n.includes("squat") || n.includes("leg press") || n.includes("lunge") || n.includes("step up") || n.includes("leg extension") || (n.includes("curl") && (n.includes("hamstring") || n.includes("leg"))) || n.includes("deadlift") || n.includes("rdl") || n.includes("hip thrust") || n.includes("kickback") || n.includes("pull through") || n.includes("abduction") || n.includes("adduction") || (n.includes("extension") && n.includes("back")) || n.includes("nordic") || n.includes("sissy")) {
     if (n.includes("leg press") && !n.includes("calf")) {
       baseThresholds = (n.includes("high foot") || currentMachineName.includes("high foot")) ? [1.20, 1.75, 2.30] : [1.30, 1.90, 2.50];
     } else if (n.includes("hack") || currentMachineName.includes("hack") || n.includes("pendulum") || currentMachineName.includes("pendulum")) {
@@ -2569,7 +2572,7 @@ export function evaluateRelativeStrength(
       baseThresholds = [0.26, 0.40, 0.54];
     } else if (n.includes("hamstring") || n.includes("leg curl")) {
       baseThresholds = n.includes("nordic") ? [0.18, 0.35, 0.50] : [0.24, 0.38, 0.52];
-    } else if (n.includes("rdl") || n.includes("deadlift")) {
+    } else if (n.includes("rdl") || n.includes("deadlift") || n.includes("pull through")) {
       if (isSmith) {
         baseThresholds = [0.92, 1.35, 1.75];
       } else if (isDumbbell || n.includes("b-stance")) {
@@ -2607,12 +2610,12 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   // 4. SHOULDERS (PRESSES & RAISES)
   // -------------------------------------------------------------
-  } else if (n.includes("shoulder") || n.includes("overhead press") || n.includes("military") || n.includes("lat raise") || n.includes("lateral raise") || n.includes("y raise") || n.includes("face pull") || n.includes("rear delt")) {
+  } else if (n.includes("shoulder") || n.includes("overhead press") || n.includes("military") || n.includes("lat raise") || n.includes("lateral raise") || n.includes("lean in db raise") || n.includes("y raise") || n.includes("face pull") || n.includes("rear delt")) {
     if (n.includes("behind back") || (isCable && (n.includes("lat raise") || n.includes("lateral raise")))) {
       baseThresholds = [0.06, 0.10, 0.14];
     } else if (isSelectorized && (n.includes("lat raise") || n.includes("lateral raise"))) {
       baseThresholds = [0.08, 0.13, 0.18];
-    } else if (n.includes("lat raise") || n.includes("lateral raise")) {
+    } else if (n.includes("lat raise") || n.includes("lateral raise") || n.includes("lean in db raise")) {
       baseThresholds = [0.06, 0.10, 0.14];
     } else if (n.includes("y raise")) {
       baseThresholds = [0.08, 0.13, 0.18];
@@ -2642,12 +2645,12 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   // 5. ARMS (TRICEPS & BICEPS)
   // -------------------------------------------------------------
-  } else if (n.includes("tricep") || n.includes("skullcrusher") || n.includes("pressdown") || n.includes("pushdown") || n.includes("close-grip") || n.includes("curl") || n.includes("katana")) {
+  } else if (n.includes("tricep") || n.includes("skullcrusher") || n.includes("pressdown") || n.includes("pushdown") || n.includes("close-grip") || n.includes("curl") || n.includes("katana") || n.includes("1 arm db overhead")) {
     if (n.includes("close-grip")) {
       baseThresholds = [0.50, 0.72, 0.95];
     } else if (n.includes("skullcrusher")) {
       baseThresholds = isDumbbell ? [0.20, 0.30, 0.40] : [0.22, 0.32, 0.44];
-    } else if (n.includes("overhead") && (n.includes("cable") || n.includes("katana") || n.includes("tricep"))) {
+    } else if ((n.includes("overhead") && (n.includes("cable") || n.includes("katana") || n.includes("tricep"))) || n.includes("1 arm db overhead")) {
       baseThresholds = isDumbbell ? [0.16, 0.25, 0.34] : [0.18, 0.28, 0.38];
     } else if (n.includes("pushdown") || n.includes("pressdown") || n.includes("tricep")) {
       baseThresholds = isSelectorized ? [0.22, 0.32, 0.44] : [0.20, 0.30, 0.40];
@@ -2674,11 +2677,11 @@ export function evaluateRelativeStrength(
   // -------------------------------------------------------------
   } else if (n.includes("calf") || n.includes("crunch") || n.includes("raise") || n.includes("rollout")) {
     if (n.includes("leg press calf") || (n.includes("calf") && currentMachineName.includes("leg press"))) {
-      baseThresholds = [1.00, 1.45, 1.90];
+      baseThresholds = [...RELATIVE_STRENGTH_THRESHOLDS.legPressCalf] as [number, number, number];
     } else if (n.includes("seated calf") || (n.includes("calf") && currentMachineName.includes("seated"))) {
-      baseThresholds = [0.75, 1.10, 1.45];
+      baseThresholds = [...RELATIVE_STRENGTH_THRESHOLDS.seatedCalf] as [number, number, number];
     } else if (n.includes("calf")) {
-      baseThresholds = [0.80, 1.20, 1.60];
+      baseThresholds = [...RELATIVE_STRENGTH_THRESHOLDS.standingCalf] as [number, number, number];
     } else if (n.includes("crunch")) {
       baseThresholds = [0.25, 0.40, 0.55];
     } else {
@@ -2766,6 +2769,8 @@ export function evaluateRelativeStrength(
     targetDisplayWeight = Math.max(step, Math.round(targetTotalWorkingLbs / step) * step);
     targetDisplayWeight = Math.round(targetDisplayWeight * 10) / 10;
   }
+  // Do not prescribe external weight for unweighted bodyweight exercises by default.
+  if (isBodyweightOnly) targetDisplayWeight = 0;
 
   const labelMap = {
     Beginner: "🌱 NOVICE",
@@ -2797,7 +2802,9 @@ export function evaluateRelativeStrength(
   }
 
   let actionableMessage = "";
-  if (tier === "Elite" && hasHistory) {
+  if (isBodyweightOnly) {
+    actionableMessage = "ใช้เฉพาะน้ำหนักตัวก่อน; ระบบยังไม่แนะนำให้เพิ่มน้ำหนักภายนอกอัตโนมัติ";
+  } else if (tier === "Elite" && hasHistory) {
     actionableMessage = "🏆 ระดับสูงสุด (Elite): มุ่งเน้นการรักษาฟอร์มและการพัฒนาต่อเนื่อง";
   } else if (!hasHistory) {
     actionableMessage = `🎯 แนะนำเริ่มต้น (${tier}): ยก ${targetDisplayWeight} ${unit}${sideDetail} × ${targetWorkingReps} ครั้ง`;
