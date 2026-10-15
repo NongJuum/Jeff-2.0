@@ -205,3 +205,27 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
   });
 });
 
+
+
+describe("Safety factor covers machine-specific exercise categories", () => {
+  it("applies the back-injury reduction to chest-supported and cable row categories", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["lowerBack"], "ChestSupportedRow").safetyFactor).toBe(0.88);
+    expect(getSafetyFactor(30, ["lowerBack"], "SeatedCableRow").safetyFactor).toBe(0.88);
+  });
+
+  it("applies the shoulder-injury reduction to machine incline press", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["shoulder"], "InclineMachinePress").safetyFactor).toBe(0.88);
+  });
+
+  it("applies the wrist-injury reduction to triceps work", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["wrist"], "Tricep").safetyFactor).toBe(0.92);
+  });
+
+  it("does not apply injury adjustments to unrelated categories", async () => {
+    const { getSafetyFactor } = await import("../lib/assessment");
+    expect(getSafetyFactor(30, ["lowerBack"], "Bicep").safetyFactor).toBe(1.0);
+  });
+});
