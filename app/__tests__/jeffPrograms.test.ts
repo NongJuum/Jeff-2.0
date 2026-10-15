@@ -4,6 +4,8 @@ import {
   resolveProgramDayForDate,
   advanceJeffProgramAfterFinish,
   recommendPrograms,
+  getNextProgramTrainingDate,
+  isJeffProgramComplete,
   type ActiveJeffProgramState,
 } from "../lib/jeffPrograms";
 
@@ -87,6 +89,32 @@ describe("Jeff Nippard Calendar Schedule & Program Progression", () => {
       scheduleDays: [0, 2, 4],
     };
     expect(advanceJeffProgramAfterFinish(state, "2026-10-12")).toEqual(state);
+  });
+
+  it("finds the next training date while respecting a future program start date", () => {
+    const state: ActiveJeffProgramState = {
+      programId: "fundamentals_full_body",
+      startDate: "2026-10-21",
+      currentWeek: 1,
+      currentDayIndex: 0,
+      completedDays: [],
+      scheduleDays: [0, 2, 4],
+    };
+    expect(getNextProgramTrainingDate(state, new Date(2026, 9, 19, 12))).toBe("2026-10-21");
+    expect(getNextProgramTrainingDate({ ...state, scheduleDays: [] }, new Date(2026, 9, 19, 12))).toBeNull();
+  });
+
+  it("marks a program complete after its planned number of sessions", () => {
+    const state: ActiveJeffProgramState = {
+      programId: "fundamentals_full_body",
+      startDate: "2026-10-12",
+      currentWeek: 8,
+      currentDayIndex: 0,
+      completedDays: Array.from({ length: 24 }, (_, i) => `2026-10-${String(i + 1).padStart(2, "0")}`),
+      scheduleDays: [0, 2, 4],
+    };
+    expect(isJeffProgramComplete(state)).toBe(true);
+    expect(advanceJeffProgramAfterFinish(state, "2026-11-20")).toEqual(state);
   });
 
   it("recommendPrograms considers profile injuries and experience", () => {
