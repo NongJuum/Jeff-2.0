@@ -7,6 +7,7 @@ import {
   ArrowLeftRight,
   ArrowUp,
   Bell,
+  BookOpen,
   CalendarDays,
   Check,
   ChevronDown,
@@ -41,6 +42,19 @@ import {
   X,
 } from "lucide-react";
 import { OnboardingWizard, hasCompletedOnboarding } from "./components/OnboardingWizard";
+import {
+  JeffProgramPicker,
+  ActiveProgramDashboard,
+  JeffProgramTodayCard,
+} from "./components/JeffProgramPicker";
+import {
+  type ActiveJeffProgramState,
+  getActiveJeffProgram,
+  saveActiveJeffProgram,
+  clearActiveJeffProgram,
+  findProgramById,
+  getProgramCurrentWeek,
+} from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
 import { MuscleTapBuilder } from "./components/MuscleTapBuilder";
@@ -82,7 +96,7 @@ import {
 } from "./lib/assessment";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
-type AppMode = "dashboard" | "today" | "preset" | "custom" | "history" | "library";
+type AppMode = "dashboard" | "today" | "preset" | "custom" | "history" | "library" | "programs";
 
 type LoadType = "barbell" | "dumbbell" | "selectorized" | "plate-loaded" | "smith" | "cable" | "bodyweight" | "specialty";
 
@@ -4381,6 +4395,11 @@ export default function Page() {
       eyebrow: "Exercise",
       title: "Library",
       description: "รวมท่าที่มีใน gym",
+    },
+    programs: {
+      eyebrow: "Jeff Nippard",
+      title: "Programs",
+      description: "เลือกโปรแกรมและตารางฝึกตามวิทยาศาสตร์",
     },
   }[mode];
 
