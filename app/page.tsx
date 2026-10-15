@@ -7128,6 +7128,7 @@ export default function Page() {
           onComplete={(result) => {
             setDays(result.days);
             setUserProfile(result.profile);
+            setUserName(result.name);
             setAppLanguage(result.language);
             setFontScale(result.fontScale);
             setShowOnboarding(false);
