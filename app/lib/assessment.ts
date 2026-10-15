@@ -605,6 +605,15 @@ export function quantizeToHardware(
 
   snapped = Math.round(snapped * 100) / 100;
 
+  // Cable profiles may be per-side without being dumbbells. Report the actual
+  // hardware interface first so single-arm cable work never gets a dumbbell label.
+  if (profile.isPerHand && profile.pulleyRatio > 1.0) {
+    return {
+      hardwareWeightKg: snapped,
+      displayNote: `เสียบสลักพิน ${snapped} kg ต่อฝั่ง (รอกทด ${profile.pulleyRatio}:1)`,
+    };
+  }
+
   if (profile.isPerHand) {
     return {
       hardwareWeightKg: snapped,
