@@ -158,7 +158,7 @@ function ProgramCard({
       {isActive && (
         <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-black text-black">
           <Play size={9} fill="black" />
-          โปรแกรมที่ใช้อยู่
+          {language === "th" ? "โปรแกรมที่ใช้อยู่" : "Active program"}
         </div>
       )}
 
@@ -201,11 +201,11 @@ function ProgramCard({
         <div className="mt-3 flex flex-wrap gap-1.5">
           <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-300">
             <Calendar size={10} />
-            {program.daysPerWeek} วัน/สัปดาห์
+            {language === "th" ? `${program.daysPerWeek} วัน/สัปดาห์` : `${program.daysPerWeek} days/week`}
           </span>
           <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-300">
             <Clock size={10} />
-            {program.durationWeeks} สัปดาห์
+            {language === "th" ? `${program.durationWeeks} สัปดาห์` : `${program.durationWeeks} weeks`}
           </span>
           <span className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-300">
             <Layers size={10} />
@@ -437,7 +437,7 @@ function ProgramSetupModal({
                         className="flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1"
                       >
                         <span className="text-[10px] font-bold text-yellow-400">
-                          {DAY_FULL_LABELS[dayIdx]}
+                          {(language === "th" ? DAY_FULL_LABELS : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"])[dayIdx]}
                         </span>
                         <span className="text-[10px] text-zinc-400">
                           {d.getDate()}/{d.getMonth() + 1}
@@ -453,14 +453,14 @@ function ProgramSetupModal({
           {/* Week 1 preview */}
           <div>
             <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2 block">
-              ตัวอย่าง Week 1
+              {language === "th" ? "ตัวอย่างสัปดาห์ที่ 1" : "Week 1 preview"}
             </label>
             <div className="rounded-xl border border-zinc-800 bg-zinc-900 divide-y divide-zinc-800">
               {program.weeks[0].days.map((day, i) => (
                 <div key={i} className="px-3 py-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-black text-white">{day.dayLabel}: {day.focusLabel}</span>
-                    <span className="text-[10px] text-zinc-500">{day.exercises.length} exercises</span>
+                    <span className="text-[10px] text-zinc-500">{day.exercises.length} {language === "th" ? "ท่า" : "exercises"}</span>
                   </div>
                   <p className="mt-0.5 text-[10px] text-zinc-500 truncate">
                     {day.exercises.slice(0, 3).map((e) => e.name).join(" · ")}...
@@ -585,7 +585,7 @@ export function ActiveProgramDashboard({
             ) : isCompletedToday ? (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
                 <p className="text-sm font-black text-emerald-300">✅ {language === "th" ? "วันนี้ฝึกเสร็จแล้ว" : "Workout completed today"}</p>
-                <p className="mt-1 text-xs text-zinc-400">ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว</p>
+                <p className="mt-1 text-xs text-zinc-400">{language === "th" ? "ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว" : "Program progress has been saved."}</p>
               </div>
             ) : isTodayTrainingDay ? (
               <div className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3">
@@ -601,7 +601,7 @@ export function ActiveProgramDashboard({
               </div>
             ) : (
               <p className="text-xs text-zinc-500 mt-1">
-                🗓️ วันพัก — วันฝึกถัดไป: {nextTrainingLabel ?? "ยังไม่ได้เลือกวันฝึก"}
+                🗓️ {language === "th" ? "วันพัก — วันฝึกถัดไป:" : "Rest day — next workout:"} {nextTrainingLabel ?? (language === "th" ? "ยังไม่ได้เลือกวันฝึก" : "No training day selected")}
               </p>
             )}
           </div>
@@ -876,7 +876,8 @@ export function JeffProgramTodayCard({
     const nextTrainingLabel = nextTrainingDate
       ? (() => {
           const nextDate = new Date(`${nextTrainingDate}T12:00:00`);
-          return `${DAY_FULL_LABELS[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
+          const dayNames = language === "th" ? DAY_FULL_LABELS : ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        return `${dayNames[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
         })()
       : null;
     return (
