@@ -5017,7 +5017,8 @@ export default function Page() {
             )}
 
             {/* B. "Today's Workout" Visual Hero Card or Rest Day Card */}
-            {isTodayScheduledRest ? (
+            {(!activeJeffProgram || (!jeffCalendarStatus?.isCompleted && !isJeffProgramComplete(activeJeffProgram))) && (
+            isTodayScheduledRest ? (
               <div className="rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-5 shadow-2xl relative overflow-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex-1 min-w-0">
@@ -5131,7 +5132,8 @@ export default function Page() {
                   </div>
                 </div>
               </div>
-            ) : null}
+            ) : null
+            )}
 
             {/* C. Performance Overview with Apple-Style Activity Ring & Embedded 6-Component Breakdown */}
             <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4 sm:p-5 shadow-2xl space-y-4">
