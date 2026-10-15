@@ -568,6 +568,7 @@ describe("Standard commercial equipment midpoint defaults", () => {
   it("routes previously misclassified library exercises to appropriate categories", () => {
     const cases: Array<[string, string]> = [
       ["Cable Lat Prayers", "LatPull"],
+      ["Leg Press Calf Raise", "LegPressCalf"],
       ["Reverse Nordic", "LegExt"],
       ["Sissy Squat", "LegExt"],
       ["Cable Pull Through", "HipHinge"],
@@ -623,5 +624,7 @@ describe("Standard commercial equipment midpoint defaults", () => {
     expect(getExerciseStrengthCategory("Seated Calf Raise")).toBe("SeatedCalf");
     expect(STRENGTH_RATIOS.SeatedCalf.male).toBeLessThan(STRENGTH_RATIOS.Calf.male);
     expect(STRENGTH_RATIOS.SeatedCalf.female).toBeLessThan(STRENGTH_RATIOS.Calf.female);
+    expect(STRENGTH_RATIOS.Calf.male).toBeLessThan(1.0);
+    expect(STRENGTH_RATIOS.LegPressCalf.male).toBeLessThan(1.0);
   });
 });
