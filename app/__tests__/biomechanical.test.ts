@@ -4,6 +4,7 @@ import {
   quantizeToHardware,
   getDefaultMechanicalProfile,
   type UserProfile,
+  getExerciseStrengthCategory,
 } from "../lib/assessment";
 
 describe("Biomechanical Engine & Hardware Quantization", () => {
@@ -68,6 +69,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     const res = calculatePrescriptionWeight("Cable Lat Raise", "cable", "6 to 10", profile);
     expect(res.hardwareWeightKg).toBe(7.5);
     expect(res.displayNote).toContain("7.5 kg");
+    expect(res.displayNote).toContain("สลักพิน");
+    expect(res.displayNote).toContain("ต่อฝั่ง");
   });
 
   // Case 4: M 70kg Inter 45° Leg Press -> 85 kg plates total (no double angle)
@@ -136,6 +139,29 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
 
     // Ensure weights differ and do not blindly carry over incompatible values
     expect(barbellRes.hardwareWeightKg).not.toBe(cableRes.hardwareWeightKg);
+  });
+
+  it("supports explicit single-arm cable variants with per-side pin loads", () => {
+    const mech = getDefaultMechanicalProfile("cable", "Cable Curl (Single-Arm)");
+    expect(mech.isPerHand).toBe(true);
+    expect(mech.pulleyRatio).toBe(2);
+    expect(getExerciseStrengthCategory("Cable Curl (Single-Arm)")).toBe("Bicep");
+  });
+
+  it("supports explicit dual-arm cable variants as two independent stacks", () => {
+    const mech = getDefaultMechanicalProfile("cable", "Cable Curl (Dual-Arm, Two Stacks)");
+    expect(mech.isPerHand).toBe(true);
+    expect(mech.pulleyRatio).toBe(2);
+    expect(getExerciseStrengthCategory("Cable Curl (Dual-Arm, Two Stacks)")).toBe("Bicep");
+  });
+
+  it("applies explicit execution profiles before crossover-name heuristics", () => {
+    const single = getDefaultMechanicalProfile("cable", "Reverse Cable Crossover (Single-Arm)");
+    const dual = getDefaultMechanicalProfile("cable", "Reverse Cable Crossover (Dual-Arm, Two Stacks)");
+    expect(single.isPerHand).toBe(true);
+    expect(single.pulleyRatio).toBe(2);
+    expect(dual.isPerHand).toBe(true);
+    expect(dual.pulleyRatio).toBe(2);
   });
 });
 

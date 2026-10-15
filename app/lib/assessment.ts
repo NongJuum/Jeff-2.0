@@ -251,6 +251,27 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string):
     };
   }
 
+  // Explicit execution variants use a cable stack per working side.
+  // Single-arm = one working side; dual-arm = two independent stacks, one per hand.
+  // Keep the prescription expressed as pin weight PER SIDE; pulley ratio remains
+  // a separate machine assumption and defaults to 2:1 for these cable variants.
+  if (
+    (lowerName.includes("(single-arm)") || lowerName.includes("(dual-arm)")) &&
+    load === "cable"
+  ) {
+    return {
+      leverageRatio: 1.0,
+      camModifier: 1.0,
+      pulleyRatio: 2.0,
+      frictionCoeff: 0.05,
+      angleThetaDeg: 0,
+      isPerHand: true,
+      bilateralDeficit: false,
+      minHardwareStep: 2.5,
+      tareWeight: 0,
+    };
+  }
+
   // ─── Single-arm cable isolation on functional trainers ─────────────────────
   // isPerHand=true: force÷2 in calculatePrescriptionWeight, then ×2 via pulleyRatio=2.0
   // Net: rawKg = bilateral force = correct pin setting displayed to user.
@@ -583,6 +604,15 @@ export function quantizeToHardware(
   }
 
   snapped = Math.round(snapped * 100) / 100;
+
+  // Cable profiles may be per-side without being dumbbells. Report the actual
+  // hardware interface first so single-arm cable work never gets a dumbbell label.
+  if (profile.isPerHand && profile.pulleyRatio > 1.0) {
+    return {
+      hardwareWeightKg: snapped,
+      displayNote: `เสียบสลักพิน ${snapped} kg ต่อฝั่ง (รอกทด ${profile.pulleyRatio}:1)`,
+    };
+  }
 
   if (profile.isPerHand) {
     return {
