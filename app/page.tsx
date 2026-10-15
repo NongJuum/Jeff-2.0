@@ -6210,7 +6210,7 @@ export default function Page() {
                             step="0.5"
                             inputMode="decimal"
                             value={machineStartingResistances[machineResistanceKey] ?? ""}
-                            onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)
+                            onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)}
                             placeholder="ไม่ทราบ? ใช้ค่าประมาณของแอป"
                             className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-100 outline-none focus:border-yellow-400"
                           />
