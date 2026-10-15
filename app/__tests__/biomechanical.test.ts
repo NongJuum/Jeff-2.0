@@ -577,6 +577,8 @@ describe("Standard commercial equipment midpoint defaults", () => {
       ["Machine Hip Adduction", "HipIsolation"],
       ["Kickbacks", "HipIsolation"],
       ["Lean In DB Raise", "LatRaise"],
+      ["Reverse Pec Deck", "RearDelt"],
+      ["Reverse Cable Crossover", "RearDelt"],
       ["1 Arm DB Overhead", "Tricep"],
       ["Cable Crunch", "Abs"],
       ["Machine Abs Crunch", "Abs"],
