@@ -676,7 +676,7 @@ export interface BiomechanicalResult {
   exerciseName: string;
   targetWeightKg: number;
   hardwareWeightKg: number;
-  /** Human-readable meaning of hardwareWeightKg (total bar load, plates per side, stack pin, etc.). */
+  /** Human-readable meaning of hardwareWeightKg. Plate-loaded values are added plate mass only; iso-lateral values are summed across both sides. */
   hardwareLoadLabel: string;
   /** Plate mass per side, always stored in kg regardless of display unit. */
   platesPerSideKg?: number;
