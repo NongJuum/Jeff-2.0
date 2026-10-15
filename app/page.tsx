@@ -6208,25 +6208,45 @@ export default function Page() {
                         </div>
                       </div>
 
-                      {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "plate-loaded" || (currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "specialty") && (
-                        <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2">
-                          <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>{machineResistanceIsPerSide ? "แรงต้านเริ่มต้นต่อข้าง (kg) ถ้าทราบ" : "แรงต้านเริ่มต้นรวมของเครื่อง (kg) ถ้าทราบ"}</label>
-                          <input
-                            id={`machine-start-resistance-${baseExercise.id}`}
-                            aria-label="แรงต้านเริ่มต้นของเครื่อง (kg)"
-                            type="number"
-                            min="0"
-                            max="1000"
-                            step="0.5"
-                            inputMode="decimal"
-                            value={machineStartingResistances[machineResistanceKey] ?? ""}
-                            onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)}
-                            placeholder="ไม่ทราบ? ใช้ค่าประมาณของแอป"
-                            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-100 outline-none focus:border-yellow-400"
-                          />
-                          <p className="text-[10px] leading-relaxed text-zinc-500">เว้นว่างเพื่อใช้ค่าประมาณมาตรฐานของแอป หรือกรอกแรงต้านเริ่มต้นจริงของเครื่องนี้ ระบบจะจำค่าแยกตามเครื่องที่เลือก</p>
-                        </div>
-                      )}
+                      {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "plate-loaded" || (currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "specialty") && (() => {
+                        const defaultEstimateKg = getDefaultMechanicalProfile(effectiveLoad, `${exercise.name} ${currentMachine || ""}`).tareWeight;
+                        const userVal = machineStartingResistances[machineResistanceKey];
+                        return (
+                          <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>
+                                ⚖️ {machineResistanceIsPerSide ? "แรงต้านเริ่มต้นต่อข้าง (kg) ถ้าทราบ" : "แรงต้านเริ่มต้นรวมของเครื่อง (kg) ถ้าทราบ"}
+                              </label>
+                              {userVal !== undefined && userVal !== "" && (
+                                <button
+                                  type="button"
+                                  onClick={() => updateMachineStartingResistance(machineResistanceKey, "")}
+                                  className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline"
+                                  title="กลับไปใช้ค่าประมาณเริ่มต้นของระบบ"
+                                >
+                                  ใช้ค่าประมาณ ({defaultEstimateKg} kg)
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              id={`machine-start-resistance-${baseExercise.id}`}
+                              aria-label="แรงต้านเริ่มต้นของเครื่อง (kg)"
+                              type="number"
+                              min="0"
+                              max="1000"
+                              step="0.5"
+                              inputMode="decimal"
+                              value={userVal ?? ""}
+                              onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)}
+                              placeholder={`ค่าประมาณ: ${defaultEstimateKg} kg`}
+                              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-100 outline-none focus:border-yellow-400"
+                            />
+                            <p className="text-[10px] leading-relaxed text-zinc-500">
+                              {userVal ? `✓ บันทึกค่ากำหนดเองแล้ว (${userVal} kg)` : `ค่าเริ่มต้น: ประมาณ ${defaultEstimateKg} kg (กรอกค่าจริงได้ถ้าทราบ หรือเว้นว่างไว้)`}
+                            </p>
+                          </div>
+                        );
+                      })()}
 
                       {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "cable") && (
                         <div className="flex items-center gap-2 min-w-0 w-full">
@@ -6273,7 +6293,11 @@ export default function Page() {
 
                           <button
                             type="button"
-                            onClick={() => { updateMachineTag(baseExercise.id, ""); updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name)); }}
+                            onClick={() => {
+                              updateMachineTag(baseExercise.id, "");
+                              updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name));
+                              updateMachineStartingResistance(machineResistanceKey, "");
+                            }}
                             className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 py-0.5"
                             title="รีเซ็ตเครื่องเป็นค่าเริ่มต้น"
                           >

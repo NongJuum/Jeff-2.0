@@ -838,7 +838,7 @@ export function quantizeToHardware(
     const displayedStartingTotal = profile.isPerHand ? startDisplay * 2 : startDisplay;
     const note = profile.isPerHand
       ? (snappedPlatesDisplay > 0
-        ? `ใส่เพลตข้างละ ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} (เพลตรวมสองข้าง ${roundDisplay(displayedPlateTotal)} ${unitLabel}) + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel}/ข้าง (รวม ${roundDisplay(displayedStartingTotal)} ${unitLabel}) = โหลดรวมโดยประมาณ ${roundDisplay(displayedEffectiveTotal)} ${unitLabel}${warning(effectiveKg)}`
+        ? `ใส่เพลตข้างละ ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} ต่อข้าง (เพลตรวมสองข้าง ${roundDisplay(displayedPlateTotal)} ${unitLabel}) + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel}/ข้าง (รวม ${roundDisplay(displayedStartingTotal)} ${unitLabel}) = โหลดรวมโดยประมาณ ${roundDisplay(displayedEffectiveTotal)} ${unitLabel}${warning(effectiveKg)}`
         : `ไม่ต้องใส่เพลต; แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel}/ข้าง (รวม ${roundDisplay(displayedStartingTotal)} ${unitLabel}) = โหลดรวมโดยประมาณ ${roundDisplay(displayedEffectiveTotal)} ${unitLabel}${warning(effectiveKg)}`)
       : (snappedPlatesDisplay > 0
         ? `ใส่เพลตเพิ่ม ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} (ไม่รวมแรงต้านเครื่อง) + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`
