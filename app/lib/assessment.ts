@@ -564,6 +564,8 @@ export interface BiomechanicalResult {
   exerciseName: string;
   targetWeightKg: number;
   hardwareWeightKg: number;
+  /** Human-readable meaning of hardwareWeightKg (total bar load, plates per side, stack pin, etc.). */
+  hardwareLoadLabel: string;
   /** Plate mass per side, always stored in kg regardless of display unit. */
   platesPerSideKg?: number;
   tareWeightKg: number;
@@ -800,6 +802,7 @@ export function calculatePrescriptionWeight(
       exerciseName,
       targetWeightKg: Math.round(rawWeightKg * 10) / 10,
       hardwareWeightKg: quantized.hardwareWeightKg,
+      hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : load === "plate-loaded" ? (mechProfile.isPerHand ? "เพลตต่อข้าง" : "น้ำหนักเพลตรวม") : load === "cable" ? (mechProfile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : "น้ำหนักเครื่อง",
       platesPerSideKg: quantized.platesPerSideKg,
       hardwareExceedsTarget: quantized.hardwareExceedsTarget,
       tareWeightKg: 0,
@@ -850,6 +853,7 @@ export function calculatePrescriptionWeight(
     exerciseName,
     targetWeightKg: Math.round(rawWeightKg * 10) / 10,
     hardwareWeightKg: quantized.hardwareWeightKg,
+    hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : load === "plate-loaded" ? (profile.isPerHand ? "เพลตต่อข้าง" : "น้ำหนักเพลตรวม") : load === "cable" ? (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : load === "selectorized" ? "น้ำหนักสลักพิน" : "น้ำหนักอุปกรณ์",
     platesPerSideKg: quantized.platesPerSideKg,
     hardwareExceedsTarget: quantized.hardwareExceedsTarget,
     tareWeightKg: profile.tareWeight,
