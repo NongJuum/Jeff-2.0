@@ -511,6 +511,11 @@ export function ActiveProgramDashboard({
                 <p className="text-sm font-black text-emerald-300">🎉 ทำโปรแกรมครบแล้ว</p>
                 <p className="mt-1 text-xs text-zinc-400">เลือกโปรแกรมใหม่ได้ หรือทบทวนประวัติการฝึก</p>
               </div>
+            ) : isCompletedToday ? (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                <p className="text-sm font-black text-emerald-300">✅ วันนี้ฝึกเสร็จแล้ว</p>
+                <p className="mt-1 text-xs text-zinc-400">ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว</p>
+              </div>
             ) : isTodayTrainingDay ? (
               <div className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3">
                 <p className="text-[10px] font-bold uppercase text-yellow-400 mb-1">
@@ -775,6 +780,16 @@ export function JeffProgramTodayCard({
         <p className="text-2xl mb-2">🏆</p>
         <p className="font-black text-emerald-300">ทำโปรแกรม {program.shortName} ครบแล้ว</p>
         <p className="text-xs text-zinc-400 mt-1">เลือกโปรแกรมใหม่ได้จากเมนู Jeff Nippard Programs</p>
+      </div>
+    );
+  }
+
+  if (isCompletedToday) {
+    return (
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
+        <p className="text-2xl mb-2">✅</p>
+        <p className="font-black text-emerald-300">วันนี้ฝึกเสร็จแล้ว</p>
+        <p className="text-xs text-zinc-400 mt-1">บันทึกความคืบหน้าของ {program.shortName} เรียบร้อย</p>
       </div>
     );
   }
