@@ -58,6 +58,7 @@ import {
   resolveProgramDayForDate,
   advanceJeffProgramAfterFinish,
   isJeffProgramComplete,
+  getProgramDateKey as getJeffProgramDateKey,
 } from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
@@ -263,6 +264,8 @@ function getLocalDateKey(value: string | Date) {
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
+
+export { getLocalDateKey as getProgramDateKey };
 
 function getDefaultPulleyRatioForExercise(exerciseName: string): "1" | "2" {
   const lower = exerciseName.toLowerCase();
