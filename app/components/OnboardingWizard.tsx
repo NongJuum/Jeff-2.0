@@ -17,6 +17,7 @@ export type OnboardingResult = {
   language: AppLanguage;
   fontScale: FontScale;
   profile: UserProfile;
+  name: string;
 };
 
 export const ONBOARDING_KEY = "haitOnboardingV2";
@@ -91,6 +92,7 @@ export function OnboardingWizard({
   onComplete: (result: OnboardingResult) => void;
 }) {
   const [step, setStep] = useState(0);
+  const [name, setName] = useState("");
   const [gender, setGender] = useState<Gender | null>(null);
   const [age, setAge] = useState("");
   const [heightCm, setHeightCm] = useState("");
@@ -109,6 +111,7 @@ export function OnboardingWizard({
     profile: "ข้อมูลส่วนตัวและพื้นฐานการฝึก",
     training: "เป้าหมายและเวลาที่ฝึกได้",
     preferences: "ภาษาและขนาดตัวอักษร",
+    name: "ชื่อที่ต้องการให้แสดง (ไม่บังคับ)",
     gender: "เพศที่ใช้คำนวณสรีรศาสตร์",
     male: "ชาย",
     female: "หญิง",
@@ -137,6 +140,7 @@ export function OnboardingWizard({
     profile: "Personal profile and training background",
     training: "Goals and training availability",
     preferences: "Language and text size",
+    name: "Display name (optional)",
     gender: "Gender for biomechanics",
     male: "Male",
     female: "Female",
@@ -188,10 +192,12 @@ export function OnboardingWizard({
       }));
       window.localStorage.setItem(APP_LANGUAGE_KEY, language);
       window.localStorage.setItem(FONT_SCALE_KEY, fontScale);
-      const result: OnboardingResult = { level, goal, days, language, fontScale, profile };
+      const displayName = name.trim() || "Athlete";
+      window.localStorage.setItem("haitUserName", displayName);
+      const result: OnboardingResult = { level, goal, days, language, fontScale, profile, name: displayName };
       window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify(result));
     } catch {}
-    onComplete({ level, goal, days, language, fontScale, profile });
+    onComplete({ level, goal, days, language, fontScale, profile, name: name.trim() || "Athlete" });
   };
 
   const inputClass = "mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-3 text-base font-bold text-white outline-none focus:border-emerald-400";
@@ -222,6 +228,10 @@ export function OnboardingWizard({
         {step === 0 && (
           <div className="space-y-4">
             <h3 className="text-sm font-black text-zinc-200">{copy.profile}</h3>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-zinc-400">{copy.name}</label>
+              <input className={inputClass} value={name} onChange={e => setName(e.target.value)} maxLength={32} placeholder={language === "th" ? "เช่น นนท์" : "e.g. Alex"} />
+            </div>
             <div>
               <label className="mb-2 block text-xs font-bold text-zinc-400">{copy.gender} *</label>
               <div className="grid grid-cols-2 gap-2">
