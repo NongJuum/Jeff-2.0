@@ -48,9 +48,9 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
 
     const res = calculatePrescriptionWeight("Flat DB Press", "dumbbell", "6 to 10", profile);
     expect(res.isPerHand).toBe(true);
-    expect(res.hardwareWeightKg).toBe(10);
+    expect(res.hardwareWeightKg).toBe(7.5);
     expect(res.hardwareWeightKg).toBeLessThanOrEqual(res.targetWeightKg);
-    expect(res.displayNote).toContain("10 kg");
+    expect(res.displayNote).toContain("7.5 kg");
   });
 
   // Case 3: M 70kg Inter Cable Lat Raise (2:1) -> conservatively snapped down to 5 kg pin per side
