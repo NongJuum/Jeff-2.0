@@ -7,6 +7,8 @@ import {
   getExerciseStrengthCategory,
   getIntelligentWarmup,
   STANDARD_EQUIPMENT_DEFAULTS,
+  PLATE_LOADED_MACHINE_DEFAULTS,
+  getPlateLoadedMachineDefault,
 } from "../lib/assessment";
 
 describe("Biomechanical Engine & Hardware Quantization", () => {
@@ -76,8 +78,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(res.displayNote).toContain("ต่อฝั่ง");
   });
 
-  // Case 4: M 70kg beginner (8m) 45° Leg Press -> standardized external plate-load estimate
-  it("Case 4: M 70kg beginner 45° Leg Press uses standardized external load without an angle multiplier", () => {
+  // Case 4: Leg press target is converted into added plates after subtracting the built-in sled resistance.
+  it("Case 4: 45° Leg Press subtracts its estimated starting resistance before recommending plates", () => {
     const profile: UserProfile = {
       gender: "male",
       age: 26,
@@ -92,9 +94,11 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     };
 
     const res = calculatePrescriptionWeight("45° Leg Press", "plate-loaded", "8 to 12", profile);
-    expect(res.hardwareWeightKg).toBe(55);
-    expect(res.displayNote).toContain("55 kg");
-    expect(res.hardwareLoadLabel).toBe("น้ำหนักเพลตรวม");
+    expect(res.hardwareWeightKg).toBe(0);
+    expect(res.effectiveHardwareWeightKg).toBe(50);
+    expect(res.tareWeightKg).toBe(50);
+    expect(res.displayNote).toContain("แรงต้านเริ่มต้นประมาณ 50 kg");
+    expect(res.hardwareLoadLabel).toBe("เพลตรวมทั้งหมด");
   });
 
   // Case 5: F 60kg Novice DB Lat Raise -> hits 2.0-2.5 kg floor
@@ -315,7 +319,12 @@ describe("Standard commercial equipment midpoint defaults", () => {
     expect(STANDARD_EQUIPMENT_DEFAULTS.functionalTrainerPulleyRatio).toBe(2);
     expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").leverageRatio).toBe(1);
     expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").minHardwareStep).toBe(5);
+    expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").tareWeight).toBe(5);
     expect(getDefaultMechanicalProfile("selectorized", "Life Fitness Chest Press").minHardwareStep).toBe(5);
+    expect(PLATE_LOADED_MACHINE_DEFAULTS.length).toBeGreaterThanOrEqual(10);
+    expect(getPlateLoadedMachineDefault("Life Fitness Plate Loaded Incline Press").startingResistanceKg).toBe(5);
+    expect(getPlateLoadedMachineDefault("Hammer Strength Iso-Lateral Wide Chest").startingResistanceKg).toBe(5);
+    expect(getPlateLoadedMachineDefault("Unlisted Plate-Loaded Machine").startingResistanceKg).toBeGreaterThan(0);
   });
 
   it("labels Hammer-style plate-loaded machine loads as plates per side", () => {
@@ -326,7 +335,10 @@ describe("Standard commercial equipment midpoint defaults", () => {
     };
     const result = calculatePrescriptionWeight("Hammer Strength Chest Press", "plate-loaded", "8 to 12", profile);
     expect(result.hardwareLoadLabel).toBe("เพลตต่อข้าง");
+    expect(result.tareWeightKg).toBe(5);
+    expect(result.effectiveHardwareWeightKg).toBeGreaterThanOrEqual(5);
     expect(result.displayNote).toContain("ต่อข้าง");
+    expect(result.displayNote).toContain("แรงต้านเริ่มต้นประมาณ");
   });
 
   it("uses 1:1 for common pulldown stacks and 2:1 for functional-trainer isolation cables", () => {
