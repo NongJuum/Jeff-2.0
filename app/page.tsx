@@ -46,6 +46,7 @@ import {
   JeffProgramPicker,
   ActiveProgramDashboard,
   JeffProgramTodayCard,
+  getExerciseDisplayName,
 } from "./components/JeffProgramPicker";
 import {
   type ActiveJeffProgramState,
@@ -3982,7 +3983,7 @@ export default function Page() {
       ...info,
       consistency: weeklyAdherence,
       completion: overallProgress,
-      hasData: activeJeffProgram.completedDays.length > 0,
+      hasData: true,
     };
   }, [basePerformanceReport, activeJeffProgram, appLanguage]);
 
@@ -5443,7 +5444,7 @@ export default function Page() {
                           rel="noreferrer"
                           className="rounded-2xl bg-zinc-900 px-3 py-3 text-sm text-zinc-300"
                         >
-                          <span className="font-bold">{item.name}</span>
+                          <span className="font-bold">{getExerciseDisplayName(item.name, appLanguage)}</span>
                           <span className="mt-1 block text-xs text-zinc-500">
                             {item.movement} · {LOAD_LABELS[getLoadType(item)]} · {item.tier}
                           </span>
@@ -5743,7 +5744,7 @@ export default function Page() {
                           <span className={`line-clamp-2 text-xs font-bold leading-4 transition ${
                             isSelected ? "text-yellow-300 font-black" : "text-zinc-300 group-hover:text-white"
                           }`}>
-                            {substituteMap[item.id] || item.name}
+                            {getExerciseDisplayName(substituteMap[item.id] || item.name, appLanguage)}
                           </span>
                         </button>
 
@@ -5837,7 +5838,7 @@ export default function Page() {
                         className="flex w-full items-center justify-between gap-3 rounded-2xl bg-zinc-950 px-3 py-3 text-left"
                       >
                         <span>
-                          <span className="block font-bold">{item.name}</span>
+                          <span className="block font-bold">{getExerciseDisplayName(item.name, appLanguage)}</span>
                           <span className="text-xs text-zinc-500">
                             {item.group} · {item.movement} · {LOAD_LABELS[getLoadType(item)]} · {item.tier}
                           </span>
@@ -5972,7 +5973,7 @@ export default function Page() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[11px] font-mono font-bold text-zinc-500">#{index + 1}</span>
                           <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white font-mono break-words leading-snug">
-                            {exercise.name}
+                            {getExerciseDisplayName(exercise.name, appLanguage)}
                           </h3>
                         </div>
                         <div className="flex items-center gap-2 mt-1">
@@ -6994,7 +6995,7 @@ export default function Page() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-sm text-zinc-100">{candidate.name}</p>
+                          <p className="font-bold text-sm text-zinc-100">{getExerciseDisplayName(candidate.name, appLanguage)}</p>
                           <span className={`rounded-md border px-1.5 py-0.5 text-[10px] font-black ${tierStyles}`}>
                             {candidate.tier}
                           </span>
