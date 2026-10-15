@@ -94,6 +94,7 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     const res = calculatePrescriptionWeight("45° Leg Press", "plate-loaded", "8 to 12", profile);
     expect(res.hardwareWeightKg).toBe(55);
     expect(res.displayNote).toContain("55 kg");
+    expect(res.hardwareLoadLabel).toBe("น้ำหนักเพลตรวม");
   });
 
   // Case 5: F 60kg Novice DB Lat Raise -> hits 2.0-2.5 kg floor
@@ -139,6 +140,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(barbellRes.tareWeightKg).toBe(20);
     expect(smithRes.tareWeightKg).toBe(11);
     expect(cableRes.tareWeightKg).toBe(0);
+    expect(barbellRes.hardwareLoadLabel).toBe("น้ำหนักรวมคาน");
+    expect(smithRes.hardwareLoadLabel).toBe("น้ำหนักรวมบาร์สมิท");
 
     // Ensure weights differ and do not blindly carry over incompatible values
     expect(barbellRes.hardwareWeightKg).not.toBe(cableRes.hardwareWeightKg);
@@ -313,6 +316,17 @@ describe("Standard commercial equipment midpoint defaults", () => {
     expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").leverageRatio).toBe(1);
     expect(getDefaultMechanicalProfile("plate-loaded", "Hammer Strength Chest Press").minHardwareStep).toBe(5);
     expect(getDefaultMechanicalProfile("selectorized", "Life Fitness Chest Press").minHardwareStep).toBe(5);
+  });
+
+  it("labels Hammer-style plate-loaded machine loads as plates per side", () => {
+    const profile: UserProfile = {
+      gender: "male", age: 28, heightCm: 180, weightKg: 80, expMonths: 24,
+      daysPerWeek: 4, goal: "hypertrophy", injuries: [], preferredWeightUnit: "kg",
+      updatedAt: new Date().toISOString(),
+    };
+    const result = calculatePrescriptionWeight("Hammer Strength Chest Press", "plate-loaded", "8 to 12", profile);
+    expect(result.hardwareLoadLabel).toBe("เพลตต่อข้าง");
+    expect(result.displayNote).toContain("ต่อข้าง");
   });
 
   it("uses 1:1 for common pulldown stacks and 2:1 for functional-trainer isolation cables", () => {
