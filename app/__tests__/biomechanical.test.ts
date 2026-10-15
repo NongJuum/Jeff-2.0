@@ -47,12 +47,12 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
 
     const res = calculatePrescriptionWeight("Flat DB Press", "dumbbell", "6 to 10", profile);
     expect(res.isPerHand).toBe(true);
-    expect(res.hardwareWeightKg).toBe(7.5);
+    expect(res.hardwareWeightKg).toBe(10);
     expect(res.hardwareWeightKg).toBeLessThanOrEqual(res.targetWeightKg);
-    expect(res.displayNote).toContain("7.5 kg");
+    expect(res.displayNote).toContain("10 kg");
   });
 
-  // Case 3: M 70kg Inter Cable Lat Raise (2:1) -> 7.5 kg pin per side
+  // Case 3: M 70kg Inter Cable Lat Raise (2:1) -> conservatively snapped down to 5 kg pin per side
   it("Case 3: M 70kg Inter Cable Lat Raise (2:1) -> 7.5 kg pin per side", () => {
     const profile: UserProfile = {
       gender: "male",
@@ -68,13 +68,13 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     };
 
     const res = calculatePrescriptionWeight("Cable Lat Raise", "cable", "6 to 10", profile);
-    expect(res.hardwareWeightKg).toBe(7.5);
-    expect(res.displayNote).toContain("7.5 kg");
+    expect(res.hardwareWeightKg).toBe(5);
+    expect(res.displayNote).toContain("5 kg");
     expect(res.displayNote).toContain("สลักพิน");
     expect(res.displayNote).toContain("ต่อฝั่ง");
   });
 
-  // Case 4: M 70kg Inter (8m) 45° Leg Press -> 80 kg plates total (with 8% safety margin)
+  // Case 4: M 70kg beginner (8m) 45° Leg Press -> conservatively snapped down to 75 kg plates total
   it("Case 4: M 70kg Inter 45° Leg Press -> 80 kg plates total", () => {
     const profile: UserProfile = {
       gender: "male",
@@ -90,8 +90,8 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     };
 
     const res = calculatePrescriptionWeight("45° Leg Press", "plate-loaded", "8 to 12", profile);
-    expect(res.hardwareWeightKg).toBe(80);
-    expect(res.displayNote).toContain("80 kg");
+    expect(res.hardwareWeightKg).toBe(75);
+    expect(res.displayNote).toContain("75 kg");
   });
 
   // Case 5: F 60kg Novice DB Lat Raise -> hits 2.0-2.5 kg floor
