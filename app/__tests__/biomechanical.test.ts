@@ -8,6 +8,8 @@ import {
   getIntelligentWarmup,
   STANDARD_EQUIPMENT_DEFAULTS,
   STRENGTH_RATIOS,
+  RELATIVE_STRENGTH_THRESHOLDS,
+  shouldAutoPrescribeAddedLoad,
   PLATE_LOADED_MACHINE_DEFAULTS,
   getPlateLoadedMachineDefault,
   getPinLoadedMachineDefault,
@@ -413,6 +415,47 @@ describe("Standard commercial equipment midpoint defaults", () => {
       const category = getExerciseStrengthCategory(name);
       expect(STRENGTH_RATIOS[category], `missing strength ratio for ${name} -> ${category}`).toBeDefined();
     }
+  });
+
+  it("routes previously misclassified library exercises to appropriate categories", () => {
+    const cases: Array<[string, string]> = [
+      ["Cable Lat Prayers", "LatPull"],
+      ["Reverse Nordic", "LegExt"],
+      ["Sissy Squat", "LegExt"],
+      ["Cable Pull Through", "HipHinge"],
+      ["45° Back Extension", "HipHinge"],
+      ["45° Glute Hyperextension", "HipHinge"],
+      ["Machine Hip Abduction", "HipIsolation"],
+      ["Machine Hip Adduction", "HipIsolation"],
+      ["Kickbacks", "HipIsolation"],
+      ["Lean In DB Raise", "LatRaise"],
+      ["1 Arm DB Overhead", "Tricep"],
+      ["Cable Crunch", "Abs"],
+      ["Machine Abs Crunch", "Abs"],
+      ["Hanging Knee Raise", "Abs"],
+      ["Captain's Chair Knee Raise", "Abs"],
+      ["Hanging Leg Raise", "Abs"],
+      ["Ab Wheel Rollout", "Abs"],
+    ];
+    for (const [name, expected] of cases) {
+      expect(getExerciseStrengthCategory(name), name).toBe(expected);
+      expect(STRENGTH_RATIOS[expected], name).toBeDefined();
+    }
+  });
+
+  it("uses conservative machine-dependent calf thresholds", () => {
+    expect(RELATIVE_STRENGTH_THRESHOLDS.seatedCalf).toEqual([0.35, 0.55, 0.75]);
+    expect(RELATIVE_STRENGTH_THRESHOLDS.standingCalf).toEqual([0.45, 0.70, 0.95]);
+    expect(RELATIVE_STRENGTH_THRESHOLDS.legPressCalf).toEqual([0.65, 1.00, 1.40]);
+  });
+
+  it("does not auto-prescribe added load for bodyweight-only movements", () => {
+    for (const name of ["Reverse Nordic", "Sissy Squat", "Hanging Knee Raise", "Ab Wheel Rollout", "45° Back Extension"]) {
+      expect(shouldAutoPrescribeAddedLoad("bodyweight", name), name).toBe(false);
+    }
+    expect(shouldAutoPrescribeAddedLoad("bodyweight", "Weighted Dip")).toBe(true);
+    expect(shouldAutoPrescribeAddedLoad("bodyweight", "Weighted Pull Up")).toBe(true);
+    expect(shouldAutoPrescribeAddedLoad("selectorized", "Machine Abs Crunch")).toBe(true);
   });
 
   it("uses a conservative, distinct strength category for Seated Calf Raise", () => {
