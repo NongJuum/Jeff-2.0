@@ -56,6 +56,7 @@ import {
   getProgramCurrentWeek,
   resolveProgramDayForDate,
   advanceJeffProgramAfterFinish,
+  isJeffProgramComplete,
 } from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
@@ -2906,6 +2907,8 @@ export default function Page() {
   function handleResetProgram() {
     clearActiveJeffProgram();
     setActiveJeffProgram(null);
+    setSelectedDay(0);
+    setActiveExerciseIndex(0);
   }
 
   // Active Session Engine & Accordion States (Hevy/Strong Style)
@@ -2968,6 +2971,8 @@ export default function Page() {
   }
 
   function handleTriggerFinishWorkout(dayTitle: string, currentDayExercises: PlanExercise[]) {
+    if (activeJeffProgram && isJeffProgramComplete(activeJeffProgram)) return;
+
     let totalSetsDone = 0;
     let totalVol = 0;
     const allCompletedSets: LogSet[] = [];
@@ -4670,7 +4675,9 @@ export default function Page() {
             <button
               type="button"
               onClick={() => handleTriggerFinishWorkout(day.title, day.exercises)}
-              className="flex items-center gap-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-3.5 py-1.5 text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.35)] transition active:scale-95"
+              disabled={Boolean(activeJeffProgram && isJeffProgramComplete(activeJeffProgram))}
+              title={activeJeffProgram && isJeffProgramComplete(activeJeffProgram) ? "โปรแกรมนี้เสร็จสมบูรณ์แล้ว" : "Finish workout"}
+              className="flex items-center gap-1.5 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-3.5 py-1.5 text-xs font-black uppercase tracking-wider shadow-[0_0_15px_rgba(250,204,21,0.35)] transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               <Check size={15} className="stroke-[3]" />
               <span>Finish</span>
@@ -5427,6 +5434,7 @@ export default function Page() {
             )}
             <JeffProgramPicker
               onProgramActivated={handleSelectJeffProgram}
+              onProgramStopped={handleResetProgram}
             />
           </div>
         )}
