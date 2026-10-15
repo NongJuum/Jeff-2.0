@@ -101,7 +101,7 @@ describe("Biomechanical Engine & Hardware Quantization", () => {
     expect(res.effectiveHardwareWeightKg).toBe(50);
     expect(res.tareWeightKg).toBe(50);
     expect(res.displayNote).toContain("แรงต้านเริ่มต้นประมาณ 50 kg");
-    expect(res.hardwareLoadLabel).toBe("เพลตรวมทั้งหมด");
+    expect(res.hardwareLoadLabel).toBe("เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)");
 
     const customResistance = calculatePrescriptionWeight("45° Leg Press", "plate-loaded", "8 to 12", profile, 1, "", undefined, undefined, 35);
     expect(customResistance.tareWeightKg).toBe(35);
@@ -283,6 +283,16 @@ describe("Hardware quantization safety and unit invariants", () => {
     expect(result.displayNote).toContain("lbs");
   });
 
+  it("reports bilateral added plates separately from built-in resistance on iso-lateral machines", () => {
+    const isoProfile = { ...profile, isPerHand: true, isPlateLoaded: true, tareWeight: 5, minHardwareStep: 5 };
+    const result = quantizeToHardware(30, isoProfile, true, false, "kg");
+    expect(result.platesPerSideKg).toBe(25);
+    expect(result.hardwareWeightKg).toBe(50); // total plates across both sides
+    expect(result.effectiveHardwareWeightKg).toBe(60); // includes 5 kg starting resistance per side
+    expect(result.displayNote).toContain("เพลตรวมสองข้าง 50 kg");
+    expect(result.displayNote).toContain("โหลดรวมโดยประมาณ 60 kg");
+  });
+
   it("warns when an empty bar exceeds the calculated target", () => {
     const bar = { ...profile, tareWeight: 20 };
     const result = quantizeToHardware(14, bar, false, false, "kg");
@@ -346,7 +356,7 @@ describe("Standard commercial equipment midpoint defaults", () => {
       updatedAt: new Date().toISOString(),
     };
     const result = calculatePrescriptionWeight("Hammer Strength Chest Press", "plate-loaded", "8 to 12", profile);
-    expect(result.hardwareLoadLabel).toBe("เพลตต่อข้าง");
+    expect(result.hardwareLoadLabel).toBe("เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)");
     expect(result.tareWeightKg).toBe(5);
     expect(result.effectiveHardwareWeightKg).toBeGreaterThanOrEqual(5);
     expect(result.displayNote).toContain("ต่อข้าง");
@@ -387,6 +397,21 @@ describe("Standard commercial equipment midpoint defaults", () => {
       const profile = getDefaultMechanicalProfile("selectorized", name);
       expect(profile.minHardwareStep, name).toBe(5);
       expect(profile.tareWeight, name).toBe(0);
+    }
+  });
+
+  it("routes the common exercise categories to explicit strength ratios", () => {
+    const names = [
+      "Deadlift", "Romanian Deadlift", "Back Squat", "45° Leg Press",
+      "Leg Extension", "Seated Hamstring Curl", "Bench Press", "Incline DB Press",
+      "Decline Machine Press", "Overhead Press", "Lateral Raise", "Rear Delt Flye",
+      "Lat Pulldown", "Bent-Over Row", "Chest Supported Row", "Seated Cable Row",
+      "Iso-Lateral High Row", "Iso-Lateral Low Row", "Shrug", "Bicep Curl",
+      "Triceps Pressdown", "Seated Calf Raise", "Standing Calf Raise", "Hip Thrust",
+    ];
+    for (const name of names) {
+      const category = getExerciseStrengthCategory(name);
+      expect(STRENGTH_RATIOS[category], `missing strength ratio for ${name} -> ${category}`).toBeDefined();
     }
   });
 
