@@ -228,7 +228,7 @@ export function resolveMechanicalProfile(exerciseName: string, machineTag = ""):
   return { baseRatio: { male: 0.40, female: 0.25 }, pulleyRatio: 1.0, isPerHand: false, stabilityFactor: 1.0 };
 }
 
-export function getDefaultMechanicalProfile(load: string, exerciseName: string): MechanicalProfile {
+export function getDefaultMechanicalProfile(load: string, exerciseName: string, pulleyRatioOverride?: number): MechanicalProfile {
   const lowerName = exerciseName.toLowerCase();
 
   // Special Overrides first:
@@ -256,13 +256,13 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string):
   // Keep the prescription expressed as pin weight PER SIDE; pulley ratio remains
   // a separate machine assumption and defaults to 2:1 for these cable variants.
   if (
-    (lowerName.includes("(single-arm)") || lowerName.includes("(dual-arm)")) &&
+    (lowerName.includes("(single-arm)") || lowerName.includes("(dual-arm")) &&
     load === "cable"
   ) {
     return {
       leverageRatio: 1.0,
       camModifier: 1.0,
-      pulleyRatio: 2.0,
+      pulleyRatio: pulleyRatioOverride ?? 2.0,
       frictionCoeff: 0.05,
       angleThetaDeg: 0,
       isPerHand: true,
@@ -555,7 +555,8 @@ export interface BiomechanicalResult {
 export function quantizeToHardware(
   rawWeightKg: number,
   profile: MechanicalProfile,
-  isIsolation: boolean
+  isIsolation: boolean,
+  isCable: boolean = false
 ): { hardwareWeightKg: number; platesPerSideKg?: number; displayNote: string } {
   const tare = profile.tareWeight;
   const step = profile.minHardwareStep;
@@ -606,7 +607,14 @@ export function quantizeToHardware(
   snapped = Math.round(snapped * 100) / 100;
 
   // Cable profiles may be per-side without being dumbbells. Report the actual
-  // hardware interface first so single-arm cable work never gets a dumbbell label.
+  // hardware interface first so cable work is labeled correctly even at 1:1.
+  if (isCable) {
+    return {
+      hardwareWeightKg: snapped,
+      displayNote: `เสียบสลักพิน ${snapped} kg ต่อฝั่ง (รอกทด ${profile.pulleyRatio}:1)`,
+    };
+  }
+
   if (profile.isPerHand && profile.pulleyRatio > 1.0) {
     return {
       hardwareWeightKg: snapped,
@@ -646,7 +654,8 @@ export function calculatePrescriptionWeight(
   repsStr: string,
   userProfile: UserProfile,
   mMusc: number = 1.0,
-  machineTag: string = ""
+  machineTag: string = "",
+  pulleyRatioOverride?: number
 ): BiomechanicalResult {
   const bw = userProfile.weightKg;
   const isFemale = userProfile.gender === "female";
@@ -676,7 +685,11 @@ export function calculatePrescriptionWeight(
   if (!isFreeWeightLoad && isRowChestOrPulldown && mechProfile.baseRatio.male !== 0.40) {
     const baseRatio = isFemale ? mechProfile.baseRatio.female : mechProfile.baseRatio.male;
     const f_physio = bw * baseRatio * e_exp * r_rep * mechProfile.stabilityFactor * g_goal * m_musc;
-    const rawWeightKg = f_physio * mechProfile.pulleyRatio;
+    const selectedPulleyRatio = pulleyRatioOverride ?? mechProfile.pulleyRatio;
+    const pulleyMultiplier = pulleyRatioOverride && load === "cable"
+      ? mechProfile.pulleyRatio * (mechProfile.pulleyRatio / pulleyRatioOverride)
+      : mechProfile.pulleyRatio;
+    const rawWeightKg = f_physio * pulleyMultiplier;
 
     const step = 2.5;
     let snapped = Math.round(rawWeightKg / step) * step;
@@ -684,7 +697,9 @@ export function calculatePrescriptionWeight(
     snapped = Math.round(snapped * 100) / 100;
 
     let displayNote = `แผ่น/สลักน้ำหนัก ${snapped} kg`;
-    if (mechProfile.isPerHand) {
+    if (load === "cable") {
+      displayNote = `เสียบสลักพิน ${snapped} kg${mechProfile.isPerHand ? " ต่อฝั่ง" : ""} (รอกทด ${selectedPulleyRatio}:1)`;
+    } else if (mechProfile.isPerHand) {
       displayNote = `ดัมเบล / สลักข้างละ ${snapped} kg`;
     } else if (mechProfile.pulleyRatio > 1.0) {
       displayNote = `เสียบสลักพิน ${snapped} kg (รอกทด ${mechProfile.pulleyRatio}:1)`;
@@ -710,7 +725,7 @@ export function calculatePrescriptionWeight(
 
   let force = bw * s_ratio * e_exp * r_rep * g_goal * m_musc;
 
-  const profile = getDefaultMechanicalProfile(load, exerciseName);
+  const profile = getDefaultMechanicalProfile(load, exerciseName, pulleyRatioOverride);
 
   if (profile.isPerHand) {
     force = (force / 2) * (profile.bilateralDeficit ? 0.88 : 1.0);
@@ -719,7 +734,11 @@ export function calculatePrescriptionWeight(
   const lowerName = exerciseName.toLowerCase();
   const radAngle = (profile.angleThetaDeg * Math.PI) / 180;
   const denominator = Math.cos(radAngle) + profile.frictionCoeff;
-  let rawWeightKg = force * profile.leverageRatio * profile.camModifier * (profile.pulleyRatio / denominator);
+  const baselinePulleyRatio = getDefaultMechanicalProfile(load, exerciseName).pulleyRatio;
+  const pulleyMultiplier = pulleyRatioOverride && load === "cable"
+    ? baselinePulleyRatio * (baselinePulleyRatio / pulleyRatioOverride)
+    : profile.pulleyRatio;
+  let rawWeightKg = force * profile.leverageRatio * profile.camModifier * (pulleyMultiplier / denominator);
 
   // Biomechanical Safety Clamp: Cable Row / Seated Row max baseline
   if (cat === "SeatedCableRow" || lowerName.includes("cable row") || lowerName.includes("seated row")) {
@@ -731,7 +750,10 @@ export function calculatePrescriptionWeight(
 
   const isIsolation = cat === "LatRaise" || cat === "Flye" || cat === "Bicep" || cat === "Tricep" || cat === "RearDelt" || cat === "LegExt" || cat === "LegCurl";
 
-  const quantized = quantizeToHardware(rawWeightKg, profile, isIsolation);
+  const quantizeProfile = pulleyRatioOverride && load === "cable"
+    ? { ...profile, pulleyRatio: pulleyRatioOverride }
+    : profile;
+  const quantized = quantizeToHardware(rawWeightKg, quantizeProfile, isIsolation, load === "cable");
 
   return {
     exerciseName,
