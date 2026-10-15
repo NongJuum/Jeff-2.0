@@ -129,7 +129,7 @@ export const STRENGTH_RATIOS: Record<string, { male: number; female: number }> =
   // Seated calf machines have model-dependent lever arms and pad geometry.
   // Use a deliberately conservative working-load baseline, distinct from standing calf raises.
   SeatedCalf: { male: 0.65, female: 0.45 },
-  Calf: { male: 0.90, female: 0.60 },
+  Calf: { male: 1.25, female: 0.85 },
   HipThrust: { male: 1.60, female: 1.20 },
 };
 
