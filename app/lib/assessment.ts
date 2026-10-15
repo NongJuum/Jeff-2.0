@@ -239,6 +239,35 @@ export function getPlateLoadedMachineDefault(exerciseName: string, machineTag = 
   };
 }
 
+export type PinLoadedMachineDefault = {
+  aliases: string[];
+  /** Selectorized stacks already represent the selectable load; do not add this to the pin value. */
+  stackStepKg: number;
+  configuration: "single-stack" | "independent-arms";
+  pulleyRatio: number;
+  source: "manufacturer-spec" | "category-estimate";
+};
+
+/** Pin-stack defaults for every selectorized machine family in the exercise library. */
+export const PIN_LOADED_MACHINE_DEFAULTS: PinLoadedMachineDefault[] = [
+  { aliases: ["machine chest press", "pin-loaded chest press", "incline machine bench", "decline machine press"], stackStepKg: 5, configuration: "single-stack", pulleyRatio: 1, source: "category-estimate" },
+  { aliases: ["pec deck", "reverse pec deck", "atlantis machine lat raise"], stackStepKg: 5, configuration: "single-stack", pulleyRatio: 1, source: "category-estimate" },
+  { aliases: ["neutral grip lat pull down", "widegrip lat pull down", "assisted pull up machine"], stackStepKg: 5, configuration: "single-stack", pulleyRatio: 1, source: "category-estimate" },
+  { aliases: ["leg extension", "seated hamstring curl", "lying leg curl"], stackStepKg: 5, configuration: "single-stack", pulleyRatio: 1, source: "category-estimate" },
+  { aliases: ["machine hip thrust", "machine hip abduction", "machine hip adduction"], stackStepKg: 5, configuration: "single-stack", pulleyRatio: 1, source: "category-estimate" },
+  { aliases: ["machine shoulder press", "machine triceps extension", "machine preacher curl", "machine abs crunch", "seated calf raise", "standing calf raise"], stackStepKg: 5, configuration: "single-stack", pulleyRatio: 1, source: "category-estimate" },
+];
+
+export function getPinLoadedMachineDefault(exerciseName: string, machineTag = ""): PinLoadedMachineDefault {
+  const name = `${exerciseName} ${machineTag}`.toLowerCase().replace(/\\s+/g, " ").trim();
+  const matched = [...PIN_LOADED_MACHINE_DEFAULTS]
+    .sort((a, b) => Math.max(...b.aliases.map((alias) => alias.length)) - Math.max(...a.aliases.map((alias) => alias.length)))
+    .find((entry) => entry.aliases.some((alias) => name.includes(alias)));
+  if (matched) return matched;
+  // Safe generic pin-stack fallback; the selected pin value is the load itself.
+  return { aliases: ["unclassified pin-loaded machine"], stackStepKg: 5, configuration: /single-arm|one arm|iso-lateral|dual-arm/.test(name) ? "independent-arms" : "single-stack", pulleyRatio: 1, source: "category-estimate" };
+}
+
 export interface MechanicalProfile {
   leverageRatio: number;
   camModifier: number;
@@ -477,18 +506,20 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
         isPlateLoaded: true,
       };
     }
-    case "selectorized":
+    case "selectorized": {
+      const machine = getPinLoadedMachineDefault(exerciseName);
       return {
         leverageRatio: 1.0,
         camModifier: 1.0,
-        pulleyRatio: 1.0,
+        pulleyRatio: machine.pulleyRatio,
         frictionCoeff: 0.0,
         angleThetaDeg: 0,
-        isPerHand: false,
+        isPerHand: machine.configuration === "independent-arms",
         bilateralDeficit: false,
-        minHardwareStep: STANDARD_EQUIPMENT_DEFAULTS.selectorizedStackStepKg,
+        minHardwareStep: machine.stackStepKg,
         tareWeight: 0,
       };
+    }
     case "cable": {
       // Single-arm isolation: isPerHand=true, pulleyRatio=2.0
       // (force÷2 × 2.0 = bilateral force = correct pin display)
