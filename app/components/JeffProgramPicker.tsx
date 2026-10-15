@@ -586,7 +586,7 @@ export function ActiveProgramDashboard({
             ) : isCompletedToday ? (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
                 <p className="text-sm font-black text-emerald-300">✅ {language === "th" ? "วันนี้ฝึกเสร็จแล้ว" : "Workout completed today"}</p>
-                <p className="mt-1 text-xs text-zinc-400">{language === "th" ? "{language === "th" ? "ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว" : "Program progress has been saved."}" : "Program progress has been saved."}</p>
+                <p className="mt-1 text-xs text-zinc-400">{language === "th" ? "ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว" : "Program progress has been saved."}</p>
               </div>
             ) : isTodayTrainingDay ? (
               <div className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3">
