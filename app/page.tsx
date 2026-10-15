@@ -5974,17 +5974,6 @@ export default function Page() {
                 const effectiveUnit = getEffectiveUnitForExercise(exercise.name, currentMachine);
     const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
 
-    const aiWeightSuggestion = userProfile ? (() => {
-      const muscleMass = userProfile.muscleMassKg ?? Math.round(userProfile.weightKg * 0.42);
-      const muscleMode = userProfile.muscleMassMode ?? "smm";
-      const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
-      const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-      const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined, undefined, machineStartingResistances[machineResistanceKey]?.trim() ? Number(machineStartingResistances[machineResistanceKey]) : undefined);
-      return effectiveUnit === "lbs"
-        ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
-        : bioRes.hardwareWeightKg;
-    })() : 0;
-
     // Check set #1 from inputs or logs (Set numbers start at 1, not 0)
     const inputWeightSet1 = parseFloat(currentSetInputs[0]?.weightLbs);
     const inputRepsSet1 = parseFloat(currentSetInputs[0]?.reps);
@@ -6389,6 +6378,7 @@ export default function Page() {
                             : 0;
 
                           const aiWeightSuggestion = userProfile ? (() => {
+                            if (!shouldAutoPrescribeAddedLoad(effectiveLoad, exercise.name)) return 0;
                             const muscleMass = userProfile.muscleMassKg ?? Math.round(userProfile.weightKg * 0.42);
                             const muscleMode = userProfile.muscleMassMode ?? "smm";
                             const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
@@ -6399,9 +6389,9 @@ export default function Page() {
                               : bioRes.hardwareWeightKg;
                           })() : 0;
 
-                          const effectivePlaceholderWeight = fallbackWeightVal > 0 
-                            ? fallbackWeightVal 
-                            : (strengthTierInfo?.targetDisplayWeight ?? 0);
+                          const effectivePlaceholderWeight = fallbackWeightVal > 0
+                            ? fallbackWeightVal
+                            : aiWeightSuggestion;
 
                           return (
                             <div key={setIndex} className="rounded-2xl bg-[#141416] p-2 hover:bg-[#18181c] transition">
