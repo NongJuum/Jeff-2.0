@@ -354,4 +354,34 @@ describe("Standard commercial equipment midpoint defaults", () => {
     expect(pulldown.pulleyRatio).toBe(1);
     expect(curl.pulleyRatio).toBe(2);
   });
+
+  it("covers machine exercises in the library with automatic pin or plate defaults", () => {
+    const plateMachines = [
+      "Plate-Loaded Chest Press", "Iso-Lateral Chest Press", "Iso-Lateral Incline Press",
+      "Machine High Row", "Chest Supported T-Bar Row", "Iso-Lateral Low Row",
+      "Iso-Lateral Pulldown", "45° Leg Press", "45° Leg Press High Foot",
+      "Hack Squat", "Belt Squat", "Pendulum Squat", "V-Squat Machine", "Leg Press Calf Raise",
+    ];
+    for (const name of plateMachines) {
+      const load = ["Hack Squat", "Belt Squat", "Pendulum Squat", "V-Squat Machine"].includes(name) ? "specialty" : "plate-loaded";
+      const profile = getDefaultMechanicalProfile(load, name);
+      expect(profile.isPlateLoaded, name).toBe(true);
+      expect(profile.tareWeight, name).toBeGreaterThan(0);
+      expect(profile.minHardwareStep, name).toBeGreaterThan(0);
+    }
+
+    const pinMachines = [
+      "Machine Chest Press", "Pin-Loaded Chest Press", "Incline Machine Bench",
+      "Decline Machine Press", "Pec Deck", "Reverse Pec Deck", "Neutral Grip Lat Pull Down",
+      "Widegrip Lat Pull Down", "Assisted Pull Up Machine", "Leg Extension",
+      "Seated Hamstring Curl", "Lying Leg Curl", "Machine Hip Thrust",
+      "Machine Shoulder Press", "Machine Triceps Extension", "Machine Preacher Curl",
+      "Machine Abs Crunch", "Seated Calf Raise", "Standing Calf Raise",
+    ];
+    for (const name of pinMachines) {
+      const profile = getDefaultMechanicalProfile("selectorized", name);
+      expect(profile.minHardwareStep, name).toBe(5);
+      expect(profile.tareWeight, name).toBe(0);
+    }
+  });
 });
