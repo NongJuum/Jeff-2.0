@@ -6005,7 +6005,7 @@ export default function Page() {
                             const muscleMode = userProfile.muscleMassMode ?? "smm";
                             const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
                             const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? "2") : undefined);
+                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined);
                             return effectiveUnit === "lbs"
                               ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
                               : bioRes.hardwareWeightKg;
