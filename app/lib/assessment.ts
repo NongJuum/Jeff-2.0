@@ -554,11 +554,11 @@ export interface BiomechanicalResult {
 /**
  * Explicit Biomechanical Safety Factor (Conservative Load Margin)
  * Separated from muscle mass rating (SMM).
- * - Novice (<6m): 0.88 safety factor (conservative starting point to protect connective tissue)
+ * - Novice (<6m): 0.88 heuristic multiplier (not a guarantee of injury prevention)
  * - Beginner (6-12m): 0.92
  * - Intermediate (1-2y): 0.96
  * - Advanced (>2y): 1.00
- * - Injury adjustment: -0.10 for relevant joint/area injuries
+ * - Injury adjustments: -0.12 for relevant back/shoulder/knee categories; -0.08 for wrist categories
  */
 export function getSafetyFactor(
   expMonths: number,
@@ -579,7 +579,7 @@ export function getSafetyFactor(
     reason = "ระดับกลาง (1-2 ปี): เผื่อความปลอดภัย 4%";
   } else {
     factor = 1.00;
-    reason = "มีประสบการณ์ (>2 ปี): ใช้พิกัดแรงเต็มขีดความสามารถ";
+    reason = "มีประสบการณ์ (>2 ปี): ใช้ตัวคูณพื้นฐาน 100% แต่ต้องปรับตามความยากจริงของเซต";
   }
 
   // Injury penalty if active injury matches exercise category
@@ -801,9 +801,12 @@ export function calculatePrescriptionWeight(
   const lowerName = exerciseName.toLowerCase();
   const radAngle = (profile.angleThetaDeg * Math.PI) / 180;
   const denominator = Math.cos(radAngle) + profile.frictionCoeff;
+  const fallbackPulleyRatio = Number.isFinite(profile.pulleyRatio) && profile.pulleyRatio > 0
+    ? Math.min(4, Math.max(1, profile.pulleyRatio))
+    : 1;
   const selectedPulleyRatio = Number.isFinite(pulleyRatioOverride) && pulleyRatioOverride! > 0
     ? Math.min(4, Math.max(1, pulleyRatioOverride!))
-    : profile.pulleyRatio;
+    : fallbackPulleyRatio;
   let rawWeightKg = force * profile.leverageRatio * profile.camModifier * (selectedPulleyRatio / denominator);
 
   // Biomechanical Safety Clamp: Cable Row / Seated Row max baseline
