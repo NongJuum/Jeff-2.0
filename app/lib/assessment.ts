@@ -558,7 +558,7 @@ export interface BiomechanicalResult {
  * - Beginner (6-12m): 0.92
  * - Intermediate (1-2y): 0.96
  * - Advanced (>2y): 1.00
- * - Injury adjustments: -0.12 for relevant back/shoulder/knee categories; -0.08 for wrist categories
+ * - Injury adjustment: -0.12 for joint/back/knee and -0.08 for wrist
  */
 export function getSafetyFactor(
   expMonths: number,
