@@ -220,7 +220,6 @@ export const PLATE_LOADED_MACHINE_DEFAULTS: PlateLoadedMachineDefault[] = [
   { aliases: ["machine hip thrust", "hip thrust", "glute drive"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["leg extension", "seated hamstring curl", "lying leg curl", "hamstring curl"], startingResistanceKg: 5, perSide: false, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["machine shoulder press", "shoulder press", "overhead press"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
-  { aliases: ["atlantis machine lat raise", "machine lat raise", "reverse pec deck", "pec deck", "machine preacher curl", "machine triceps extension", "machine abs crunch", "machine hip abduction", "machine hip adduction"], startingResistanceKg: 0, perSide: false, plateStepKg: 5, source: "category-estimate" },
 ];
 
 export function getPlateLoadedMachineDefault(exerciseName: string, machineTag = ""): PlateLoadedMachineDefault {
@@ -331,6 +330,27 @@ export function resolveMechanicalProfile(exerciseName: string, machineTag = ""):
 
 export function getDefaultMechanicalProfile(load: string, exerciseName: string, pulleyRatioOverride?: number): MechanicalProfile {
   const lowerName = exerciseName.toLowerCase();
+
+  // Plate-loaded specialty machines in the exercise library (not the trap bar)
+  // use the same start-resistance subtraction as other plate-loaded machines.
+  if (
+    load === "specialty" &&
+    ["hack squat", "belt squat", "pendulum squat", "v-squat"].some((name) => lowerName.includes(name))
+  ) {
+    const machine = getPlateLoadedMachineDefault(exerciseName);
+    return {
+      leverageRatio: STANDARD_EQUIPMENT_DEFAULTS.plateLoadedLeverageRatio,
+      camModifier: 1,
+      pulleyRatio: 1,
+      frictionCoeff: 0,
+      angleThetaDeg: 0,
+      isPerHand: machine.perSide,
+      bilateralDeficit: false,
+      minHardwareStep: machine.plateStepKg,
+      tareWeight: machine.startingResistanceKg,
+      isPlateLoaded: true,
+    };
+  }
 
   // Special Overrides first:
   // Exclude calf raise from leg press override so it gets Calf category + proper ratio.
@@ -883,7 +903,8 @@ export function calculatePrescriptionWeight(
     combinedText.includes("pulldown") ||
     combinedText.includes("pull down");
 
-  const isFreeWeightLoad = ["barbell", "dumbbell", "smith", "plate-loaded"].includes(load);
+  const isPlateLoadedSpecialtyMachine = load === "specialty" && ["hack squat", "belt squat", "pendulum squat", "v-squat"].some((name) => combinedText.includes(name));
+  const isFreeWeightLoad = ["barbell", "dumbbell", "smith", "plate-loaded"].includes(load) || isPlateLoadedSpecialtyMachine;
 
   // Check if we should use specialized resolveMechanicalProfile
   const mechProfile = resolveMechanicalProfile(exerciseName, machineTag);
