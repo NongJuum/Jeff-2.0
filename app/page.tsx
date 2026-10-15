@@ -3276,10 +3276,18 @@ export default function Page() {
   }
 
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [appLanguage, setAppLanguage] = useState<AppLanguage>(() => getAppLanguage());
-  const [fontScale, setFontScale] = useState<FontScale>(() => getFontScale());
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>("th");
+  const [fontScale, setFontScale] = useState<FontScale>("medium");
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   useEffect(() => {
+    setAppLanguage(getAppLanguage());
+    setFontScale(getFontScale());
+    setPreferencesLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
     const root = document.documentElement;
     root.lang = appLanguage;
     root.style.fontSize = fontScale === "small" ? "14px" : fontScale === "large" ? "18px" : "16px";
@@ -3287,7 +3295,7 @@ export default function Page() {
       window.localStorage.setItem(APP_LANGUAGE_KEY, appLanguage);
       window.localStorage.setItem(FONT_SCALE_KEY, fontScale);
     } catch {}
-  }, [appLanguage, fontScale]);
+  }, [preferencesLoaded, appLanguage, fontScale]);
 
   // Migration State (M2)
   const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null);
