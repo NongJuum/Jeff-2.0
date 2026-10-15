@@ -906,7 +906,7 @@ export function getIntelligentWarmup(
     return {
       type: "skip",
       headline: "พร้อมเริ่มเซตจริงได้ทันที",
-      note: "ท่า Isolation / มัดเล็ก ไม่จำเป็นต้องวอร์มซ้ำ",
+      note: "ท่า Isolation มักไม่ต้องวอร์มหลายเซต แต่ควรเริ่มด้วยน้ำหนักเบาและเพิ่มโหลดเมื่อฟอร์ม/ข้อต่อพร้อม หากมีอาการเจ็บให้หยุดและอย่าฝืน",
       steps: [],
     };
   }
@@ -924,7 +924,7 @@ export function getIntelligentWarmup(
   });
 
   const step = effectiveUnit === "kg" ? 2.5 : 5;
-  const snap = (w: number) => Math.max(step, Math.round(w / step) * step);
+  const snap = (w: number) => Math.max(step, Math.floor((Math.max(0, w) + 1e-9) / step) * step);
 
   if (hasPriorCompoundSameMuscle) {
     return {
