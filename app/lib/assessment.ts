@@ -685,7 +685,11 @@ export function calculatePrescriptionWeight(
   if (!isFreeWeightLoad && isRowChestOrPulldown && mechProfile.baseRatio.male !== 0.40) {
     const baseRatio = isFemale ? mechProfile.baseRatio.female : mechProfile.baseRatio.male;
     const f_physio = bw * baseRatio * e_exp * r_rep * mechProfile.stabilityFactor * g_goal * m_musc;
-    const rawWeightKg = f_physio * mechProfile.pulleyRatio;
+    const selectedPulleyRatio = pulleyRatioOverride ?? mechProfile.pulleyRatio;
+    const pulleyMultiplier = pulleyRatioOverride && load === "cable"
+      ? mechProfile.pulleyRatio * (mechProfile.pulleyRatio / pulleyRatioOverride)
+      : mechProfile.pulleyRatio;
+    const rawWeightKg = f_physio * pulleyMultiplier;
 
     const step = 2.5;
     let snapped = Math.round(rawWeightKg / step) * step;
@@ -693,7 +697,9 @@ export function calculatePrescriptionWeight(
     snapped = Math.round(snapped * 100) / 100;
 
     let displayNote = `แผ่น/สลักน้ำหนัก ${snapped} kg`;
-    if (mechProfile.isPerHand) {
+    if (load === "cable") {
+      displayNote = `เสียบสลักพิน ${snapped} kg${mechProfile.isPerHand ? " ต่อฝั่ง" : ""} (รอกทด ${selectedPulleyRatio}:1)`;
+    } else if (mechProfile.isPerHand) {
       displayNote = `ดัมเบล / สลักข้างละ ${snapped} kg`;
     } else if (mechProfile.pulleyRatio > 1.0) {
       displayNote = `เสียบสลักพิน ${snapped} kg (รอกทด ${mechProfile.pulleyRatio}:1)`;
@@ -730,7 +736,7 @@ export function calculatePrescriptionWeight(
   const denominator = Math.cos(radAngle) + profile.frictionCoeff;
   const baselinePulleyRatio = getDefaultMechanicalProfile(load, exerciseName).pulleyRatio;
   const pulleyMultiplier = pulleyRatioOverride && load === "cable"
-    ? baselinePulleyRatio * (2 / pulleyRatioOverride)
+    ? baselinePulleyRatio * (baselinePulleyRatio / pulleyRatioOverride)
     : profile.pulleyRatio;
   let rawWeightKg = force * profile.leverageRatio * profile.camModifier * (pulleyMultiplier / denominator);
 
