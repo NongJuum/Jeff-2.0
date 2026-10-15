@@ -360,7 +360,8 @@ function ProgramSetupModal({
               <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
                 <div className="flex flex-wrap gap-1.5">
                   {nextDates.map((date) => {
-                    const d = new Date(date);
+                    // Parse date-only keys at local noon to avoid timezone-induced weekday shifts.
+                    const d = new Date(`${date}T12:00:00`);
                     const dayIdx = (d.getDay() + 6) % 7;
                     return (
                       <div
