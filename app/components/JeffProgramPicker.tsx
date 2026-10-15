@@ -401,7 +401,7 @@ function ProgramSetupModal({
               )}
             </p>
             <div className="grid grid-cols-7 gap-1">
-              {DAY_LABELS.map((label, idx) => (
+              {(language === "th" ? DAY_LABELS : DAY_LABELS_EN).map((label, idx) => (
                 <button
                   key={idx}
                   onClick={() => toggleDay(idx)}
@@ -588,7 +588,7 @@ export function ActiveProgramDashboard({
             ) : isTodayTrainingDay ? (
               <div className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3">
                 <p className="text-[10px] font-bold uppercase text-yellow-400 mb-1">
-                  {isCompletedToday ? "✅ วันนี้เสร็จแล้ว!" : "⚡ วันนี้มีฝึก!"}
+                  {isCompletedToday ? "✅ วันนี้เสร็จแล้ว!" : "⚡ {language === "th" ? "วันนี้มีฝึก!" : "Training day"}"}
                 </p>
                 {currentWorkout && (
                   <div className="text-xs text-zinc-300">
@@ -735,7 +735,7 @@ export function JeffProgramPicker({
               className="flex items-center gap-1 rounded-xl bg-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-700 border border-zinc-700 transition"
             >
               <RotateCcw size={12} />
-              หยุด
+              {language === "th" ? "หยุด" : "Stop"}
             </button>
           </div>
         </div>
@@ -744,20 +744,20 @@ export function JeffProgramPicker({
       {/* Confirm Stop */}
       {confirmStop && (
         <div className="rounded-2xl border border-red-500/40 bg-red-900/20 p-4">
-          <p className="text-sm font-bold text-red-300 mb-3">⚠️ หยุดโปรแกรมปัจจุบัน?</p>
-          <p className="text-xs text-zinc-400 mb-3">ประวัติการฝึกจะยังอยู่ แต่ progress จะถูก reset</p>
+          <p className="text-sm font-bold text-red-300 mb-3">{language === "th" ? "⚠️ หยุดโปรแกรมปัจจุบัน?" : "⚠️ Stop the current program?"}</p>
+          <p className="text-xs text-zinc-400 mb-3">{language === "th" ? "ประวัติการฝึกจะยังอยู่ แต่ความคืบหน้าโปรแกรมจะเริ่มใหม่" : "Workout history stays saved, but program progress will reset."}</p>
           <div className="flex gap-2">
             <button
               onClick={() => setConfirmStop(false)}
               className="flex-1 rounded-xl bg-zinc-800 py-2 text-sm font-bold text-zinc-300 border border-zinc-700"
             >
-              ยกเลิก
+              {language === "th" ? "ยกเลิก" : "Cancel"}
             </button>
             <button
               onClick={handleStopProgram}
               className="flex-1 rounded-xl bg-red-600 py-2 text-sm font-black text-white"
             >
-              ยืนยันหยุด
+              {language === "th" ? "ยืนยันหยุด" : "Confirm stop"}
             </button>
           </div>
         </div>
@@ -766,11 +766,11 @@ export function JeffProgramPicker({
       {/* Filter tabs */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
         {[
-          { key: "recommended", label: "⭐ แนะนำ" },
-          { key: "all", label: "ทั้งหมด" },
-          { key: "beginner", label: "🌱 มือใหม่" },
-          { key: "intermediate", label: "💪 กลาง" },
-          { key: "advanced", label: "🔥 ขั้นสูง" },
+          { key: "recommended", label: language === "th" ? "⭐ แนะนำ" : "⭐ Recommended" },
+          { key: "all", label: language === "th" ? "ทั้งหมด" : "All" },
+          { key: "beginner", label: language === "th" ? "🌱 มือใหม่" : "🌱 Beginner" },
+          { key: "intermediate", label: language === "th" ? "💪 กลาง" : "💪 Intermediate" },
+          { key: "advanced", label: language === "th" ? "🔥 ขั้นสูง" : "🔥 Advanced" },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -835,9 +835,11 @@ export function JeffProgramPicker({
 export function JeffProgramTodayCard({
   activeState,
   onMarkDayComplete,
+  language = "th",
 }: {
   activeState: ActiveJeffProgramState;
   onMarkDayComplete: (date: string) => void;
+  language?: AppLanguage;
 }) {
   const program = findProgramById(activeState.programId);
   const currentWeekData = getProgramCurrentWeek(activeState);
@@ -851,8 +853,8 @@ export function JeffProgramTodayCard({
     return (
       <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
         <p className="text-2xl mb-2">🏆</p>
-        <p className="font-black text-emerald-300">ทำโปรแกรม {program.shortName} ครบแล้ว</p>
-        <p className="text-xs text-zinc-400 mt-1">เลือกโปรแกรมใหม่ได้จากเมนู Jeff Nippard Programs</p>
+        <p className="font-black text-emerald-300">{language === "th" ? `ทำโปรแกรม ${program.shortName} ครบแล้ว` : `${program.shortName} completed`}</p>
+        <p className="text-xs text-zinc-400 mt-1">{language === "th" ? "เลือกโปรแกรมใหม่ได้จากเมนูโปรแกรม" : "Choose another program from the Programs menu."}</p>
       </div>
     );
   }
@@ -861,7 +863,7 @@ export function JeffProgramTodayCard({
     return (
       <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
         <p className="text-2xl mb-2">✅</p>
-        <p className="font-black text-emerald-300">วันนี้ฝึกเสร็จแล้ว</p>
+        <p className="font-black text-emerald-300">{language === "th" ? "วันนี้ฝึกเสร็จแล้ว" : "Workout completed today"}</p>
         <p className="text-xs text-zinc-400 mt-1">บันทึกความคืบหน้าของ {program.shortName} เรียบร้อย</p>
       </div>
     );
@@ -951,7 +953,7 @@ export function JeffProgramTodayCard({
         {isCompletedToday ? (
           <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 py-3">
             <CheckCircle size={16} className="text-emerald-400" />
-            <span className="text-sm font-black text-emerald-300">ฝึกเสร็จแล้ววันนี้! 💪</span>
+            <span className="text-sm font-black text-emerald-300">{language === "th" ? "ฝึกเสร็จแล้ววันนี้! 💪" : "Workout completed today! 💪"}</span>
           </div>
         ) : (
           <button
