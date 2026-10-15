@@ -46,44 +46,9 @@ import type { AppLanguage } from "./OnboardingWizard";
 const DAY_LABELS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
 const DAY_LABELS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-export function getExerciseDisplayName(name: string, language: AppLanguage = "th"): string {
-  if (language !== "th") return name;
-  const replacements: [RegExp, string][] = [
-    [/Bulgarian Split Squat/gi, "บัลแกเรียนสปลิตสควอต"],
-    [/Romanian Deadlift/gi, "โรมาเนียนเดดลิฟต์"],
-    [/Hanging Knee Raise/gi, "แฮงกิงนีเรส"],
-    [/Chest Supported/gi, "เชสต์ซัพพอร์ตเต็ด"],
-    [/Shoulder Press/gi, "โชลเดอร์เพรส"],
-    [/Bench Press/gi, "เบนช์เพรส"],
-    [/Incline/gi, "อินไคลน์"],
-    [/Deadlift/gi, "เดดลิฟต์"],
-    [/Squat/gi, "สควอต"],
-    [/Dumbbell|\bDB\b/gi, "ดัมเบล"],
-    [/Barbell/gi, "บาร์เบล"],
-    [/Cable/gi, "เคเบิล"],
-    [/Machine/gi, "แมชชีน"],
-    [/Pulldown/gi, "พูลดาวน์"],
-    [/Pull Up/gi, "พูลอัป"],
-    [/Lat Raise/gi, "แลทเรส"],
-    [/Lateral Raise/gi, "แลเทอรัลเรส"],
-    [/Pec Deck/gi, "เพคเด็ค"],
-    [/Leg Extension/gi, "เลกเอ็กซ์เทนชัน"],
-    [/Hamstring Curl/gi, "แฮมสตริงเคิร์ล"],
-    [/Tricep/gi, "ไตรเซปส์"],
-    [/Bicep/gi, "ไบเซปส์"],
-    [/Pushdown/gi, "พุชดาวน์"],
-    [/Push-ups/gi, "พุชอัป"],
-    [/Curl/gi, "เคิร์ล"],
-    [/Row/gi, "โรว์"],
-    [/Press/gi, "เพรส"],
-    [/Flye|Fly/gi, "ฟลาย"],
-    [/Raise/gi, "เรส"],
-    [/Reverse/gi, "รีเวิร์ส"],
-    [/Weighted/gi, "เวตเต็ด"],
-    [/Bodyweight/gi, "บอดีเวต"],
-    [/Full Body/gi, "ฟูลบอดี"],
-  ];
-  return replacements.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), name);
+export function getExerciseDisplayName(name: string, _language: AppLanguage = "th"): string {
+  // Requirement: Exercise names must remain in English in Thai UI without altering canonical IDs
+  return name;
 }
 
 const PROGRAM_THAI_COPY: Record<string, { description: string; focus: string; benefit: string; difficulty: string }> = {
