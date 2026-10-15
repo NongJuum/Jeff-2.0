@@ -588,16 +588,33 @@ export function getSafetyFactor(
     const hasWrist = injuries.includes("wrist");
 
     const cat = exerciseCategory || "";
-    if (hasBack && (cat === "Deadlift" || cat === "Squat" || cat === "RDL" || cat === "Row")) {
+    const backSensitive = new Set([
+      "Deadlift", "Squat", "RDL", "Row", "ChestSupportedRow",
+      "SeatedCableRow", "IsoLateralHighRow", "IsoLateralLowRow",
+    ]);
+    const shoulderSensitive = new Set([
+      "Bench", "OHP", "Incline", "InclineMachinePress",
+      "DeclineMachinePress", "Flye", "LatRaise", "RearDelt",
+    ]);
+    const kneeSensitive = new Set(["Squat", "LegPress", "LegExt", "LegCurl"]);
+    const wristSensitive = new Set([
+      "Bench", "OHP", "Incline", "InclineMachinePress",
+      "DeclineMachinePress", "Bicep", "Tricep", "Row",
+      "ChestSupportedRow", "SeatedCableRow", "LatPull",
+    ]);
+
+    // Use the actual strength-category IDs emitted by getExerciseStrengthCategory.
+    // Otherwise machine-specific categories silently bypass the injury adjustment.
+    if (hasBack && backSensitive.has(cat)) {
       factor = Math.max(0.70, factor - 0.12);
       reason += " + ลดน้ำหนักเพิ่ม 12% เนื่องจากมีประวัติเจ็บหลังส่วนล่าง";
-    } else if (hasShoulder && (cat === "Bench" || cat === "OHP" || cat === "Incline" || cat === "Flye" || cat === "LatRaise")) {
+    } else if (hasShoulder && shoulderSensitive.has(cat)) {
       factor = Math.max(0.70, factor - 0.12);
       reason += " + ลดน้ำหนักเพิ่ม 12% เนื่องจากมีประวัติเจ็บหัวไหล่";
-    } else if (hasKnee && (cat === "Squat" || cat === "LegPress" || cat === "LegExt")) {
+    } else if (hasKnee && kneeSensitive.has(cat)) {
       factor = Math.max(0.70, factor - 0.12);
       reason += " + ลดน้ำหนักเพิ่ม 12% เนื่องจากมีประวัติเจ็บข้อเข่า";
-    } else if (hasWrist && (cat === "Bench" || cat === "OHP" || cat === "Bicep")) {
+    } else if (hasWrist && wristSensitive.has(cat)) {
       factor = Math.max(0.75, factor - 0.08);
       reason += " + ลดน้ำหนักเพิ่ม 8% เนื่องจากมีประวัติเจ็บข้อมือ";
     }
