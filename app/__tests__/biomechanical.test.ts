@@ -9,6 +9,7 @@ import {
   STANDARD_EQUIPMENT_DEFAULTS,
   PLATE_LOADED_MACHINE_DEFAULTS,
   getPlateLoadedMachineDefault,
+  getPinLoadedMachineDefault,
 } from "../lib/assessment";
 
 describe("Biomechanical Engine & Hardware Quantization", () => {
@@ -325,6 +326,11 @@ describe("Standard commercial equipment midpoint defaults", () => {
     expect(getPlateLoadedMachineDefault("Life Fitness Plate Loaded Incline Press").startingResistanceKg).toBe(5);
     expect(getPlateLoadedMachineDefault("Hammer Strength Iso-Lateral Wide Chest").startingResistanceKg).toBe(5);
     expect(getPlateLoadedMachineDefault("Unlisted Plate-Loaded Machine").startingResistanceKg).toBeGreaterThan(0);
+    expect(PIN_LOADED_MACHINE_DEFAULTS.length).toBeGreaterThanOrEqual(6);
+    expect(getPinLoadedMachineDefault("Machine Chest Press").stackStepKg).toBe(5);
+    expect(getPinLoadedMachineDefault("Machine Chest Press").configuration).toBe("single-stack");
+    expect(getPinLoadedMachineDefault("One Arm Lat Pull Down").configuration).toBe("independent-arms");
+    expect(getDefaultMechanicalProfile("specialty", "Hack Squat").isPlateLoaded).toBe(true);
   });
 
   it("labels Hammer-style plate-loaded machine loads as plates per side", () => {
