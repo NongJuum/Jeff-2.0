@@ -5046,6 +5046,7 @@ export default function Page() {
                 <JeffProgramTodayCard
                   activeState={activeJeffProgram}
                   onMarkDayComplete={handleMarkJeffDayComplete}
+                  language={appLanguage}
                 />
               </div>
             )}
@@ -5466,6 +5467,7 @@ export default function Page() {
                 activeState={activeJeffProgram}
                 onNavigateToPrograms={handleSwitchProgram}
                 onStopProgram={handleResetProgram}
+                language={appLanguage}
               />
             )}
             <JeffProgramPicker
