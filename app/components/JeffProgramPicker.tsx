@@ -35,6 +35,9 @@ import {
   getProgramCurrentWeek,
   getProgramScheduledDates,
   getProgramDateKey,
+  getNextProgramTrainingDate,
+  isJeffProgramComplete,
+  resolveProgramDayForDate,
 } from "../lib/jeffPrograms";
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getUserProfile } from "../lib/assessment";
@@ -438,10 +441,20 @@ export function ActiveProgramDashboard({
   if (!program) return null;
 
   const currentWeekData = getProgramCurrentWeek(activeState);
-  const todayKey = getProgramDateKey(new Date());
-  const dayOfWeek = (new Date().getDay() + 6) % 7;
-  const isTodayTrainingDay = activeState.scheduleDays.includes(dayOfWeek);
-  const isCompletedToday = activeState.completedDays.includes(todayKey);
+  const scheduleStatus = resolveProgramDayForDate(activeState);
+  const isTodayTrainingDay = scheduleStatus.isTrainingDay;
+  const isCompletedToday = scheduleStatus.isCompleted;
+  const isProgramComplete = isJeffProgramComplete(activeState);
+  const nextTrainingDate = getNextProgramTrainingDate(activeState);
+  const nextTrainingLabel = nextTrainingDate
+    ? (() => {
+        const nextDate = new Date(`${nextTrainingDate}T12:00:00`);
+        return `${DAY_FULL_LABELS[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
+      })()
+    : null;
+  const currentWorkout = currentWeekData?.days[
+    Math.max(0, Math.min(activeState.currentDayIndex, (currentWeekData?.days.length ?? 1) - 1))
+  ];
 
   // Progress percentage
   const totalDays = program.durationWeeks * program.daysPerWeek;
@@ -493,26 +506,26 @@ export function ActiveProgramDashboard({
         {/* Today's workout */}
         {currentWeekData && (
           <div className="mt-3">
-            {isTodayTrainingDay ? (
+            {isProgramComplete ? (
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
+                <p className="text-sm font-black text-emerald-300">🎉 ทำโปรแกรมครบแล้ว</p>
+                <p className="mt-1 text-xs text-zinc-400">เลือกโปรแกรมใหม่ได้ หรือทบทวนประวัติการฝึก</p>
+              </div>
+            ) : isTodayTrainingDay ? (
               <div className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3">
                 <p className="text-[10px] font-bold uppercase text-yellow-400 mb-1">
                   {isCompletedToday ? "✅ วันนี้เสร็จแล้ว!" : "⚡ วันนี้มีฝึก!"}
                 </p>
-                {currentWeekData.days.map((day, i) => (
-                  <div key={i} className="text-xs text-zinc-300">
-                    <span className="font-black">{day.dayLabel}:</span> {day.focusLabel}
-                    <span className="text-zinc-500 ml-1">({day.exercises.length} exercises)</span>
+                {currentWorkout && (
+                  <div className="text-xs text-zinc-300">
+                    <span className="font-black">{currentWorkout.dayLabel}:</span> {currentWorkout.focusLabel}
+                    <span className="text-zinc-500 ml-1">({currentWorkout.exercises.length} exercises)</span>
                   </div>
-                ))}
+                )}
               </div>
             ) : (
               <p className="text-xs text-zinc-500 mt-1">
-                🗓️ วันหยุดพัก — วันฝึกถัดไป:{" "}
-                {(() => {
-                  const nextDay = activeState.scheduleDays.find((d) => d > dayOfWeek) ??
-                    activeState.scheduleDays[0];
-                  return DAY_FULL_LABELS[nextDay];
-                })()}
+                🗓️ วันพัก — วันฝึกถัดไป: {nextTrainingLabel ?? "ยังไม่ได้เลือกวันฝึก"}
               </p>
             )}
           </div>
@@ -527,9 +540,11 @@ export function ActiveProgramDashboard({
 // ─────────────────────────────────────────────────────────────────
 export function JeffProgramPicker({
   onProgramActivated,
+  onProgramStopped,
   onClose,
 }: {
   onProgramActivated: (state: ActiveJeffProgramState) => void;
+  onProgramStopped: () => void;
   onClose?: () => void;
 }) {
   const [filter, setFilter] = useState<"recommended" | "all" | "beginner" | "intermediate" | "advanced">("recommended");
@@ -589,6 +604,7 @@ export function JeffProgramPicker({
     clearActiveJeffProgram();
     setActiveState(null);
     setConfirmStop(false);
+    onProgramStopped();
   };
 
   // Filter programs
@@ -748,21 +764,35 @@ export function JeffProgramTodayCard({
   const program = findProgramById(activeState.programId);
   const currentWeekData = getProgramCurrentWeek(activeState);
   const todayKey = getProgramDateKey(new Date());
-  const isCompletedToday = activeState.completedDays.includes(todayKey);
+  const scheduleStatus = resolveProgramDayForDate(activeState);
+  const isCompletedToday = scheduleStatus.isCompleted;
 
   if (!program || !currentWeekData) return null;
 
-  const dayOfWeek = (new Date().getDay() + 6) % 7;
-  const isTodayTrainingDay = activeState.scheduleDays.includes(dayOfWeek);
+  if (isJeffProgramComplete(activeState)) {
+    return (
+      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
+        <p className="text-2xl mb-2">🏆</p>
+        <p className="font-black text-emerald-300">ทำโปรแกรม {program.shortName} ครบแล้ว</p>
+        <p className="text-xs text-zinc-400 mt-1">เลือกโปรแกรมใหม่ได้จากเมนู Jeff Nippard Programs</p>
+      </div>
+    );
+  }
 
-  if (!isTodayTrainingDay) {
+  if (!scheduleStatus.isTrainingDay) {
+    const nextTrainingDate = getNextProgramTrainingDate(activeState);
+    const nextTrainingLabel = nextTrainingDate
+      ? (() => {
+          const nextDate = new Date(`${nextTrainingDate}T12:00:00`);
+          return `${DAY_FULL_LABELS[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
+        })()
+      : null;
     return (
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-center">
         <p className="text-2xl mb-2">😴</p>
         <p className="font-black text-white">วันพักผ่อน</p>
         <p className="text-xs text-zinc-400 mt-1">
-          {program.shortName} — วันฝึกถัดไป:{" "}
-          {DAY_FULL_LABELS[activeState.scheduleDays.find((d) => d > dayOfWeek) ?? activeState.scheduleDays[0]]}
+          {program.shortName} — วันฝึกถัดไป: {nextTrainingLabel ?? "ยังไม่ได้เลือกวันฝึก"}
         </p>
       </div>
     );
