@@ -131,7 +131,24 @@ export const STRENGTH_RATIOS: Record<string, { male: number; female: number }> =
   SeatedCalf: { male: 0.65, female: 0.45 },
   Calf: { male: 1.25, female: 0.85 },
   HipThrust: { male: 1.60, female: 1.20 },
+  HipHinge: { male: 0.75, female: 0.50 },
+  HipIsolation: { male: 0.35, female: 0.25 },
+  Abs: { male: 0.25, female: 0.18 },
 };
+
+/** Conservative relative-strength thresholds for exercises with highly machine-dependent resistance. */
+export const RELATIVE_STRENGTH_THRESHOLDS = {
+  seatedCalf: [0.35, 0.55, 0.75] as const,
+  standingCalf: [0.45, 0.70, 0.95] as const,
+  legPressCalf: [0.65, 1.00, 1.40] as const,
+};
+
+/** Bodyweight-only movements should not receive an automatic external-load suggestion. */
+export function shouldAutoPrescribeAddedLoad(loadType: string, exerciseName: string): boolean {
+  if (loadType !== "bodyweight") return true;
+  const name = exerciseName.toLowerCase();
+  return name.includes("weighted dip") || name.includes("weighted pull up");
+}
 
 /**
  * Experience Modifier (E_exp)
@@ -634,8 +651,14 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   const name = exerciseName.toLowerCase();
   if (name.includes("romanian") || name.includes("rdl")) return "RDL";
   if (name.includes("deadlift")) return "Deadlift";
-  // Seated calf raise uses a conservative machine-specific baseline; don't inherit leg/calf compound ratios.
+  if (name.includes("cable lat prayer") || name.includes("straight arm pulldown")) return "LatPull";
   if (name.includes("seated calf")) return "SeatedCalf";
+  if (name.includes("reverse nordic") || name.includes("sissy squat") || name.includes("sissy")) return "LegExt";
+  if (name.includes("cable pull through") || name.includes("back extension") || name.includes("hyperextension")) return "HipHinge";
+  if (name.includes("hip abduction") || name.includes("hip adduction") || name === "kickbacks" || name.includes("glute kickback")) return "HipIsolation";
+  if (name.includes("ab wheel") || name.includes("knee raise") || name.includes("leg raise") || name.includes("captain's chair") || name.includes("crunch") || name.includes("rollout")) return "Abs";
+  if (name.includes("lean in db raise")) return "LatRaise";
+  if (name.includes("1 arm db overhead")) return "Tricep";
   // Calf check before leg press: "Leg Press Calf Raise" → Calf, not LegPress
   if (name.includes("calf") || name.includes("calves")) return "Calf";
   if (name.includes("leg press")) return "LegPress";
