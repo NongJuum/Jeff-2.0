@@ -36,6 +36,7 @@ import {
   getProgramScheduledDates,
 } from "../lib/jeffPrograms";
 import { getOnboardingResult } from "./OnboardingWizard";
+import { getUserProfile } from "../lib/assessment";
 
 const DAY_LABELS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
 const DAY_FULL_LABELS = ["จันทร์", "อังคาร", "พุธ", "พฤหัสฯ", "ศุกร์", "เสาร์", "อาทิตย์"];
@@ -541,18 +542,35 @@ export function JeffProgramPicker({
     const saved = getActiveJeffProgram();
     setActiveState(saved);
 
-    // Build recommendations from onboarding data
+    // Build recommendations prioritizing detailed userProfile, then onboarding wizard
+    const profile = getUserProfile();
     const onboarding = getOnboardingResult();
-    if (onboarding) {
-      const recs = recommendPrograms(
-        onboarding.level,
-        onboarding.goal === "fitness" ? "fitness" : onboarding.goal as "strength" | "hypertrophy" | "fitness",
-        onboarding.days as 3 | 4 | 5 | 6
-      );
-      setRecommendations(recs);
-    } else {
-      setRecommendations(recommendPrograms("intermediate", "hypertrophy", 4));
-    }
+
+    const resolvedLevel = profile
+      ? profile.expMonths < 6
+        ? "beginner"
+        : profile.expMonths >= 24
+        ? "advanced"
+        : "intermediate"
+      : onboarding?.level || "intermediate";
+
+    const resolvedGoal = profile?.goal || onboarding?.goal || "hypertrophy";
+    const resolvedDays = (profile?.daysPerWeek || onboarding?.days || 4) as 3 | 4 | 5 | 6;
+
+    const recs = recommendPrograms(
+      resolvedLevel,
+      resolvedGoal === "fitness" ? "fitness" : resolvedGoal as "strength" | "hypertrophy" | "fitness",
+      resolvedDays,
+      true,
+      {
+        injuries: profile?.injuries || [],
+        expMonths: profile?.expMonths,
+        daysPerWeek: resolvedDays,
+        goal: resolvedGoal,
+        level: resolvedLevel,
+      }
+    );
+    setRecommendations(recs);
   }, []);
 
   const handleSelectProgram = (program: JeffProgram) => {
@@ -749,8 +767,10 @@ export function JeffProgramTodayCard({
     );
   }
 
-  const dayCount = activeState.scheduleDays.indexOf(dayOfWeek);
-  const todayWorkout = currentWeekData.days[dayCount % currentWeekData.days.length];
+  const sortedSchedule = [...activeState.scheduleDays].sort((a, b) => a - b);
+  const dayCount = sortedSchedule.indexOf(dayOfWeek);
+  const safeDayIndex = dayCount !== -1 ? dayCount : activeState.currentDayIndex;
+  const todayWorkout = currentWeekData.days[safeDayIndex % currentWeekData.days.length];
 
   return (
     <div className={`rounded-2xl border border-zinc-700 overflow-hidden`}>

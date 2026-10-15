@@ -54,6 +54,8 @@ import {
   clearActiveJeffProgram,
   findProgramById,
   getProgramCurrentWeek,
+  resolveProgramDayForDate,
+  advanceJeffProgramAfterFinish,
 } from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
@@ -650,8 +652,39 @@ const allGroups: MuscleGroup[] = ["Chest", "Back", "Legs", "Shoulders", "Arms", 
 
 const exerciseByNameMap = new Map<string, Exercise>(exerciseLibrary.map((ex) => [ex.name, ex]));
 
-function findExercise(name: string) {
-  return exerciseByNameMap.get(name) ?? exerciseLibrary[0];
+// Alias mapping for Jeff Nippard Program exercises to canonical exerciseLibrary entries
+const exerciseAliasMap: Record<string, string> = {
+  "Back Squat": "Barbell Back Squat",
+  "Barbell Bench Press": "Bench Press",
+  "Barbell Hip Thrust": "Machine Hip Thrust",
+  "Bicycle Crunch": "Cable Crunch",
+  "Bodyweight Back Squat": "Barbell Back Squat",
+  "Bodyweight Rows": "Chest Supported Row",
+  "Cable Flye": "Seated Cable Pec Flye",
+  "Crunch": "Cable Crunch",
+  "Diamond Push-ups": "Close-Grip Bench Press",
+  "Dumbbell Overhead Press": "Seated DB Overhead Press",
+  "Dumbbell Seated Shoulder Press": "Seated DB Overhead Press",
+  "Glute Bridge": "Machine Hip Thrust",
+  "Goblet Squat": "Barbell Back Squat",
+  "Lat Pulldown": "Neutral Grip Lat Pull Down",
+  "Leg Press": "45° Leg Press",
+  "Pause Deadlift": "Deadlift",
+  "Pike Push-ups": "Barbell Overhead Press",
+  "Push-ups": "Bench Press",
+  "Romanian Deadlift": "Romanian Deadlift RDL",
+  "Single-Arm Pulldown": "One Arm Lat Pull Down",
+  "Wide Push-ups": "Bench Press",
+};
+
+function findExercise(name: string): Exercise {
+  const direct = exerciseByNameMap.get(name);
+  if (direct) return direct;
+  const aliasName = exerciseAliasMap[name];
+  if (aliasName && exerciseByNameMap.has(aliasName)) {
+    return exerciseByNameMap.get(aliasName)!;
+  }
+  return exerciseLibrary[0];
 }
 
 const LOAD_LABELS: Record<LoadType, string> = {
@@ -2840,43 +2873,24 @@ export default function Page() {
   function handleSelectJeffProgram(activatedState: ActiveJeffProgramState) {
     const program = findProgramById(activatedState.programId);
     if (!program) return;
+    const resolved = resolveProgramDayForDate(activatedState, new Date());
     const newState: ActiveJeffProgramState = {
       ...activatedState,
-      currentDayIndex: activatedState.currentDayIndex ?? 0,
+      currentDayIndex: resolved.scheduledDayIndex,
     };
     saveActiveJeffProgram(newState);
     setActiveJeffProgram(newState);
-    setSelectedDay(0);
+    setSelectedDay(resolved.scheduledDayIndex);
     setActiveExerciseIndex(0);
     setMode("today");
   }
 
   function handleMarkJeffDayComplete(dateStr: string) {
     if (!activeJeffProgram) return;
-    const currentList = activeJeffProgram.completedDays || [];
-    if (currentList.includes(dateStr)) return;
-    const updatedCompleted = [...currentList, dateStr];
-
-    const currentProg = findProgramById(activeJeffProgram.programId);
-    const currentWeekInfo = getProgramCurrentWeek(activeJeffProgram);
-    const totalDaysInWeek = currentWeekInfo?.days.length || activeJeffProgram.scheduleDays.length || 4;
-
-    let nextDayIdx = activeJeffProgram.currentDayIndex + 1;
-    let nextWeek = activeJeffProgram.currentWeek;
-    if (nextDayIdx >= totalDaysInWeek) {
-      nextDayIdx = 0;
-      nextWeek = Math.min(currentProg?.durationWeeks || 8, activeJeffProgram.currentWeek + 1);
-    }
-
-    const updatedState: ActiveJeffProgramState = {
-      ...activeJeffProgram,
-      completedDays: updatedCompleted,
-      currentDayIndex: nextDayIdx,
-      currentWeek: nextWeek,
-    };
+    const updatedState = advanceJeffProgramAfterFinish(activeJeffProgram, dateStr);
     saveActiveJeffProgram(updatedState);
     setActiveJeffProgram(updatedState);
-    setSelectedDay(nextDayIdx);
+    setSelectedDay(updatedState.currentDayIndex);
     setActiveExerciseIndex(0);
   }
 
@@ -3361,8 +3375,16 @@ export default function Page() {
     return isPresetLike ? activePresetPlan : selectedCustomPlan?.days ?? [];
   }, [activeJeffProgram, jeffProgramPlans, isPresetLike, activePresetPlan, selectedCustomPlan]);
 
+  // Calendar-aware Jeff Nippard schedule status for today
+  const jeffCalendarStatus = useMemo(() => {
+    if (!activeJeffProgram) return null;
+    return resolveProgramDayForDate(activeJeffProgram, new Date());
+  }, [activeJeffProgram]);
+
   const activeDayIndex = isPresetLike
-    ? (activeJeffProgram ? activeJeffProgram.currentDayIndex : selectedDay)
+    ? (activeJeffProgram
+        ? (selectedDay !== undefined && selectedDay !== null ? selectedDay : jeffCalendarStatus?.scheduledDayIndex ?? activeJeffProgram.currentDayIndex)
+        : selectedDay)
     : selectedCustomDay;
   const rawDay = activePlan[activeDayIndex] ?? activePlan[0];
 
@@ -3415,11 +3437,10 @@ export default function Page() {
 
   const isTodayScheduledRest = useMemo(() => {
     if (activeJeffProgram) {
-      const dayOfWeek0to6 = (new Date().getDay() + 6) % 7; // Mon=0 .. Sun=6
-      return !activeJeffProgram.scheduleDays.includes(dayOfWeek0to6);
+      return !jeffCalendarStatus?.isTrainingDay;
     }
     return !weeklySchedule[todayDayOfWeek];
-  }, [activeJeffProgram, weeklySchedule, todayDayOfWeek]);
+  }, [activeJeffProgram, jeffCalendarStatus, weeklySchedule, todayDayOfWeek]);
 
   function moveSessionExercise(currentIndex: number, direction: -1 | 1) {
     if (!day || !day.exercises) return;

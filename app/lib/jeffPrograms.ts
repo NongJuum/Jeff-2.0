@@ -1209,11 +1209,21 @@ export interface ProgramRecommendation {
   matchBadge: "Perfect Match" | "Great Match" | "Good Match";
 }
 
+export interface ProfileRecommendationContext {
+  level?: "beginner" | "intermediate" | "advanced";
+  goal?: "strength" | "hypertrophy" | "fitness";
+  daysPerWeek?: number;
+  hasGymAccess?: boolean;
+  injuries?: string[];
+  expMonths?: number;
+}
+
 export function recommendPrograms(
   level: "beginner" | "intermediate" | "advanced",
   goal: "strength" | "hypertrophy" | "fitness",
   daysPerWeek: 3 | 4 | 5 | 6,
-  hasGymAccess: boolean = true
+  hasGymAccess: boolean = true,
+  profileContext?: ProfileRecommendationContext
 ): ProgramRecommendation[] {
   const results: ProgramRecommendation[] = [];
 
@@ -1259,6 +1269,19 @@ export function recommendPrograms(
       score += 5;
     }
 
+    // Injury-safe bonus / penalty
+    if (profileContext?.injuries && profileContext.injuries.length > 0) {
+      const hasBackInjury = profileContext.injuries.includes("lowerBack");
+      if (hasBackInjury) {
+        if (program.id === "card_workout" || program.id === "the_essentials_3x") {
+          score += 15;
+          reasons.push("ความเค้นต่อหลังส่วนล่างต่ำ ปลอดภัยต่อการฟื้นฟูหลัง");
+        } else if (program.id === "powerbuilding_3_0") {
+          score -= 20; // Heavy deadlifts/squats may aggravate back injury
+        }
+      }
+    }
+
     if (score >= 30) {
       results.push({
         program,
@@ -1282,10 +1305,10 @@ export const JEFF_PROGRAM_SCHEDULE_KEY = "haitJeffProgramScheduleV1";
 
 export interface ActiveJeffProgramState {
   programId: string;
-  startDate: string; // ISO date
+  startDate: string; // ISO date YYYY-MM-DD
   currentWeek: number; // 1-indexed
   currentDayIndex: number; // 0-indexed day within current week
-  completedDays: string[]; // ISO date keys of completed workout days
+  completedDays: string[]; // ISO date keys of completed workout days (e.g. "2026-10-15")
   scheduleDays: number[]; // 0=Mon ... 6=Sun
 }
 
@@ -1342,13 +1365,76 @@ export function getProgramScheduledDates(
 
   const current = new Date(start);
   while (current < end) {
-    // getDay() returns 0=Sun, 1=Mon...6=Sat
-    // We store 0=Mon, 6=Sun
-    const dayOfWeek = (current.getDay() + 6) % 7; // Convert to Mon=0 format
+    // getDay() returns 0=Sun, 1=Mon...6=Sat; Mon=0 format:
+    const dayOfWeek = (current.getDay() + 6) % 7;
     if (scheduleDays.includes(dayOfWeek)) {
       dates.push(current.toISOString().split("T")[0]);
     }
     current.setDate(current.getDate() + 1);
   }
   return dates;
+}
+
+/**
+ * Calendar-aware schedule resolver:
+ * Checks whether a given calendar date is scheduled as a training day,
+ * and if so, maps which program workout day index (Day 1, Day 2, etc.) corresponds to it.
+ */
+export function resolveProgramDayForDate(
+  state: ActiveJeffProgramState,
+  date: Date = new Date()
+): { isTrainingDay: boolean; scheduledDayIndex: number; isCompleted: boolean; dateKey: string } {
+  const dateKey = date.toISOString().split("T")[0];
+  const dayOfWeek0to6 = (date.getDay() + 6) % 7; // Mon=0 ... Sun=6
+
+  const sortedSchedule = [...state.scheduleDays].sort((a, b) => a - b);
+  const scheduleIndex = sortedSchedule.indexOf(dayOfWeek0to6);
+
+  const isTrainingDay = scheduleIndex !== -1;
+  const isCompleted = state.completedDays.includes(dateKey);
+
+  // If it's a scheduled training day, map it to the corresponding day in the week
+  // Otherwise default to currentDayIndex so the user can inspect or workout anyway
+  const scheduledDayIndex = isTrainingDay
+    ? (scheduleIndex % (findProgramById(state.programId)?.daysPerWeek || sortedSchedule.length || 1))
+    : state.currentDayIndex;
+
+  return {
+    isTrainingDay,
+    scheduledDayIndex,
+    isCompleted,
+    dateKey,
+  };
+}
+
+/**
+ * Advance program progression after finishing a session:
+ * Marks date completed and advances day/week without corrupting calendar mapping.
+ */
+export function advanceJeffProgramAfterFinish(
+  currentState: ActiveJeffProgramState,
+  completedDateKey: string
+): ActiveJeffProgramState {
+  const program = findProgramById(currentState.programId);
+  const weekData = getProgramCurrentWeek(currentState);
+  const totalDaysInWeek = weekData?.days.length || currentState.scheduleDays.length || 4;
+
+  const updatedCompleted = currentState.completedDays.includes(completedDateKey)
+    ? currentState.completedDays
+    : [...currentState.completedDays, completedDateKey];
+
+  let nextDayIdx = currentState.currentDayIndex + 1;
+  let nextWeek = currentState.currentWeek;
+
+  if (nextDayIdx >= totalDaysInWeek) {
+    nextDayIdx = 0;
+    nextWeek = Math.min(program?.durationWeeks || 8, currentState.currentWeek + 1);
+  }
+
+  return {
+    ...currentState,
+    completedDays: updatedCompleted,
+    currentDayIndex: nextDayIdx,
+    currentWeek: nextWeek,
+  };
 }
