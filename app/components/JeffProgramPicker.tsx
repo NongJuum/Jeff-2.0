@@ -120,8 +120,9 @@ const LEVEL_LABELS: Record<string, string> = {
   beginner: "มือใหม่",
   intermediate: "กลาง",
   advanced: "ขั้นสูง",
+  all: "ทุกระดับ",
 };
-const LEVEL_LABELS_EN: Record<string, string> = { beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced" };
+const LEVEL_LABELS_EN: Record<string, string> = { beginner: "Beginner", intermediate: "Intermediate", advanced: "Advanced", all: "All levels" };
 const GOAL_LABELS: Record<string, string> = {
   strength: "Strength 💪",
   hypertrophy: "Hypertrophy 📈",
@@ -265,12 +266,12 @@ function ProgramCard({
             </div>
             <div className="mt-2">
               <span className="text-[10px] font-bold uppercase text-emerald-500">✓ {language === "th" ? "เหมาะกับ:" : "Best for:"} </span>
-              <span className="text-zinc-300">{program.bestFor}</span>
+              <span className="text-zinc-300">{language === "th" ? program.bestFor : `For ${program.level.map((l) => LEVEL_LABELS_EN[l]).join(" / ")} lifters targeting ${program.goals.join(", ")}.`}</span>
             </div>
             {program.notFor && (
               <div>
                 <span className="text-[10px] font-bold uppercase text-red-500">✗ {language === "th" ? "ไม่เหมาะกับ:" : "Not for:"} </span>
-                <span className="text-zinc-300">{program.notFor}</span>
+                <span className="text-zinc-300">{language === "th" ? program.notFor : "May not suit lifters outside the intended experience level or without the required equipment."}</span>
               </div>
             )}
             <div>
@@ -463,7 +464,7 @@ function ProgramSetupModal({
                     <span className="text-[10px] text-zinc-500">{day.exercises.length} {language === "th" ? "ท่า" : "exercises"}</span>
                   </div>
                   <p className="mt-0.5 text-[10px] text-zinc-500 truncate">
-                    {day.exercises.slice(0, 3).map((e) => e.name).join(" · ")}...
+                    {day.exercises.slice(0, 3).map((e) => getExerciseDisplayName(e.name, language)).join(" · ")}...
                   </p>
                 </div>
               ))}
@@ -585,7 +586,7 @@ export function ActiveProgramDashboard({
             ) : isCompletedToday ? (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
                 <p className="text-sm font-black text-emerald-300">✅ {language === "th" ? "วันนี้ฝึกเสร็จแล้ว" : "Workout completed today"}</p>
-                <p className="mt-1 text-xs text-zinc-400">{language === "th" ? "ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว" : "Program progress has been saved."}</p>
+                <p className="mt-1 text-xs text-zinc-400">{language === "th" ? "{language === "th" ? "ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว" : "Program progress has been saved."}" : "Program progress has been saved."}</p>
               </div>
             ) : isTodayTrainingDay ? (
               <div className="rounded-xl border border-zinc-700 bg-zinc-900/60 p-3">
