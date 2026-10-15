@@ -868,7 +868,7 @@ export function JeffProgramTodayCard({
       <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-center">
         <p className="text-2xl mb-2">✅</p>
         <p className="font-black text-emerald-300">{language === "th" ? "วันนี้ฝึกเสร็จแล้ว" : "Workout completed today"}</p>
-        <p className="text-xs text-zinc-400 mt-1">บันทึกความคืบหน้าของ {program.shortName} เรียบร้อย</p>
+        <p className="text-xs text-zinc-400 mt-1">{language === "th" ? `บันทึกความคืบหน้าของ ${program.shortName} เรียบร้อย` : `Progress for ${program.shortName} has been saved.`}</p>
       </div>
     );
   }
