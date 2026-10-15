@@ -272,6 +272,7 @@ function ProgramSetupModal({
       programId: program.id,
       startDate,
       currentWeek: 1,
+      currentDayIndex: 0,
       completedDays: [],
       scheduleDays: selectedDays,
     };

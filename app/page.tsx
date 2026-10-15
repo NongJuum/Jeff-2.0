@@ -1611,7 +1611,7 @@ function sanitizeUiState(raw: PersistedUiState | null): PersistedUiState {
     activeExerciseIndex: 0,
   };
   if (!raw || typeof raw !== "object") return fallback;
-  const modes: AppMode[] = ["dashboard", "today", "preset", "custom", "history", "library"];
+  const modes: AppMode[] = ["dashboard", "today", "preset", "custom", "history", "library", "programs"];
   const safeInt = (v: unknown) => (typeof v === "number" && Number.isInteger(v) && v >= 0 ? v : 0);
   return {
     mode: modes.includes(raw.mode) ? raw.mode : fallback.mode,
@@ -2834,6 +2834,61 @@ export default function Page() {
   const [cardioLogs, setCardioLogs] = useState<CardioLog[]>(() => readJson<CardioLog[]>(CARDIO_LOGS_KEY, []));
   const [manualTierMap, setManualTierMap] = useState<Record<string, "Beginner" | "Intermediate" | "Advanced" | "Elite">>({});
 
+  // Active Jeff Nippard Scientific Workout Program State
+  const [activeJeffProgram, setActiveJeffProgram] = useState<ActiveJeffProgramState | null>(() => getActiveJeffProgram());
+
+  function handleSelectJeffProgram(activatedState: ActiveJeffProgramState) {
+    const program = findProgramById(activatedState.programId);
+    if (!program) return;
+    const newState: ActiveJeffProgramState = {
+      ...activatedState,
+      currentDayIndex: activatedState.currentDayIndex ?? 0,
+    };
+    saveActiveJeffProgram(newState);
+    setActiveJeffProgram(newState);
+    setSelectedDay(0);
+    setActiveExerciseIndex(0);
+    setMode("today");
+  }
+
+  function handleMarkJeffDayComplete(dateStr: string) {
+    if (!activeJeffProgram) return;
+    const currentList = activeJeffProgram.completedDays || [];
+    if (currentList.includes(dateStr)) return;
+    const updatedCompleted = [...currentList, dateStr];
+
+    const currentProg = findProgramById(activeJeffProgram.programId);
+    const currentWeekInfo = getProgramCurrentWeek(activeJeffProgram);
+    const totalDaysInWeek = currentWeekInfo?.days.length || activeJeffProgram.scheduleDays.length || 4;
+
+    let nextDayIdx = activeJeffProgram.currentDayIndex + 1;
+    let nextWeek = activeJeffProgram.currentWeek;
+    if (nextDayIdx >= totalDaysInWeek) {
+      nextDayIdx = 0;
+      nextWeek = Math.min(currentProg?.durationWeeks || 8, activeJeffProgram.currentWeek + 1);
+    }
+
+    const updatedState: ActiveJeffProgramState = {
+      ...activeJeffProgram,
+      completedDays: updatedCompleted,
+      currentDayIndex: nextDayIdx,
+      currentWeek: nextWeek,
+    };
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
+    setSelectedDay(nextDayIdx);
+    setActiveExerciseIndex(0);
+  }
+
+  function handleSwitchProgram() {
+    setMode("programs");
+  }
+
+  function handleResetProgram() {
+    clearActiveJeffProgram();
+    setActiveJeffProgram(null);
+  }
+
   // Active Session Engine & Accordion States (Hevy/Strong Style)
   const savedActiveSession = useMemo(() => {
     return readJson<{ isRunning: boolean; elapsedSeconds: number; lastSavedAt: number } | null>(ACTIVE_SESSION_KEY, null);
@@ -2992,6 +3047,17 @@ export default function Page() {
     });
     setIsSessionRunning(false);
     setShowFinishCelebration(true);
+
+    // Auto-advance to next workout day & mark completion
+    if (activeJeffProgram) {
+      handleMarkJeffDayComplete(todayKey);
+    } else if (isPresetLike) {
+      setSelectedDay((prev) => (prev + 1) % activePlan.length);
+      setActiveExerciseIndex(0);
+    } else {
+      setSelectedCustomDay((prev) => (prev + 1) % activePlan.length);
+      setActiveExerciseIndex(0);
+    }
   }
 
   // Cardio Quick-Input State
@@ -3254,10 +3320,50 @@ export default function Page() {
     return customPlans.find((plan) => plan.id === selectedCustomPlanId) ?? customPlans[0];
   }, [customPlans, selectedCustomPlanId]);
 
+  // Convert active Jeff Nippard Program into DayPlan[] if active
+  const jeffProgramPlans = useMemo(() => {
+    if (!activeJeffProgram) return null;
+    const weekData = getProgramCurrentWeek(activeJeffProgram);
+    if (!weekData) return null;
+    return weekData.days.map((d, dIdx) => {
+      const planExs: PlanExercise[] = d.exercises.map((ex, exIdx) => {
+        const found = findExercise(ex.name);
+        return {
+          id: `jeff_${activeJeffProgram.programId}_w${weekData.weekNumber}_d${dIdx}_ex${exIdx}`,
+          name: ex.name,
+          group: found.group,
+          sets: ex.sets,
+          reps: ex.reps,
+          warmup: (ex.warmupSets ?? 0) > 0,
+          muscles: found.muscles,
+          movement: found.movement,
+          load: found.load,
+        };
+      });
+      return {
+        id: `jeff_day_${dIdx}`,
+        title: `${d.dayLabel}: ${d.focusLabel}`,
+        subtitle: `Jeff Nippard ${findProgramById(activeJeffProgram.programId)?.shortName || "Program"} · W${weekData.weekNumber}`,
+        focus: ["Chest", "Back", "Legs", "Shoulders", "Arms"].filter((g) =>
+          planExs.some((e) => e.group === g)
+        ) as MuscleGroup[],
+        exercises: planExs,
+      };
+    });
+  }, [activeJeffProgram]);
+
   const activePresetPlan = days === 5 && fiveDayMode === "oneLegDay" ? fiveDayLegOncePlan : presetPlans[days];
   const isPresetLike = mode === "today" || mode === "preset" || mode === "dashboard";
-  const activePlan = isPresetLike ? activePresetPlan : selectedCustomPlan?.days ?? [];
-  const activeDayIndex = isPresetLike ? selectedDay : selectedCustomDay;
+  const activePlan = useMemo(() => {
+    if (activeJeffProgram && jeffProgramPlans && jeffProgramPlans.length > 0 && isPresetLike) {
+      return jeffProgramPlans;
+    }
+    return isPresetLike ? activePresetPlan : selectedCustomPlan?.days ?? [];
+  }, [activeJeffProgram, jeffProgramPlans, isPresetLike, activePresetPlan, selectedCustomPlan]);
+
+  const activeDayIndex = isPresetLike
+    ? (activeJeffProgram ? activeJeffProgram.currentDayIndex : selectedDay)
+    : selectedCustomDay;
   const rawDay = activePlan[activeDayIndex] ?? activePlan[0];
 
   const currentDayKey = `${mode}_${activeDayIndex}`;
@@ -3298,18 +3404,22 @@ export default function Page() {
     if (day && Array.isArray(day.exercises) && day.exercises.length > 0) {
       return day;
     }
-    const presetList = days === 5 && fiveDayMode === "oneLegDay" ? fiveDayLegOncePlan : presetPlans[days];
+    const presetList = activePlan;
     const safePresetIndex = selectedDay < presetList.length ? selectedDay : 0;
     return presetList[safePresetIndex] || presetList[0];
-  }, [day, days, fiveDayMode, fiveDayLegOncePlan, presetPlans, selectedDay]);
+  }, [day, activePlan, selectedDay]);
 
   const dashboardMuscleSummary = useMemo(() => {
     return buildPlannedMuscleSummary(dashboardDay?.exercises ?? []);
   }, [dashboardDay]);
 
   const isTodayScheduledRest = useMemo(() => {
+    if (activeJeffProgram) {
+      const dayOfWeek0to6 = (new Date().getDay() + 6) % 7; // Mon=0 .. Sun=6
+      return !activeJeffProgram.scheduleDays.includes(dayOfWeek0to6);
+    }
     return !weeklySchedule[todayDayOfWeek];
-  }, [weeklySchedule, todayDayOfWeek]);
+  }, [activeJeffProgram, weeklySchedule, todayDayOfWeek]);
 
   function moveSessionExercise(currentIndex: number, direction: -1 | 1) {
     if (!day || !day.exercises) return;
@@ -4560,13 +4670,15 @@ export default function Page() {
                 >
                   <SlidersHorizontal size={13} className="text-yellow-400" />
                   <span>
-                    {mode === "custom"
+                    {activeJeffProgram
+                      ? `${findProgramById(activeJeffProgram.programId)?.shortName || "Jeff"} (W${activeJeffProgram.currentWeek}) ▾`
+                      : mode === "custom"
                       ? `${selectedCustomPlan?.name || "Custom"} ▾`
                       : `${days} Days Split ▾`}
                   </span>
                 </button>
 
-                {/* Compact Mode Pill (Preset vs Custom) */}
+                {/* Compact Mode Pill (Today vs Preset vs Custom vs Programs) */}
                 <div className="flex items-center bg-zinc-950 p-0.5 rounded-xl border border-zinc-800 text-[11px] font-bold">
                   <button
                     type="button"
@@ -4578,6 +4690,19 @@ export default function Page() {
                     }`}
                   >
                     Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("programs")}
+                    className={`h-7 px-2.5 rounded-lg transition flex items-center gap-1 ${
+                      mode === "programs"
+                        ? "bg-yellow-400 text-black font-black shadow-sm"
+                        : "text-amber-400 hover:text-amber-300"
+                    }`}
+                    title="โปรแกรมการฝึก Jeff Nippard"
+                  >
+                    <BookOpen size={11} />
+                    <span>Programs</span>
                   </button>
                   <button
                     type="button"
@@ -4847,6 +4972,16 @@ export default function Page() {
                 </button>
               </div>
             </div>
+
+            {/* Active Jeff Nippard Program Hero Widget */}
+            {activeJeffProgram && (
+              <div className="space-y-3">
+                <JeffProgramTodayCard
+                  activeState={activeJeffProgram}
+                  onMarkDayComplete={handleMarkJeffDayComplete}
+                />
+              </div>
+            )}
 
             {/* B. "Today's Workout" Visual Hero Card or Rest Day Card */}
             {isTodayScheduledRest ? (
@@ -5252,6 +5387,24 @@ export default function Page() {
           </div>
         )}
 
+        {/* ========================================================================= */}
+        {/* JEFF NIPPARD PROGRAMS SCREEN (mode === "programs")                         */}
+        {/* ========================================================================= */}
+        {mode === "programs" && (
+          <div className="mt-4 space-y-4">
+            {activeJeffProgram && (
+              <ActiveProgramDashboard
+                activeState={activeJeffProgram}
+                onNavigateToPrograms={handleSwitchProgram}
+                onStopProgram={handleResetProgram}
+              />
+            )}
+            <JeffProgramPicker
+              onProgramActivated={handleSelectJeffProgram}
+            />
+          </div>
+        )}
+
         {mode === "custom" && selectedCustomPlan && (
           <details className="mt-4 rounded-3xl border border-yellow-400/20 bg-zinc-900 p-4">
             <summary className="cursor-pointer text-base font-black text-yellow-300">Plan settings</summary>
@@ -5309,6 +5462,26 @@ export default function Page() {
 
         {(mode === "today" || mode === "preset" || mode === "custom") && day && (
           <>
+            {mode === "today" && isTodayScheduledRest && (
+              <div className="mt-3 rounded-2xl border border-yellow-500/30 bg-gradient-to-r from-zinc-950 via-zinc-900 to-black p-4 shadow-xl">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">😴</span>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-yellow-300">
+                        {activeJeffProgram ? "Jeff Program · Rest & Recovery" : "Scheduled Rest Day"}
+                      </p>
+                      <h4 className="text-sm font-black text-white">
+                        วันนี้ตามตารางเป็น "วันพักผ่อน"
+                      </h4>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">
+                        ระบบจัดตารางให้พักวันนี้ แต่คุณสามารถเลือกวันซ้อมอื่นหรือกดฝึกต่อได้เลยด้านล่าง
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900 p-3">
               {mode === "custom" ? (
                 <div className="mb-3 grid gap-3">
@@ -7104,10 +7277,11 @@ export default function Page() {
       )}
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
-        <div className="mx-auto grid max-w-5xl grid-cols-5 gap-1">
+        <div className="mx-auto grid max-w-5xl grid-cols-6 gap-1">
           {[
             ["dashboard", "Home", Home],
             ["workout", "Workout", Dumbbell],
+            ["programs", "Programs", BookOpen],
             ["stats", "Stats", Trophy],
             ["library", "Library", Library],
             ["profile", "Profile", User],
@@ -7115,6 +7289,7 @@ export default function Page() {
             const isTabActive =
               (key === "dashboard" && mode === "dashboard") ||
               (key === "workout" && ["today", "preset", "custom"].includes(mode)) ||
+              (key === "programs" && mode === "programs") ||
               (key === "stats" && mode === "history") ||
               (key === "library" && mode === "library");
 
@@ -7125,6 +7300,7 @@ export default function Page() {
                 onClick={() => {
                   if (key === "dashboard") setMode("dashboard");
                   else if (key === "workout") setMode("today");
+                  else if (key === "programs") setMode("programs");
                   else if (key === "stats") setMode("history");
                   else if (key === "library") setMode("library");
                   else setShowProfileModal(true);

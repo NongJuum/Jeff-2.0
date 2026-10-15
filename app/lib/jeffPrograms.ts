@@ -1284,6 +1284,7 @@ export interface ActiveJeffProgramState {
   programId: string;
   startDate: string; // ISO date
   currentWeek: number; // 1-indexed
+  currentDayIndex: number; // 0-indexed day within current week
   completedDays: string[]; // ISO date keys of completed workout days
   scheduleDays: number[]; // 0=Mon ... 6=Sun
 }
