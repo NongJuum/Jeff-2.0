@@ -44,6 +44,47 @@ import { getUserProfile } from "../lib/assessment";
 import type { AppLanguage } from "./OnboardingWizard";
 
 const DAY_LABELS = ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"];
+const DAY_LABELS_EN = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+export function getExerciseDisplayName(name: string, language: AppLanguage = "th"): string {
+  if (language !== "th") return name;
+  const replacements: [RegExp, string][] = [
+    [/Bulgarian Split Squat/gi, "บัลแกเรียนสปลิตสควอต"],
+    [/Romanian Deadlift/gi, "โรมาเนียนเดดลิฟต์"],
+    [/Hanging Knee Raise/gi, "แฮงกิงนีเรส"],
+    [/Chest Supported/gi, "เชสต์ซัพพอร์ตเต็ด"],
+    [/Shoulder Press/gi, "โชลเดอร์เพรส"],
+    [/Bench Press/gi, "เบนช์เพรส"],
+    [/Incline/gi, "อินไคลน์"],
+    [/Deadlift/gi, "เดดลิฟต์"],
+    [/Squat/gi, "สควอต"],
+    [/Dumbbell|\bDB\b/gi, "ดัมเบล"],
+    [/Barbell/gi, "บาร์เบล"],
+    [/Cable/gi, "เคเบิล"],
+    [/Machine/gi, "แมชชีน"],
+    [/Pulldown/gi, "พูลดาวน์"],
+    [/Pull Up/gi, "พูลอัป"],
+    [/Lat Raise/gi, "แลทเรส"],
+    [/Lateral Raise/gi, "แลเทอรัลเรส"],
+    [/Pec Deck/gi, "เพคเด็ค"],
+    [/Leg Extension/gi, "เลกเอ็กซ์เทนชัน"],
+    [/Hamstring Curl/gi, "แฮมสตริงเคิร์ล"],
+    [/Tricep/gi, "ไตรเซปส์"],
+    [/Bicep/gi, "ไบเซปส์"],
+    [/Pushdown/gi, "พุชดาวน์"],
+    [/Push-ups/gi, "พุชอัป"],
+    [/Curl/gi, "เคิร์ล"],
+    [/Row/gi, "โรว์"],
+    [/Press/gi, "เพรส"],
+    [/Flye|Fly/gi, "ฟลาย"],
+    [/Raise/gi, "เรส"],
+    [/Reverse/gi, "รีเวิร์ส"],
+    [/Weighted/gi, "เวตเต็ด"],
+    [/Bodyweight/gi, "บอดีเวต"],
+    [/Full Body/gi, "ฟูลบอดี"],
+  ];
+  return replacements.reduce((result, [pattern, replacement]) => result.replace(pattern, replacement), name);
+}
 
 const PROGRAM_THAI_COPY: Record<string, { description: string; focus: string; benefit: string; difficulty: string }> = {
   fundamentals_full_body: { description: "ฝึกกล้ามเนื้อทั่วร่างกาย 3 วันต่อสัปดาห์", focus: "พื้นฐานท่าหลักและเพิ่มกล้ามเนื้อทั่วร่างกาย", benefit: "สร้างพื้นฐานที่ดี ฝึกทักษะสม่ำเสมอ และเพิ่มปริมาณฝึกอย่างเป็นระบบ", difficulty: "เริ่มต้นถึงปานกลาง" },
@@ -198,7 +239,7 @@ function ProgramCard({
           className="mt-3 flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 transition"
         >
           <Info size={11} />
-          {expanded ? "ซ่อนรายละเอียด" : "ดูรายละเอียดเพิ่ม"}
+          {expanded ? (language === "th" ? "ซ่อนรายละเอียด" : "Hide details") : (language === "th" ? "ดูรายละเอียดเพิ่ม" : "More details")}
           <ChevronDown
             size={11}
             className={`transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -256,12 +297,12 @@ function ProgramCard({
           {isActive ? (
             <>
               <CheckCircle size={15} />
-              กำลังใช้งานอยู่
+              {language === "th" ? "กำลังใช้งานอยู่" : "Currently active"}
             </>
           ) : (
             <>
               <Play size={14} fill="white" />
-              เลือกโปรแกรมนี้
+              {language === "th" ? "เลือกโปรแกรมนี้" : "Choose this program"}
             </>
           )}
         </button>
@@ -277,10 +318,12 @@ function ProgramSetupModal({
   program,
   onConfirm,
   onCancel,
+  language = "th",
 }: {
   program: JeffProgram;
   onConfirm: (state: ActiveJeffProgramState) => void;
   onCancel: () => void;
+  language?: AppLanguage;
 }) {
   const [selectedDays, setSelectedDays] = useState<number[]>(program.defaultScheduleDays);
   const [startDate, setStartDate] = useState(() => {
@@ -320,13 +363,13 @@ function ProgramSetupModal({
             <span className="text-3xl">{program.emoji}</span>
             <div>
               <p className="text-xs font-bold uppercase tracking-wider text-white/70">
-                ตั้งค่าโปรแกรม
+                {language === "th" ? "ตั้งค่าโปรแกรม" : "Program setup"}
               </p>
               <h2 className="text-lg font-black text-white">{program.shortName}</h2>
             </div>
           </div>
           <p className="mt-2 text-sm text-white/80">
-            {program.daysPerWeek} วัน/สัปดาห์ · {program.durationWeeks} สัปดาห์ · {SPLIT_LABELS[program.split]}
+            {language === "th" ? `${program.daysPerWeek} วัน/สัปดาห์ · ${program.durationWeeks} สัปดาห์ · ${SPLIT_LABELS[program.split]}` : `${program.daysPerWeek} days/week · ${program.durationWeeks} weeks · ${program.split.replaceAll("_", " ")}`}
           </p>
         </div>
 
@@ -334,7 +377,7 @@ function ProgramSetupModal({
           {/* Start date */}
           <div>
             <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2 block">
-              วันเริ่มต้น
+              {language === "th" ? "วันเริ่มต้น" : "Start date"}
             </label>
             <input
               type="date"
@@ -347,13 +390,13 @@ function ProgramSetupModal({
           {/* Training days */}
           <div>
             <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-1 block">
-              วันออกกำลังกาย
+              {language === "th" ? "วันฝึก" : "Training days"}
             </label>
             <p className="text-[11px] text-zinc-500 mb-3">
-              ต้องเลือก {program.daysPerWeek} วัน/สัปดาห์ — เลือกอยู่ {selectedDays.length} วัน
+              {language === "th" ? `เลือก ${program.daysPerWeek} วัน/สัปดาห์ — เลือกแล้ว ${selectedDays.length} วัน` : `Select ${program.daysPerWeek} days/week — ${selectedDays.length} selected`}
               {!isDayCountValid && (
                 <span className="text-amber-400 ml-1">
-                  (ต้องเลือกให้ครบ {program.daysPerWeek} วัน)
+                  ({language === "th" ? `ต้องเลือกให้ครบ ${program.daysPerWeek} วัน` : `Select exactly ${program.daysPerWeek} days`})
                 </span>
               )}
             </p>
@@ -381,7 +424,7 @@ function ProgramSetupModal({
           {nextDates.length > 0 && (
             <div>
               <label className="text-xs font-bold uppercase tracking-wide text-zinc-400 mb-2 block">
-                ตารางฝึก 2 สัปดาห์แรก
+                {language === "th" ? "ตารางฝึก 2 สัปดาห์แรก" : "First two weeks"}
               </label>
               <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
                 <div className="flex flex-wrap gap-1.5">
@@ -435,7 +478,7 @@ function ProgramSetupModal({
             onClick={onCancel}
             className="flex-1 rounded-xl bg-zinc-900 py-3 text-sm font-bold text-zinc-300 border border-zinc-700 active:scale-95 transition"
           >
-            ยกเลิก
+            {language === "th" ? "ยกเลิก" : "Cancel"}
           </button>
           <button
             onClick={handleConfirm}
@@ -539,7 +582,7 @@ export function ActiveProgramDashboard({
               </div>
             ) : isCompletedToday ? (
               <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
-                <p className="text-sm font-black text-emerald-300">✅ วันนี้ฝึกเสร็จแล้ว</p>
+                <p className="text-sm font-black text-emerald-300">✅ {language === "th" ? "วันนี้ฝึกเสร็จแล้ว" : "Workout completed today"}</p>
                 <p className="mt-1 text-xs text-zinc-400">ความคืบหน้าของโปรแกรมถูกบันทึกแล้ว</p>
               </div>
             ) : isTodayTrainingDay ? (
@@ -678,12 +721,12 @@ export function JeffProgramPicker({
             <div className="flex items-center gap-2">
               <span className="text-2xl">{findProgramById(activeState.programId)?.emoji}</span>
               <div>
-                <p className="text-[10px] font-bold uppercase text-yellow-400">กำลังใช้งาน</p>
+                <p className="text-[10px] font-bold uppercase text-yellow-400">{language === "th" ? "กำลังใช้งาน" : "Active program"}</p>
                 <p className="text-sm font-black text-white">
                   {findProgramById(activeState.programId)?.shortName}
                 </p>
                 <p className="text-xs text-zinc-400">
-                  สัปดาห์ {activeState.currentWeek} · {activeState.completedDays.length} sessions ✅
+                  {language === "th" ? `สัปดาห์ ${activeState.currentWeek} · ${activeState.completedDays.length} ครั้งที่ฝึก` : `Week ${activeState.currentWeek} · ${activeState.completedDays.length} sessions`} ✅
                 </p>
               </div>
             </div>
@@ -748,7 +791,7 @@ export function JeffProgramPicker({
         <div className="flex items-center gap-2 rounded-xl bg-emerald-900/20 border border-emerald-500/30 px-3 py-2">
           <Sparkles size={14} className="text-emerald-400" />
           <p className="text-xs text-emerald-300">
-            แนะนำตามข้อมูลส่วนตัวของคุณ — ระดับ · เป้าหมาย · วันว่าง
+            {language === "th" ? "แนะนำตามโปรไฟล์ของคุณ: ระดับ · เป้าหมาย · วันฝึก" : "Recommended for your profile: experience · goal · availability"}
           </p>
         </div>
       )}
@@ -757,7 +800,7 @@ export function JeffProgramPicker({
       <div className="space-y-3">
         {filteredPrograms.length === 0 ? (
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-            <p className="text-zinc-500 text-sm">ไม่พบโปรแกรม</p>
+            <p className="text-zinc-500 text-sm">{language === "th" ? "ไม่พบโปรแกรม" : "No programs found"}</p>
           </div>
         ) : (
           filteredPrograms.map(({ program, recommendation }) => (
@@ -779,6 +822,7 @@ export function JeffProgramPicker({
           program={setupProgram}
           onConfirm={handleConfirmSetup}
           onCancel={() => setSetupProgram(null)}
+          language={language}
         />
       )}
     </div>
@@ -834,7 +878,7 @@ export function JeffProgramTodayCard({
     return (
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-center">
         <p className="text-2xl mb-2">😴</p>
-        <p className="font-black text-white">วันพักผ่อน</p>
+        <p className="font-black text-white">{language === "th" ? "วันพัก" : "Rest day"}</p>
         <p className="text-xs text-zinc-400 mt-1">
           {program.shortName} — วันฝึกถัดไป: {nextTrainingLabel ?? "ยังไม่ได้เลือกวันฝึก"}
         </p>
@@ -868,7 +912,7 @@ export function JeffProgramTodayCard({
           <div key={i} className="px-4 py-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-white">{exercise.name}</p>
+                <p className="text-sm font-black text-white">{getExerciseDisplayName(exercise.name, language)}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   <span className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2 py-0.5 text-[10px] font-bold text-zinc-300">
                     {exercise.sets} sets × {exercise.reps}
@@ -915,7 +959,7 @@ export function JeffProgramTodayCard({
             className={`w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
           >
             <CheckCircle size={15} />
-            บันทึกว่าฝึกเสร็จแล้ว
+            {language === "th" ? "บันทึกว่าฝึกเสร็จแล้ว" : "Mark workout complete"}
           </button>
         )}
       </div>
