@@ -25,18 +25,22 @@ export function getCurrentBodyweight(): BodyweightEntry | null {
   }
 }
 
-export function BodyweightManager({ open, onClose, currentPrs, preferredUnit = "kg", onSaveSuccess }: Props & { preferredUnit?: "kg" | "lbs"; onSaveSuccess?: () => void }) {
+import { getPersistentWeightUnit, setPersistentWeightUnit, convertInputWeight, formatUnitLabel } from "../lib/units";
+
+export function BodyweightManager({ open, onClose, currentPrs, preferredUnit, onSaveSuccess }: Props & { preferredUnit?: "kg" | "lbs"; onSaveSuccess?: () => void }) {
+  const activePref = preferredUnit || getPersistentWeightUnit();
   const [entry, setEntry] = useState<BodyweightEntry | null>(null);
   const [inputVal, setInputVal] = useState("");
-  const [unit, setUnit] = useState<"kg" | "lbs">(preferredUnit);
+  const [unit, setUnit] = useState<"kg" | "lbs">(activePref);
 
   useEffect(() => {
     if (open) {
       const current = getCurrentBodyweight();
+      const currentPref = preferredUnit || getPersistentWeightUnit();
       setEntry(current);
-      setUnit(preferredUnit);
+      setUnit(currentPref);
       if (current) {
-        if (preferredUnit === "kg") {
+        if (currentPref === "kg") {
           setInputVal(String(Math.round((current.lbs * 0.453592) * 10) / 10));
         } else {
           setInputVal(String(Math.round(current.lbs * 10) / 10));
@@ -51,15 +55,12 @@ export function BodyweightManager({ open, onClose, currentPrs, preferredUnit = "
 
   const handleUnitToggle = (newUnit: "kg" | "lbs") => {
     if (newUnit === unit) return;
-    const num = Number(inputVal);
-    if (num > 0) {
-      if (newUnit === "kg") {
-        setInputVal(String(Math.round((num * 0.453592) * 10) / 10));
-      } else {
-        setInputVal(String(Math.round((num / 0.453592) * 10) / 10));
-      }
+    if (inputVal) {
+      const converted = convertInputWeight(inputVal, unit, newUnit);
+      setInputVal(converted);
     }
     setUnit(newUnit);
+    setPersistentWeightUnit(newUnit);
   };
 
   const save = () => {
@@ -125,7 +126,7 @@ export function BodyweightManager({ open, onClose, currentPrs, preferredUnit = "
                   onClick={() => handleUnitToggle("lbs")}
                   className={`px-2 py-0.5 rounded-md transition ${unit === "lbs" ? "bg-emerald-400 text-zinc-950 font-black shadow-sm" : "text-zinc-400 hover:text-zinc-200"}`}
                 >
-                  lbs
+                  lb
                 </button>
               </div>
             </div>
@@ -139,7 +140,7 @@ export function BodyweightManager({ open, onClose, currentPrs, preferredUnit = "
                 placeholder={unit === "kg" ? "เช่น 70.5" : "เช่น 155"}
                 className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-lg font-black outline-none focus:border-emerald-400"
               />
-              <span className="flex items-center px-3 text-sm font-bold text-zinc-400">{unit}</span>
+              <span className="flex items-center px-3 text-sm font-bold text-zinc-400">{formatUnitLabel(unit)}</span>
               <button
                 onClick={save}
                 className="rounded-xl bg-emerald-400 px-5 py-3 text-sm font-black text-zinc-950 hover:bg-emerald-300 transition active:scale-95"

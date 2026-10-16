@@ -21,16 +21,23 @@ import {
   Users,
   X,
   Zap,
+  ArrowRightLeft,
+  CalendarPlus,
+  Undo2,
 } from "lucide-react";
 import {
   type JeffProgram,
   type ProgramRecommendation,
   type ActiveJeffProgramState,
+  type RecoveryPlan,
+  type RecoveryPlanSession,
+  type ManualScheduleMove,
   JEFF_PROGRAMS,
   recommendPrograms,
   getActiveJeffProgram,
   saveActiveJeffProgram,
   clearActiveJeffProgram,
+  getProgramProgressArchive,
   findProgramById,
   getProgramCurrentWeek,
   getProgramScheduledDates,
@@ -38,6 +45,8 @@ import {
   getNextProgramTrainingDate,
   isJeffProgramComplete,
   resolveProgramDayForDate,
+  buildRecoveryPlan,
+  getValidMoveDates,
 } from "../lib/jeffPrograms";
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getUserProfile } from "../lib/assessment";
@@ -290,8 +299,20 @@ function ProgramSetupModal({
   onCancel: () => void;
   language?: AppLanguage;
 }) {
-  const [selectedDays, setSelectedDays] = useState<number[]>(program.defaultScheduleDays);
+  const [selectedDays, setSelectedDays] = useState<number[]>(() => {
+    const active = getActiveJeffProgram();
+    const archive = getProgramProgressArchive();
+    const existing = (active && active.programId === program.id) ? active : archive[program.id];
+    if (existing?.scheduleDays && Array.isArray(existing.scheduleDays) && existing.scheduleDays.length > 0) {
+      return existing.scheduleDays;
+    }
+    return program.defaultScheduleDays;
+  });
   const [startDate, setStartDate] = useState(() => {
+    const active = getActiveJeffProgram();
+    const archive = getProgramProgressArchive();
+    const existing = (active && active.programId === program.id) ? active : archive[program.id];
+    if (existing?.startDate) return existing.startDate;
     const today = new Date();
     return getProgramDateKey(today);
   });
@@ -305,12 +326,18 @@ function ProgramSetupModal({
   const isDayCountValid = selectedDays.length === program.daysPerWeek;
 
   const handleConfirm = () => {
+    const active = getActiveJeffProgram();
+    const archive = getProgramProgressArchive();
+    const existing = (active && active.programId === program.id) ? active : archive[program.id];
+
     const state: ActiveJeffProgramState = {
       programId: program.id,
-      startDate,
-      currentWeek: 1,
-      currentDayIndex: 0,
-      completedDays: [],
+      startDate: existing?.startDate || startDate,
+      currentWeek: existing?.currentWeek ?? 1,
+      currentDayIndex: existing?.currentDayIndex ?? 0,
+      completedDays: existing?.completedDays ?? [],
+      rescheduledSessions: existing?.rescheduledSessions,
+      skippedDates: existing?.skippedDates,
       scheduleDays: selectedDays,
     };
     onConfirm(state);
@@ -804,12 +831,17 @@ export function JeffProgramPicker({
 export function JeffProgramTodayCard({
   activeState,
   onMarkDayComplete,
+  onMoveSession,
+  onCancelMove,
   language = "th",
 }: {
   activeState: ActiveJeffProgramState;
   onMarkDayComplete: (date: string, completedDayIndex?: number) => void;
+  onMoveSession?: (fromDate: string, toDate: string) => void;
+  onCancelMove?: (moveId: string) => void;
   language?: AppLanguage;
 }) {
+  const [showMoveModal, setShowMoveModal] = useState(false);
   const program = findProgramById(activeState.programId);
   const currentWeekData = getProgramCurrentWeek(activeState);
   const todayKey = getProgramDateKey(new Date());
@@ -848,12 +880,25 @@ export function JeffProgramTodayCard({
         })()
       : null;
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-center">
-        <p className="text-2xl mb-2">😴</p>
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-center space-y-2">
+        <p className="text-2xl mb-1">😴</p>
         <p className="font-black text-white">{language === "th" ? "วันนี้เป็นวันพัก" : "Today is a rest day"}</p>
-        <p className="text-xs text-zinc-400 mt-1">
+        <p className="text-xs text-zinc-400">
           {program.shortName} — {language === "th" ? "วันฝึกถัดไป:" : "Next training day:"} {nextTrainingLabel ?? (language === "th" ? "ยังไม่ได้เลือกวันฝึก" : "No training day selected")}
         </p>
+        {scheduleStatus.manualMove && scheduleStatus.isManualMove && (
+          <div className="mt-2 inline-flex items-center gap-2 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs text-amber-300">
+            <span>📌 {language === "th" ? `เซสชันเดิมถูกย้ายไปวันที่ ${scheduleStatus.manualMove.targetDateKey}` : `Original session moved to ${scheduleStatus.manualMove.targetDateKey}`}</span>
+            {onCancelMove && (
+              <button
+                onClick={() => onCancelMove(scheduleStatus.manualMove!.id)}
+                className="underline hover:text-white font-bold"
+              >
+                {language === "th" ? "ยกเลิกการย้าย" : "Undo move"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   }
@@ -873,6 +918,11 @@ export function JeffProgramTodayCard({
                   ⚡ {language === "th" ? "ซ้อมชดเชย" : "Make-up"}
                 </span>
               )}
+              {scheduleStatus.isManualMove && (
+                <span className="inline-flex items-center rounded-md bg-blue-500/25 border border-blue-400/40 px-2 py-0.5 text-[10px] font-black uppercase text-blue-200">
+                  📌 {language === "th" ? "ย้ายวันฝึกมา" : "Moved session"}
+                </span>
+              )}
               <p className="text-xs font-bold uppercase tracking-wider text-white/70">
                 {program.shortName} · {language === "th" ? `สัปดาห์ ${scheduleStatus.cycleNumber || activeState.currentWeek}` : `Week ${scheduleStatus.cycleNumber || activeState.currentWeek}`}
               </p>
@@ -884,6 +934,26 @@ export function JeffProgramTodayCard({
           <span className="text-3xl">{program.emoji}</span>
         </div>
       </div>
+
+      {/* Manual move banner if applicable */}
+      {scheduleStatus.isManualMove && scheduleStatus.manualMove && (
+        <div className="flex items-center justify-between bg-blue-950/40 border-b border-blue-500/30 px-4 py-2">
+          <span className="text-xs text-blue-300 flex items-center gap-1.5">
+            <ArrowRightLeft size={13} />
+            {language === "th"
+              ? `ย้ายมาจาก ${scheduleStatus.manualMove.originalDateKey}`
+              : `Moved from ${scheduleStatus.manualMove.originalDateKey}`}
+          </span>
+          {onCancelMove && (
+            <button
+              onClick={() => onCancelMove(scheduleStatus.manualMove!.id)}
+              className="text-xs text-blue-400 hover:text-white underline font-bold"
+            >
+              {language === "th" ? "ยกเลิกการย้าย" : "Undo move"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Exercise list */}
       <div className="bg-zinc-900 divide-y divide-zinc-800">
@@ -925,22 +995,238 @@ export function JeffProgramTodayCard({
         ))}
       </div>
 
-      {/* Mark complete */}
-      <div className="bg-zinc-900 border-t border-zinc-800 p-4">
+      {/* Mark complete & Move Actions */}
+      <div className="bg-zinc-900 border-t border-zinc-800 p-4 space-y-2">
         {isCompletedToday ? (
           <div className="flex items-center justify-center gap-2 rounded-xl bg-emerald-500/15 border border-emerald-500/30 py-3">
             <CheckCircle size={16} className="text-emerald-400" />
             <span className="text-sm font-black text-emerald-300">{language === "th" ? "ฝึกเสร็จแล้ววันนี้! 💪" : "Workout completed today! 💪"}</span>
           </div>
         ) : (
-          <button
-            onClick={() => onMarkDayComplete(todayKey, safeDayIndex)}
-            className={`w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
-          >
-            <CheckCircle size={15} />
-            {language === "th" ? "บันทึกว่าฝึกเสร็จแล้ว" : "Mark workout complete"}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => onMarkDayComplete(todayKey, safeDayIndex)}
+              className={`flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
+            >
+              <CheckCircle size={15} />
+              {language === "th" ? "บันทึกว่าฝึกเสร็จแล้ว" : "Mark complete"}
+            </button>
+            {onMoveSession && (
+              <button
+                onClick={() => setShowMoveModal(true)}
+                title={language === "th" ? "ย้ายเซสชันนี้ไปยังวันอื่น" : "Move workout to another date"}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-800 px-3.5 py-3 text-xs font-black text-zinc-300 hover:bg-zinc-700 transition"
+              >
+                <ArrowRightLeft size={14} className="text-yellow-400" />
+                <span>{language === "th" ? "ย้ายวัน" : "Move"}</span>
+              </button>
+            )}
+          </div>
         )}
+      </div>
+
+      {/* Move Workout Modal */}
+      {showMoveModal && onMoveSession && (
+        <MoveWorkoutModal
+          activeState={activeState}
+          fromDateKey={todayKey}
+          onConfirmMove={(from, to) => {
+            onMoveSession(from, to);
+            setShowMoveModal(false);
+          }}
+          onClose={() => setShowMoveModal(false)}
+          language={language}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MISSED RECOVERY PROMPT BANNER
+// ─────────────────────────────────────────────────────────────────
+export function MissedRecoveryPrompt({
+  activeState,
+  onConfirmRecovery,
+  onDeclineRecovery,
+  language = "th",
+}: {
+  activeState: ActiveJeffProgramState;
+  onConfirmRecovery: (plan: RecoveryPlan) => void;
+  onDeclineRecovery: () => void;
+  language?: AppLanguage;
+}) {
+  const plan = activeState.recoveryPlan?.status === "awaiting_user_decision"
+    ? activeState.recoveryPlan
+    : buildRecoveryPlan(activeState);
+
+  if (!plan || plan.sessions.length === 0 || activeState.recoveryPlan?.status === "declined") {
+    return null;
+  }
+
+  return (
+    <div className="rounded-2xl border border-amber-500/40 bg-gradient-to-br from-amber-950/40 via-zinc-900 to-zinc-900 p-4 shadow-xl">
+      <div className="flex items-start gap-3">
+        <div className="rounded-xl bg-amber-500/20 p-2 text-amber-400 shrink-0">
+          <CalendarPlus size={20} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm font-black text-amber-200">
+            {language === "th"
+              ? "คุณมีโปรแกรมฝึกที่ยังไม่ได้ทำ ต้องการแทรกเซสชันที่พลาดลงในตารางฝึกถัดไปหรือไม่?"
+              : "You have missed workout sessions. Would you like to insert them into your upcoming schedule?"}
+          </h4>
+          <p className="text-xs text-zinc-400 mt-1">
+            {language === "th"
+              ? `ตรวจพบ ${plan.sessions.length} เซสชันที่ค้างอยู่ ระบบจะจัดลงในวันพักหรือสล็อตถัดไปอย่างเหมาะสมตามโครงสร้างโปรแกรม ไม่เร่งฝึกติดต่อกัน`
+              : `Detected ${plan.sessions.length} missed session(s). They will be safely distributed across upcoming training or rest slots.`}
+          </p>
+
+          {/* List proposed sessions */}
+          <div className="mt-3 space-y-1.5 rounded-xl bg-zinc-950/60 p-2.5 border border-zinc-800">
+            {plan.sessions.map((s) => (
+              <div key={s.id} className="flex items-center justify-between text-xs">
+                <span className="font-bold text-zinc-300">
+                  {s.dayLabel}: {s.focusLabel}
+                </span>
+                <span className="text-amber-400 font-mono text-[11px]">
+                  {s.targetDateKey ? `📅 ${s.targetDateKey}` : "📅 สล็อตถัดไป"}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Decision Buttons */}
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <button
+              onClick={() => onDeclineRecovery()}
+              className="flex-1 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700/80 px-3 py-2 text-xs font-black text-zinc-300 transition"
+            >
+              {language === "th" ? "A. ไม่แทรกโปรแกรมที่พลาด" : "A. Do not insert missed sessions"}
+            </button>
+            <button
+              onClick={() => onConfirmRecovery(plan)}
+              className="flex-1 rounded-xl bg-amber-500 hover:bg-amber-400 px-3 py-2 text-xs font-black text-black shadow-lg transition active:scale-95"
+            >
+              {language === "th" ? "B. ยืนยันแทรกโปรแกรมที่พลาด" : "B. Confirm & insert missed sessions"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MOVE WORKOUT MODAL
+// ─────────────────────────────────────────────────────────────────
+export function MoveWorkoutModal({
+  activeState,
+  fromDateKey,
+  onConfirmMove,
+  onClose,
+  language = "th",
+}: {
+  activeState: ActiveJeffProgramState;
+  fromDateKey: string;
+  onConfirmMove: (fromDate: string, toDate: string) => void;
+  onClose: () => void;
+  language?: AppLanguage;
+}) {
+  const candidateDates = getValidMoveDates(activeState, fromDateKey, 21);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+
+  const selectedCandidate = candidateDates.find((c) => c.dateKey === selectedDate);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/90 backdrop-blur-md sm:items-center p-4">
+      <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-950 overflow-hidden shadow-2xl p-5 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft size={18} className="text-yellow-400" />
+            <h3 className="text-base font-black text-white">
+              {language === "th" ? "ย้ายวันฝึกของเซสชันนี้" : "Move workout session"}
+            </h3>
+          </div>
+          <button onClick={onClose} className="rounded-xl p-1.5 text-zinc-400 hover:bg-zinc-800 transition">
+            <X size={18} />
+          </button>
+        </div>
+
+        <p className="text-xs text-zinc-400">
+          {language === "th"
+            ? `เลือกวันที่ต้องการย้ายเซสชันจาก ${fromDateKey} โดยไม่กระทบลำดับโปรแกรมหลัก และไม่นับว่าฝึกเสร็จล่วงหน้า`
+            : `Select a new date to move this session from ${fromDateKey} without affecting program sequence.`}
+        </p>
+
+        {/* Date options */}
+        <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+          {candidateDates.map((item) => {
+            const isSelected = selectedDate === item.dateKey;
+            return (
+              <button
+                key={item.dateKey}
+                disabled={!item.canMove}
+                onClick={() => setSelectedDate(item.dateKey)}
+                className={`w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-xs transition ${
+                  isSelected
+                    ? "bg-yellow-400 text-black font-black"
+                    : item.canMove
+                    ? "bg-zinc-900 text-zinc-200 hover:bg-zinc-800"
+                    : "bg-zinc-900/40 text-zinc-500 cursor-not-allowed border border-zinc-800/50"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>📅 {item.dateKey}</span>
+                  {item.isRestDay && (
+                    <span className="text-[10px] rounded px-1.5 py-0.5 bg-zinc-800 text-zinc-400">
+                      {language === "th" ? "วันพัก" : "Rest day"}
+                    </span>
+                  )}
+                  {item.isScheduledTrainingDay && (
+                    <span className="text-[10px] rounded px-1.5 py-0.5 bg-emerald-950 text-emerald-400 border border-emerald-800/60">
+                      {language === "th" ? "วันฝึกตามตาราง" : "Scheduled"}
+                    </span>
+                  )}
+                </div>
+                {item.hasConflict ? (
+                  <span className="text-[10px] text-rose-400 font-bold">{item.conflictReason}</span>
+                ) : (
+                  <span className="text-[10px] font-bold text-zinc-400">
+                    {language === "th" ? "เลือกได้" : "Available"}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {selectedCandidate && selectedCandidate.isRestDay && (
+          <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl p-2.5">
+            ⚠️ {language === "th" ? "คุณเลือกย้ายมาในวันพักเดิม ระบบจะตั้งให้วันนี้เป็นวันฝึกพิเศษสำหรับเซสชันนี้" : "You selected a rest day. It will become a training day for this session."}
+          </p>
+        )}
+
+        <div className="flex gap-2 pt-2 border-t border-zinc-800">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl bg-zinc-800 hover:bg-zinc-700 py-2.5 text-xs font-bold text-zinc-300 transition"
+          >
+            {language === "th" ? "ยกเลิก" : "Cancel"}
+          </button>
+          <button
+            disabled={!selectedDate || !selectedCandidate?.canMove}
+            onClick={() => {
+              if (selectedDate) {
+                onConfirmMove(fromDateKey, selectedDate);
+                onClose();
+              }
+            }}
+            className="flex-1 rounded-xl bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-300 py-2.5 text-xs font-black text-black shadow-lg transition active:scale-95"
+          >
+            {language === "th" ? "ยืนยันย้ายวันฝึก" : "Confirm Move"}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -62,7 +62,8 @@ function calculateStreakFromLogs(logs: LogSet[]): number {
 /**
  * ประเมิน level จาก PR ที่ดีที่สุดของผู้ใช้
  */
-function estimateLevel(recordsMap: Record<string, ExerciseRecords>): "beginner" | "intermediate" | "advanced" {
+function estimateLevel(recordsMap?: Record<string, ExerciseRecords>): "beginner" | "intermediate" | "advanced" {
+  if (!recordsMap) return "beginner";
   const benchPR = recordsMap["Bench Press"]?.maxWeight?.weightLbs ?? 0;
   const squatPR = recordsMap["Barbell Back Squat"]?.maxWeight?.weightLbs ?? 0;
   const deadliftPR = recordsMap["Deadlift"]?.maxWeight?.weightLbs ?? 0;
@@ -80,9 +81,10 @@ function estimateLevel(recordsMap: Record<string, ExerciseRecords>): "beginner" 
  * Bench ≈ 1x BW, Squat ≈ 1.5x BW สำหรับ intermediate
  */
 function estimateBodyweightLbs(
-  recordsMap: Record<string, ExerciseRecords>,
-  level: "beginner" | "intermediate" | "advanced"
+  recordsMap?: Record<string, ExerciseRecords>,
+  level: "beginner" | "intermediate" | "advanced" = "beginner"
 ): number | undefined {
+  if (!recordsMap) return undefined;
   const benchPR = recordsMap["Bench Press"]?.maxWeight?.weightLbs;
   const squatPR = recordsMap["Barbell Back Squat"]?.maxWeight?.weightLbs;
 
@@ -118,9 +120,9 @@ export function hasMigrated(): boolean {
  * เรียกใช้ migration — รันครั้งเดียวหลังอัปเดต v2.1 → v3.0
  */
 export function runMigration(
-  logs: LogSet[],
-  recordsMap: Record<string, ExerciseRecords>,
-  currentDays: 3 | 4 | 5
+  logs: LogSet[] = [],
+  recordsMap: Record<string, ExerciseRecords> = {},
+  currentDays: 3 | 4 | 5 = 4
 ): MigrationResult | null {
   if (typeof window === "undefined") return null;
   if (hasMigrated()) return null;
@@ -145,6 +147,7 @@ export function runMigration(
     // 2. สร้าง onboarding result อัตโนมัติ (ข้าม wizard)
     const onboarding = { level, goal: "hypertrophy", days: currentDays };
     window.localStorage.setItem(ONBOARDING_KEY, JSON.stringify(onboarding));
+    window.localStorage.setItem("haitOnboardingV2", JSON.stringify(onboarding));
 
     // 3. บันทึก streak
     window.localStorage.setItem(STREAK_KEY, String(weekStreak));

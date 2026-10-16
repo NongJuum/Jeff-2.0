@@ -3,7 +3,13 @@
 import React, { useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Globe } from "lucide-react";
 import { saveUserProfile, type Gender, type UserProfile } from "../lib/assessment";
-import type { WeightUnit } from "../lib/units";
+import {
+  type WeightUnit,
+  getPersistentWeightUnit,
+  setPersistentWeightUnit,
+  convertInputWeight,
+  formatUnitLabel,
+} from "../lib/units";
 
 type Goal = "strength" | "hypertrophy" | "fitness";
 type Days = 3 | 4 | 5;
@@ -75,8 +81,30 @@ export function getFontScale(): FontScale {
 export function hasCompletedOnboarding(): boolean {
   if (typeof window === "undefined") return true;
   try {
-    return window.localStorage.getItem(ONBOARDING_KEY) !== null
-      && window.localStorage.getItem("haitUserProfileV1") !== null;
+    if (window.localStorage.getItem(ONBOARDING_KEY) !== null) return true;
+    if (window.localStorage.getItem("haitOnboardingV1") !== null) return true;
+    if (window.localStorage.getItem("haitUserProfileV1") !== null) return true;
+    if (
+      window.localStorage.getItem("haitActiveJeffProgramV1") !== null ||
+      window.localStorage.getItem("haitActiveJeffProgram") !== null ||
+      window.localStorage.getItem("activeJeffProgram") !== null
+    ) {
+      return true;
+    }
+    if (
+      window.localStorage.getItem("trainingLatestV2") !== null ||
+      window.localStorage.getItem("trainingHistory") !== null
+    ) {
+      return true;
+    }
+    if (window.localStorage.getItem("haitMigrationV1") !== null) return true;
+    if (
+      window.localStorage.getItem("haitCustomPlansV2") !== null ||
+      window.localStorage.getItem("haitCustomPlansV1") !== null
+    ) {
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
@@ -101,7 +129,7 @@ export function OnboardingWizard({
   const [goal, setGoal] = useState<Goal | null>(null);
   const [days, setDays] = useState<Days | null>(null);
   const [injuries, setInjuries] = useState<string[]>([]);
-  const [unit, setUnit] = useState<WeightUnit>("kg");
+  const [unit, setUnit] = useState<WeightUnit>(() => getPersistentWeightUnit());
   const [language, setLanguage] = useState<AppLanguage>("th");
   const [fontScale, setFontScale] = useState<FontScale>("medium");
 
@@ -265,7 +293,22 @@ export function OnboardingWizard({
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-bold text-zinc-400">หน่วยน้ำหนัก / Weight unit</p>
               <div className="flex gap-1 rounded-xl bg-zinc-900 p-1">
-                {(["kg", "lbs"] as WeightUnit[]).map(v => <button key={v} type="button" onClick={() => { const current = Number(weightKg); if (current > 0 && v !== unit) setWeightKg(String(Math.round((unit === "kg" ? current / 0.453592 : current * 0.453592) * 10) / 10)); setUnit(v); }} className={`rounded-lg px-3 py-1.5 text-xs font-black ${unit === v ? "bg-emerald-400 text-black" : "text-zinc-400"}`}>{v}</button>)}
+                {(["kg", "lbs"] as WeightUnit[]).map(v => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => {
+                      if (weightKg) {
+                        setWeightKg(convertInputWeight(weightKg, unit, v));
+                      }
+                      setUnit(v);
+                      setPersistentWeightUnit(v);
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-black ${unit === v ? "bg-emerald-400 text-black shadow-sm" : "text-zinc-400 hover:text-white"}`}
+                  >
+                    {formatUnitLabel(v)}
+                  </button>
+                ))}
               </div>
             </div>
             <div>

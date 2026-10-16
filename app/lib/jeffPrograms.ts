@@ -1326,6 +1326,51 @@ export interface RescheduledSession {
   focusLabel: string; // e.g. "Upper Body A"
   status: RescheduledSessionStatus;
   resolvedAt?: string; // Date key when completed or explicitly skipped
+  type?: "recovery" | "manual_move";
+  recoveryPlanId?: string;
+}
+
+export type RecoveryPlanStatus =
+  | "not_offered"
+  | "awaiting_user_decision"
+  | "declined"
+  | "proposed"
+  | "active"
+  | "completed"
+  | "cancelled";
+
+export interface RecoveryPlanSession {
+  id: string;
+  originalDateKey: string;
+  targetDateKey: string;
+  sourceWeek: number;
+  dayIndex: number;
+  dayLabel: string;
+  focusLabel: string;
+  status: "pending" | "completed" | "skipped";
+  resolvedAt?: string;
+}
+
+export interface RecoveryPlan {
+  id: string;
+  createdAt: string;
+  status: RecoveryPlanStatus;
+  sessions: RecoveryPlanSession[];
+  dismissedDates?: string[];
+  completedAt?: string;
+}
+
+export interface ManualScheduleMove {
+  id: string;
+  originalDateKey: string;
+  targetDateKey: string;
+  sourceWeek: number;
+  dayIndex: number;
+  dayLabel: string;
+  focusLabel: string;
+  status: "pending" | "completed" | "cancelled";
+  createdAt: string;
+  completedAt?: string;
 }
 
 export interface UniversalWorkoutDay {
@@ -1362,10 +1407,12 @@ export interface ProgramDayResolution {
   dateKey: string;
   isRescheduledMakeUp?: boolean;
   rescheduledSession?: RescheduledSession;
+  isManualMove?: boolean;
+  manualMove?: ManualScheduleMove;
   pendingBacklogCount?: number;
   isRestDay: boolean;
   cycleNumber: number;
-  reason?: "scheduled_session" | "make_up_session" | "scheduled_rest" | "program_completed" | "before_start";
+  reason?: "scheduled_session" | "make_up_session" | "manual_move" | "scheduled_rest" | "program_completed" | "before_start";
 }
 
 export interface ActiveJeffProgramState {
@@ -1377,6 +1424,10 @@ export interface ActiveJeffProgramState {
   scheduleDays: number[]; // 0=Mon ... 6=Sun
   rescheduledSessions?: RescheduledSession[];
   skippedDates?: string[]; // Date keys explicitly skipped
+  // Recovery & Manual Scheduling extensions
+  recoveryPlan?: RecoveryPlan;
+  dismissedMissedDates?: string[]; // Date keys user chose "ไม่แทรกโปรแกรมที่พลาด" (never re-prompt)
+  manualMoves?: ManualScheduleMove[]; // User-moved sessions
   // Universal engine extensions
   schedulingModel?: SchedulingModel;
   cycleLengthDays?: number; // Defaults to 7 for weekly splits; can be any integer >= 1
@@ -1387,20 +1438,105 @@ export interface ActiveJeffProgramState {
   customProgramDefinition?: UniversalProgramDefinition;
 }
 
+export const PROGRAM_PROGRESS_ARCHIVE_KEY = "haitProgramProgressArchiveV1";
+
+export function getProgramProgressArchive(): Record<string, Partial<ActiveJeffProgramState>> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(PROGRAM_PROGRESS_ARCHIVE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveProgramProgressArchive(programId: string, progress: Partial<ActiveJeffProgramState>): void {
+  if (typeof window === "undefined" || !programId) return;
+  try {
+    const archive = getProgramProgressArchive();
+    archive[programId] = {
+      ...archive[programId],
+      ...progress,
+      programId,
+    };
+    window.localStorage.setItem(PROGRAM_PROGRESS_ARCHIVE_KEY, JSON.stringify(archive));
+  } catch {}
+}
+
 export function getActiveJeffProgram(): ActiveJeffProgramState | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(ACTIVE_JEFF_PROGRAM_KEY);
-    return raw ? JSON.parse(raw) : null;
+    let raw = window.localStorage.getItem(ACTIVE_JEFF_PROGRAM_KEY);
+    // Legacy storage key fallback across app updates
+    if (!raw) {
+      const legacyKeys = ["haitActiveJeffProgram", "activeJeffProgram", "jeffProgramActive"];
+      for (const k of legacyKeys) {
+        const legacyVal = window.localStorage.getItem(k);
+        if (legacyVal) {
+          raw = legacyVal;
+          try {
+            window.localStorage.setItem(ACTIVE_JEFF_PROGRAM_KEY, legacyVal);
+          } catch {}
+          break;
+        }
+      }
+    }
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !parsed.programId) return null;
+
+    // Sanitize state to guarantee data integrity across updates
+    const sanitized: ActiveJeffProgramState = {
+      ...parsed,
+      programId: String(parsed.programId),
+      startDate: typeof parsed.startDate === "string" ? parsed.startDate : getProgramDateKey(),
+      currentWeek: Number.isInteger(parsed.currentWeek) && parsed.currentWeek >= 1 ? parsed.currentWeek : 1,
+      currentDayIndex: Number.isInteger(parsed.currentDayIndex) && parsed.currentDayIndex >= 0 ? parsed.currentDayIndex : 0,
+      completedDays: Array.isArray(parsed.completedDays) ? parsed.completedDays.filter((d: unknown): d is string => typeof d === "string") : [],
+      scheduleDays: Array.isArray(parsed.scheduleDays) ? parsed.scheduleDays.filter((d: unknown): d is number => typeof d === "number" && Number.isInteger(d) && d >= 0 && d <= 6) : [0, 2, 4],
+      rescheduledSessions: Array.isArray(parsed.rescheduledSessions) ? parsed.rescheduledSessions : [],
+      skippedDates: Array.isArray(parsed.skippedDates) ? parsed.skippedDates : [],
+      recoveryPlan: parsed.recoveryPlan && typeof parsed.recoveryPlan === "object" ? parsed.recoveryPlan : undefined,
+      dismissedMissedDates: Array.isArray(parsed.dismissedMissedDates) ? parsed.dismissedMissedDates : [],
+      manualMoves: Array.isArray(parsed.manualMoves) ? parsed.manualMoves : [],
+    };
+
+    // Reconcile completedDays from workout history if completedDays is empty
+    if (sanitized.completedDays.length === 0) {
+      try {
+        const logsRaw = window.localStorage.getItem("trainingLatestV2");
+        if (logsRaw) {
+          const logs = JSON.parse(logsRaw);
+          if (Array.isArray(logs) && logs.length > 0) {
+            const dateKeys = Array.from(new Set(logs.map((l: any) => getProgramDateKey(new Date(l.date))))).filter(Boolean);
+            if (dateKeys.length > 0) {
+              sanitized.completedDays = dateKeys;
+            }
+          }
+        }
+      } catch {}
+    }
+
+    return sanitized;
   } catch {
     return null;
   }
 }
 
 export function saveActiveJeffProgram(state: ActiveJeffProgramState): void {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || !state) return;
   try {
     window.localStorage.setItem(ACTIVE_JEFF_PROGRAM_KEY, JSON.stringify(state));
+    saveProgramProgressArchive(state.programId, {
+      currentWeek: state.currentWeek,
+      currentDayIndex: state.currentDayIndex,
+      completedDays: state.completedDays,
+      startDate: state.startDate,
+      scheduleDays: state.scheduleDays,
+      recoveryPlan: state.recoveryPlan,
+      dismissedMissedDates: state.dismissedMissedDates,
+      manualMoves: state.manualMoves,
+    });
   } catch {}
 }
 
@@ -1507,6 +1643,8 @@ export function getProgramDateKey(date: Date = new Date()): string {
  */
 export function getProgramSchedulingModel(state: ActiveJeffProgramState): SchedulingModel {
   if (state.schedulingModel) return state.schedulingModel;
+  const legacyConfig = (state as any).scheduleConfig;
+  if (legacyConfig?.model) return legacyConfig.model;
   const def = resolveProgramDefinition(state);
   if (def.defaultSchedulingModel) return def.defaultSchedulingModel;
   if (state.cyclePattern && state.cyclePattern.length > 0) return "cycle_pattern";
@@ -1518,6 +1656,8 @@ export function getProgramSchedulingModel(state: ActiveJeffProgramState): Schedu
  */
 export function getProgramMissedPolicy(state: ActiveJeffProgramState): MissedSessionPolicy {
   if (state.missedSessionPolicy) return state.missedSessionPolicy;
+  const legacyConfig = (state as any).scheduleConfig;
+  if (legacyConfig?.missedPolicy) return legacyConfig.missedPolicy;
   const def = resolveProgramDefinition(state);
   return def.defaultMissedSessionPolicy || "shift_sequence";
 }
@@ -1533,9 +1673,15 @@ export function isDateScheduledTrainingDay(
   if (state.startDate && dateKey < state.startDate) return false;
 
   const model = getProgramSchedulingModel(state);
+  const def = resolveProgramDefinition(state);
+  const rawScheduleDays = Array.isArray(state.scheduleDays)
+    ? state.scheduleDays
+    : (Array.isArray((state as any).scheduleConfig?.scheduleDays)
+        ? (state as any).scheduleConfig.scheduleDays
+        : def.defaultScheduleDays || []);
 
   if (model === "sequential_rotation") {
-    const scheduleDays = Array.isArray(state.scheduleDays) ? state.scheduleDays : [];
+    const scheduleDays = Array.isArray(rawScheduleDays) ? rawScheduleDays : [];
     if (scheduleDays.length === 0) return true;
     const dayOfWeek = (date.getDay() + 6) % 7;
     return scheduleDays.includes(dayOfWeek);
@@ -1553,8 +1699,8 @@ export function isDateScheduledTrainingDay(
   }
 
   // fixed_weekday
-  const scheduleDays = Array.isArray(state.scheduleDays)
-    ? state.scheduleDays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+  const scheduleDays = Array.isArray(rawScheduleDays)
+    ? rawScheduleDays.filter((day: any) => Number.isInteger(day) && day >= 0 && day <= 6)
     : [];
   if (scheduleDays.length === 0) return false;
   const dayOfWeek = (date.getDay() + 6) % 7;
@@ -1687,7 +1833,10 @@ export function detectMissedSessions(
     };
   }
 
-  const totalResolved = state.completedDays.length + (state.skippedDates?.length || 0);
+  const progressionSeq = Math.max(0, (Math.max(1, state.currentWeek) - 1) * daysInCycle + Math.max(0, state.currentDayIndex));
+  const recordedCompletedCount = Array.isArray(state.completedDays) ? state.completedDays.length : 0;
+  const recordedSkippedCount = Array.isArray(state.skippedDates) ? state.skippedDates.length : 0;
+  const totalResolved = Math.max(progressionSeq, recordedCompletedCount + recordedSkippedCount);
   const totalTrackedOrResolved = totalResolved + existingPending.length;
   const newObligations: RescheduledSession[] = [];
 
@@ -1842,6 +1991,42 @@ export function resolveRescheduledSession(
   const resolvedDate = completedDateKey || getProgramDateKey();
   const updatedSessions = [...state.rescheduledSessions];
 
+  // Update manualMoves if applicable
+  const updatedMoves = (state.manualMoves ?? []).map((m) =>
+    m.id === sessionId
+      ? { ...m, status: action === "complete" ? ("completed" as const) : ("cancelled" as const), completedAt: resolvedDate }
+      : m
+  );
+
+  // Update recoveryPlan if applicable
+  let updatedRecoveryPlan = state.recoveryPlan;
+  let newDismissed = state.dismissedMissedDates ?? [];
+
+  if (updatedRecoveryPlan && (updatedRecoveryPlan.status === "active" || updatedRecoveryPlan.status === "proposed" || updatedRecoveryPlan.status === "awaiting_user_decision")) {
+    const updatedPlanSessions = updatedRecoveryPlan.sessions.map((s) => {
+      if (s.id === sessionId || s.originalDateKey === targetSession.originalDateKey) {
+        return {
+          ...s,
+          status: action === "complete" ? ("completed" as const) : ("skipped" as const),
+          resolvedAt: resolvedDate,
+        };
+      }
+      return s;
+    });
+
+    const allPlanResolved = updatedPlanSessions.every((s) => s.status === "completed" || s.status === "skipped");
+    updatedRecoveryPlan = {
+      ...updatedRecoveryPlan,
+      sessions: updatedPlanSessions,
+      status: allPlanResolved ? "completed" : updatedRecoveryPlan.status,
+      completedAt: allPlanResolved ? resolvedDate : updatedRecoveryPlan.completedAt,
+    };
+
+    if (allPlanResolved) {
+      newDismissed = Array.from(new Set([...newDismissed, ...updatedPlanSessions.map((s) => s.originalDateKey)]));
+    }
+  }
+
   if (action === "complete") {
     updatedSessions[targetIdx] = {
       ...targetSession,
@@ -1873,6 +2058,9 @@ export function resolveRescheduledSession(
       completedDays: updatedCompleted,
       currentDayIndex: nextDayIdx,
       currentWeek: nextWeek,
+      manualMoves: updatedMoves,
+      recoveryPlan: updatedRecoveryPlan,
+      dismissedMissedDates: newDismissed,
     };
   } else {
     // Explicit skip
@@ -1891,6 +2079,9 @@ export function resolveRescheduledSession(
       ...state,
       rescheduledSessions: updatedSessions,
       skippedDates: Array.from(skipped),
+      manualMoves: updatedMoves,
+      recoveryPlan: updatedRecoveryPlan,
+      dismissedMissedDates: newDismissed,
     };
   }
 }
@@ -1917,8 +2108,417 @@ export function cancelRescheduledSession(
 }
 
 /**
+ * Detects past scheduled training dates that were missed and are eligible for recovery.
+ * Respects dismissed dates, completed sessions, and sequential rotation.
+ */
+export function detectEligibleMissedDates(
+  state: ActiveJeffProgramState,
+  asOfDate: Date = new Date()
+): string[] {
+  if (!state.startDate) return [];
+  const asOfKey = getProgramDateKey(asOfDate);
+  if (asOfKey <= state.startDate) return [];
+
+  const model = getProgramSchedulingModel(state);
+  if (model === "sequential_rotation") return [];
+
+  const existingRescheduled = state.rescheduledSessions ? [...state.rescheduledSessions] : [];
+  const activeRecoveryDates = state.recoveryPlan && (state.recoveryPlan.status === "active" || state.recoveryPlan.status === "awaiting_user_decision")
+    ? state.recoveryPlan.sessions.map((s) => s.originalDateKey)
+    : [];
+
+  const trackedDates = new Set<string>([
+    ...state.completedDays,
+    ...(state.skippedDates ?? []),
+    ...(state.dismissedMissedDates ?? []),
+    ...existingRescheduled.map((s) => s.originalDateKey),
+    ...activeRecoveryDates,
+  ]);
+
+  let current = new Date(`${state.startDate}T12:00:00`);
+  if (!Number.isFinite(current.getTime())) return [];
+
+  const pastScheduledDates: string[] = [];
+  while (getProgramDateKey(current) < asOfKey) {
+    const dKey = getProgramDateKey(current);
+    if (isDateScheduledTrainingDay(state, current)) {
+      pastScheduledDates.push(dKey);
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  return pastScheduledDates.filter((dKey) => !trackedDates.has(dKey));
+}
+
+/**
+ * Builds a finite recovery plan proposal for user confirmation.
+ * Never forces sessions into consecutive days; distributes them safely across upcoming slots.
+ */
+export function buildRecoveryPlan(
+  state: ActiveJeffProgramState,
+  asOfDate: Date = new Date()
+): RecoveryPlan | null {
+  const eligibleDates = detectEligibleMissedDates(state, asOfDate);
+  if (eligibleDates.length === 0) {
+    if (state.recoveryPlan && (state.recoveryPlan.status === "active" || state.recoveryPlan.status === "awaiting_user_decision")) {
+      return state.recoveryPlan;
+    }
+    return null;
+  }
+
+  const asOfKey = getProgramDateKey(asOfDate);
+  const def = resolveProgramDefinition(state);
+  const weekData = getProgramCurrentWeek(state);
+  const daysInCycle = weekData?.days.length || def.days?.length || (Array.isArray(state.scheduleDays) ? state.scheduleDays.length : 0) || 4;
+  const policy = getProgramMissedPolicy(state);
+
+  const progressionSeq = Math.max(0, (Math.max(1, state.currentWeek) - 1) * daysInCycle + Math.max(0, state.currentDayIndex));
+  const existingPending = (state.rescheduledSessions ?? []).filter((s) => s.status === "pending");
+  const totalTrackedOrResolved = Math.max(progressionSeq, state.completedDays.length + (state.skippedDates?.length || 0)) + existingPending.length;
+
+  const reservedDates = new Set<string>([
+    ...state.completedDays,
+    ...(state.skippedDates ?? []),
+    ...(state.dismissedMissedDates ?? []),
+    ...existingPending.map((s) => s.targetDateKey || s.originalDateKey),
+  ]);
+
+  const proposedSessions: RecoveryPlanSession[] = [];
+  let cursor = new Date(`${asOfKey}T12:00:00`);
+
+  for (let i = 0; i < eligibleDates.length; i++) {
+    const origKey = eligibleDates[i];
+    const targetSeq = totalTrackedOrResolved + proposedSessions.length;
+    const targetDayIndex = targetSeq % daysInCycle;
+    const targetWeek = Math.floor(targetSeq / daysInCycle) + 1;
+    const dayDef = weekData?.days[targetDayIndex];
+
+    let foundSlot: string | null = null;
+    const lookahead = new Date(cursor);
+    for (let offset = 0; offset < 56; offset++) {
+      const candidateKey = getProgramDateKey(lookahead);
+      const isCandidateTrainingDay = isDateScheduledTrainingDay(state, lookahead);
+
+      const isValidSlot = policy === "reschedule_to_rest_day"
+        ? !isCandidateTrainingDay && !reservedDates.has(candidateKey)
+        : isCandidateTrainingDay && !reservedDates.has(candidateKey);
+
+      if (isValidSlot) {
+        foundSlot = candidateKey;
+        reservedDates.add(candidateKey);
+        lookahead.setDate(lookahead.getDate() + 1);
+        cursor = new Date(lookahead);
+        break;
+      }
+      lookahead.setDate(lookahead.getDate() + 1);
+    }
+
+    proposedSessions.push({
+      id: `rec_${origKey}_d${targetDayIndex}`,
+      originalDateKey: origKey,
+      targetDateKey: foundSlot || origKey,
+      sourceWeek: targetWeek,
+      dayIndex: targetDayIndex,
+      dayLabel: dayDef?.dayLabel || `Day ${targetDayIndex + 1}`,
+      focusLabel: dayDef?.focusLabel || "Make-up Workout",
+      status: "pending",
+    });
+  }
+
+  return {
+    id: `rec_plan_${asOfKey}_${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    status: "awaiting_user_decision",
+    sessions: proposedSessions,
+    dismissedDates: [],
+  };
+}
+
+/**
+ * Confirms and activates a proposed recovery plan, scheduling its finite sessions.
+ */
+export function confirmRecoveryPlan(
+  state: ActiveJeffProgramState,
+  planToConfirm?: RecoveryPlan
+): ActiveJeffProgramState {
+  const plan = planToConfirm || state.recoveryPlan;
+  if (!plan || plan.sessions.length === 0) return state;
+
+  const activePlan: RecoveryPlan = {
+    ...plan,
+    status: "active",
+  };
+
+  const newObligations: RescheduledSession[] = plan.sessions.map((s) => {
+    const existing = (state.rescheduledSessions ?? []).find((e) => e.id === s.id);
+    return {
+      id: s.id,
+      originalDateKey: s.originalDateKey,
+      targetDateKey: s.targetDateKey,
+      sourceWeek: s.sourceWeek,
+      dayIndex: s.dayIndex,
+      dayLabel: s.dayLabel,
+      focusLabel: s.focusLabel,
+      status: existing?.status || s.status || "pending",
+      type: "recovery",
+      recoveryPlanId: activePlan.id,
+    };
+  });
+
+  const existingRescheduled = (state.rescheduledSessions ?? []).filter(
+    (s) => !newObligations.some((n) => n.id === s.id)
+  );
+
+  return {
+    ...state,
+    recoveryPlan: activePlan,
+    rescheduledSessions: [...existingRescheduled, ...newObligations],
+  };
+}
+
+/**
+ * Declines inserting missed sessions into upcoming schedule.
+ * Records dismissed dates to avoid re-prompting and leaves upcoming calendar clean.
+ */
+export function declineRecoveryPlan(
+  state: ActiveJeffProgramState,
+  planId?: string
+): ActiveJeffProgramState {
+  const targetPlan = state.recoveryPlan;
+  const datesToDismiss = targetPlan && targetPlan.sessions.length > 0
+    ? targetPlan.sessions.map((s) => s.originalDateKey)
+    : detectEligibleMissedDates(state);
+
+  const updatedDismissed = Array.from(new Set([
+    ...(state.dismissedMissedDates ?? []),
+    ...datesToDismiss,
+  ]));
+
+  const updatedRescheduled = (state.rescheduledSessions ?? []).filter(
+    (s) => s.type !== "recovery" && !datesToDismiss.includes(s.originalDateKey)
+  );
+
+  const declinedPlan: RecoveryPlan = targetPlan
+    ? {
+        ...targetPlan,
+        status: "declined",
+        dismissedDates: datesToDismiss,
+      }
+    : {
+        id: `rec_declined_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        status: "declined",
+        sessions: [],
+        dismissedDates: datesToDismiss,
+      };
+
+  return {
+    ...state,
+    recoveryPlan: declinedPlan,
+    dismissedMissedDates: updatedDismissed,
+    rescheduledSessions: updatedRescheduled,
+  };
+}
+
+/**
+ * Cancels an active or proposed recovery plan, clearing recovery-only sessions.
+ */
+export function cancelRecoveryPlan(
+  state: ActiveJeffProgramState
+): ActiveJeffProgramState {
+  if (!state.recoveryPlan) return state;
+
+  const planId = state.recoveryPlan.id;
+  const updatedRescheduled = (state.rescheduledSessions ?? []).filter(
+    (s) => s.recoveryPlanId !== planId
+  );
+
+  return {
+    ...state,
+    recoveryPlan: {
+      ...state.recoveryPlan,
+      status: "cancelled",
+    },
+    rescheduledSessions: updatedRescheduled,
+  };
+}
+
+/**
+ * Evaluates candidate move dates for a workout session with conflict detection.
+ */
+export function getValidMoveDates(
+  state: ActiveJeffProgramState,
+  fromDateKey: string,
+  lookaheadDays: number = 21
+): {
+  dateKey: string;
+  isScheduledTrainingDay: boolean;
+  isRestDay: boolean;
+  isAlreadyCompleted: boolean;
+  hasConflict: boolean;
+  conflictReason?: string;
+  canMove: boolean;
+  isValid: boolean;
+}[] {
+  const result = [];
+  const fromDate = new Date(`${fromDateKey}T12:00:00`);
+  const start = new Date(fromDate);
+  start.setDate(start.getDate() - 3);
+
+  const totalDays = lookaheadDays + 4;
+  const pendingMoves = (state.manualMoves ?? []).filter((m) => m.status === "pending");
+
+  for (let offset = 0; offset <= totalDays; offset++) {
+    const candidate = new Date(start);
+    candidate.setDate(candidate.getDate() + offset);
+    const candidateKey = getProgramDateKey(candidate);
+
+    const isScheduledTraining = isDateScheduledTrainingDay(state, candidate);
+    const isCompleted = state.completedDays.includes(candidateKey);
+    const isSameDay = candidateKey === fromDateKey;
+    const isMovedToThisDay = pendingMoves.some((m) => m.targetDateKey === candidateKey);
+
+    let hasConflict = false;
+    let conflictReason: string | undefined = undefined;
+
+    if (isSameDay) {
+      hasConflict = true;
+      conflictReason = "วันเดิมที่เลือกไว้";
+    } else if (isCompleted) {
+      hasConflict = true;
+      conflictReason = "ฝึกเสร็จสิ้นแล้ว";
+    } else if (isMovedToThisDay) {
+      hasConflict = true;
+      conflictReason = "มีเซสชันอื่นย้ายมาลงวันนี้แล้ว";
+    }
+
+    result.push({
+      dateKey: candidateKey,
+      isScheduledTrainingDay: isScheduledTraining,
+      isRestDay: !isScheduledTraining,
+      isAlreadyCompleted: isCompleted,
+      hasConflict,
+      conflictReason,
+      canMove: !hasConflict,
+      isValid: !hasConflict,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Manually moves a scheduled workout session from one date to another.
+ * Never marks as completed or duplicates history.
+ */
+export function moveWorkoutSession(
+  state: ActiveJeffProgramState,
+  fromDateKey: string,
+  toDateKey: string
+): { success: boolean; error?: string; state: ActiveJeffProgramState } {
+  if (fromDateKey === toDateKey) {
+    return { success: false, error: "Target date must be different from source date", state };
+  }
+  if (state.completedDays.includes(toDateKey)) {
+    return { success: false, error: "Cannot move workout to an already completed date", state };
+  }
+  const pendingMoves = (state.manualMoves ?? []).filter((m) => m.status === "pending");
+  if (pendingMoves.some((m) => m.targetDateKey === toDateKey)) {
+    return { success: false, error: "Another session has already been moved to this date", state };
+  }
+
+  const weekData = getProgramCurrentWeek(state);
+
+  const existingPending = (state.rescheduledSessions ?? []).find(
+    (s) => s.status === "pending" && (s.targetDateKey === fromDateKey || s.originalDateKey === fromDateKey)
+  );
+
+  let sourceDayIndex = state.currentDayIndex;
+  let sourceWeek = state.currentWeek;
+  let dayLabel = `Day ${sourceDayIndex + 1}`;
+  let focusLabel = "Workout Session";
+
+  if (existingPending) {
+    sourceDayIndex = existingPending.dayIndex;
+    sourceWeek = existingPending.sourceWeek;
+    dayLabel = existingPending.dayLabel;
+    focusLabel = existingPending.focusLabel;
+  } else {
+    const resolution = resolveProgramDayForDate(state, new Date(`${fromDateKey}T12:00:00`));
+    sourceDayIndex = resolution.scheduledDayIndex;
+    sourceWeek = resolution.cycleNumber;
+    const dayDef = weekData?.days[sourceDayIndex];
+    if (dayDef) {
+      dayLabel = dayDef.dayLabel;
+      focusLabel = dayDef.focusLabel;
+    }
+  }
+
+  const moveId = `manual_move_${fromDateKey}_to_${toDateKey}_d${sourceDayIndex}`;
+  const move: ManualScheduleMove = {
+    id: moveId,
+    originalDateKey: fromDateKey,
+    targetDateKey: toDateKey,
+    sourceWeek,
+    dayIndex: sourceDayIndex,
+    dayLabel,
+    focusLabel,
+    status: "pending",
+    createdAt: new Date().toISOString(),
+  };
+
+  const moveRescheduled: RescheduledSession = {
+    id: moveId,
+    originalDateKey: fromDateKey,
+    targetDateKey: toDateKey,
+    sourceWeek,
+    dayIndex: sourceDayIndex,
+    dayLabel,
+    focusLabel,
+    status: "pending",
+    type: "manual_move",
+  };
+
+  const updatedMoves = [
+    ...(state.manualMoves ?? []).filter((m) => m.originalDateKey !== fromDateKey),
+    move,
+  ];
+
+  const updatedRescheduled = [
+    ...(state.rescheduledSessions ?? []).filter((s) => s.originalDateKey !== fromDateKey || s.type !== "manual_move"),
+    moveRescheduled,
+  ];
+
+  return {
+    success: true,
+    state: {
+      ...state,
+      manualMoves: updatedMoves,
+      rescheduledSessions: updatedRescheduled,
+    },
+  };
+}
+
+/**
+ * Cancels a pending manual move, returning the session to its original scheduled slot.
+ */
+export function cancelManualMove(
+  state: ActiveJeffProgramState,
+  moveId: string
+): ActiveJeffProgramState {
+  if (!state.manualMoves && !state.rescheduledSessions) return state;
+  const updatedMoves = (state.manualMoves ?? []).filter((m) => m.id !== moveId);
+  const updatedRescheduled = (state.rescheduledSessions ?? []).filter((s) => s.id !== moveId);
+  return {
+    ...state,
+    manualMoves: updatedMoves,
+    rescheduledSessions: updatedRescheduled,
+  };
+}
+
+/**
  * Universal Calendar-aware schedule resolver:
- * Evaluates configured training/rest days, pending make-up sessions, and progression.
+ * Evaluates configured training/rest days, manual moves, recovery sessions, and progression.
  * Returns authoritative schedule status and day recommendation for any date.
  */
 export function resolveProgramDayForDate(
@@ -1928,11 +2528,15 @@ export function resolveProgramDayForDate(
   const dateKey = getProgramDateKey(date);
   const isAfterStartDate = !state.startDate || dateKey >= state.startDate;
 
+  const safeCurrentDayIndex = Number.isInteger(state.currentDayIndex)
+    ? Math.max(0, state.currentDayIndex)
+    : 0;
+
   if (!isAfterStartDate) {
     return {
       isTrainingDay: false,
-      scheduledDayIndex: 0,
-      cycleNumber: 1,
+      scheduledDayIndex: safeCurrentDayIndex,
+      cycleNumber: Math.max(1, state.currentWeek || 1),
       isCompleted: false,
       dateKey,
       isRestDay: true,
@@ -1943,7 +2547,7 @@ export function resolveProgramDayForDate(
   if (isJeffProgramComplete(state)) {
     return {
       isTrainingDay: false,
-      scheduledDayIndex: 0,
+      scheduledDayIndex: safeCurrentDayIndex,
       cycleNumber: state.currentWeek,
       isCompleted: true,
       dateKey,
@@ -1956,6 +2560,41 @@ export function resolveProgramDayForDate(
   const isScheduledTraining = isDateScheduledTrainingDay(state, date);
   const isCompleted = state.completedDays.includes(dateKey);
   const pendingSessions = (state.rescheduledSessions ?? []).filter((s) => s.status === "pending");
+
+  // 1. Check if a manual move is targeted TO this date
+  const activeManualMoves = (state.manualMoves ?? []).filter((m) => m.status === "pending");
+  const moveTargetedToDate = activeManualMoves.find((m) => m.targetDateKey === dateKey);
+  if (moveTargetedToDate) {
+    return {
+      isTrainingDay: true,
+      scheduledDayIndex: moveTargetedToDate.dayIndex,
+      cycleNumber: moveTargetedToDate.sourceWeek,
+      isCompleted,
+      dateKey,
+      isManualMove: true,
+      manualMove: moveTargetedToDate,
+      pendingBacklogCount: pendingSessions.length,
+      isRestDay: false,
+      reason: "manual_move",
+    };
+  }
+
+  // 2. Check if a scheduled session was moved AWAY from this date
+  const moveAwayFromDate = activeManualMoves.find((m) => m.originalDateKey === dateKey);
+  if (moveAwayFromDate) {
+    return {
+      isTrainingDay: false,
+      scheduledDayIndex: safeCurrentDayIndex,
+      cycleNumber: state.currentWeek,
+      isCompleted,
+      dateKey,
+      isManualMove: true,
+      manualMove: moveAwayFromDate,
+      pendingBacklogCount: pendingSessions.length,
+      isRestDay: true,
+      reason: "scheduled_rest",
+    };
+  }
 
   // Sequential rotation: workouts advance linearly when trained
   if (model === "sequential_rotation") {
@@ -1975,42 +2614,47 @@ export function resolveProgramDayForDate(
     };
   }
 
-  // 1. Check if a pending rescheduled session is targeted for today
+  // 3. Check if a pending rescheduled/recovery session is targeted for today
   const targetedSession = pendingSessions.find((s) => s.targetDateKey === dateKey);
   if (targetedSession) {
+    const isMove = targetedSession.type === "manual_move";
     return {
       isTrainingDay: true,
       scheduledDayIndex: targetedSession.dayIndex,
       cycleNumber: targetedSession.sourceWeek,
       isCompleted,
       dateKey,
-      isRescheduledMakeUp: true,
+      isRescheduledMakeUp: !isMove,
       rescheduledSession: targetedSession,
+      isManualMove: isMove,
       pendingBacklogCount: pendingSessions.length,
       isRestDay: false,
-      reason: "make_up_session",
+      reason: isMove ? "manual_move" : "make_up_session",
     };
   }
 
-  // 2. If today is a scheduled training day and there are pending make-up sessions,
-  // recommend the earliest pending session to preserve sequential order
-  if (isScheduledTraining && pendingSessions.length > 0) {
+  // 4. If today is a scheduled training day and there are pending make-up sessions:
+  // If user declined recovery, do not recommend make-up sessions!
+  const isRecoveryDeclined = state.recoveryPlan?.status === "declined";
+  if (isScheduledTraining && pendingSessions.length > 0 && !isRecoveryDeclined) {
     const firstPending = pendingSessions[0];
+    const isMove = firstPending.type === "manual_move";
     return {
       isTrainingDay: true,
       scheduledDayIndex: firstPending.dayIndex,
       cycleNumber: firstPending.sourceWeek,
       isCompleted,
       dateKey,
-      isRescheduledMakeUp: true,
+      isRescheduledMakeUp: !isMove,
       rescheduledSession: firstPending,
+      isManualMove: isMove,
       pendingBacklogCount: pendingSessions.length,
       isRestDay: false,
-      reason: "make_up_session",
+      reason: isMove ? "manual_move" : "make_up_session",
     };
   }
 
-  // 3. Normal recurring program schedule
+  // 5. Normal recurring program schedule
   const weekData = getProgramCurrentWeek(state);
   const dayCount = weekData?.days.length || 1;
   const scheduledDayIndex = Math.max(0, Math.min(state.currentDayIndex || 0, dayCount - 1));
@@ -2022,8 +2666,8 @@ export function resolveProgramDayForDate(
     isCompleted,
     dateKey,
     isRescheduledMakeUp: false,
-    rescheduledSession: pendingSessions.length > 0 ? pendingSessions[0] : undefined,
-    pendingBacklogCount: pendingSessions.length,
+    rescheduledSession: (!isRecoveryDeclined && pendingSessions.length > 0) ? pendingSessions[0] : undefined,
+    pendingBacklogCount: isRecoveryDeclined ? 0 : pendingSessions.length,
     isRestDay: !isScheduledTraining,
     reason: isScheduledTraining ? "scheduled_session" : "scheduled_rest",
   };
@@ -2031,7 +2675,7 @@ export function resolveProgramDayForDate(
 
 /**
  * Advance program progression after finishing a session:
- * Marks date completed, resolves any corresponding make-up obligation exactly once,
+ * Marks date completed, resolves any corresponding make-up or manual move exactly once,
  * and advances day/week without corrupting calendar mapping.
  */
 export function advanceJeffProgramAfterFinish(
@@ -2044,7 +2688,7 @@ export function advanceJeffProgramAfterFinish(
     return currentState;
   }
 
-  // Check if this completion fulfills an active pending make-up obligation
+  // Check if this completion fulfills an active pending manual move or make-up obligation
   const pendingList = (currentState.rescheduledSessions ?? []).filter((s) => s.status === "pending");
   const matchingRescheduled = pendingList.find(
     (s) => s.targetDateKey === completedDateKey || s.dayIndex === completedDayIndex
@@ -2052,6 +2696,14 @@ export function advanceJeffProgramAfterFinish(
 
   if (matchingRescheduled) {
     return resolveRescheduledSession(currentState, matchingRescheduled.id, "complete", completedDateKey);
+  }
+
+  // Check if matching a pending manual move directly
+  const matchingMove = (currentState.manualMoves ?? []).find(
+    (m) => m.status === "pending" && (m.targetDateKey === completedDateKey || m.dayIndex === completedDayIndex)
+  );
+  if (matchingMove) {
+    return resolveRescheduledSession(currentState, matchingMove.id, "complete", completedDateKey);
   }
 
   const def = resolveProgramDefinition(currentState);

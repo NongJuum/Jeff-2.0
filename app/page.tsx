@@ -46,13 +46,16 @@ import {
   JeffProgramPicker,
   ActiveProgramDashboard,
   JeffProgramTodayCard,
+  MissedRecoveryPrompt,
   getExerciseDisplayName,
 } from "./components/JeffProgramPicker";
 import {
   type ActiveJeffProgramState,
+  type RecoveryPlan,
   getActiveJeffProgram,
   saveActiveJeffProgram,
   clearActiveJeffProgram,
+  getProgramProgressArchive,
   findProgramById,
   getProgramCurrentWeek,
   resolveProgramDayForDate,
@@ -61,6 +64,11 @@ import {
   resolveRescheduledSession,
   detectMissedSessions,
   planRescheduledSessions,
+  buildRecoveryPlan,
+  confirmRecoveryPlan,
+  declineRecoveryPlan,
+  moveWorkoutSession,
+  cancelManualMove,
   getProgramDateKey as getJeffProgramDateKey,
 } from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
@@ -77,11 +85,17 @@ import { NotificationSettings } from "./components/NotificationSettings";
 import { startNotificationScheduler } from "./lib/notifications";
 import {
   type WeightUnit,
+  normalizeWeightUnit,
   resolveEffectiveUnit,
   getSnapStep,
   snapWeight,
   convertWeight,
   convertAndSnapWeight,
+  convertInputWeight,
+  getPersistentWeightUnit,
+  setPersistentWeightUnit,
+  formatUnitLabel,
+  resolveRecordDisplay,
   MACHINE_UNITS_KEY,
   EXERCISE_UNITS_KEY,
   getMachineUnitsMap,
@@ -1673,6 +1687,43 @@ function sanitizeUiState(raw: PersistedUiState | null): PersistedUiState {
   };
 }
 
+function loadPersistedUiState(): PersistedUiState {
+  const legacyKeys = [UI_STATE_KEY, "haitUiStateV4", "haitUiStateV3", "haitUiStateV2", "haitUiStateV1", "haitUiState"];
+  let saved: PersistedUiState | null = null;
+  let sourceKey: string | null = null;
+
+  for (const k of legacyKeys) {
+    const data = readJson<PersistedUiState | null>(k, null);
+    if (data && typeof data === "object") {
+      saved = data;
+      sourceKey = k;
+      break;
+    }
+  }
+
+  const sanitized = sanitizeUiState(saved);
+
+  // If retrieved from a legacy key, migrate to current UI_STATE_KEY
+  if (sourceKey && sourceKey !== UI_STATE_KEY && typeof window !== "undefined") {
+    try {
+      writeLocalJson<PersistedUiState>(UI_STATE_KEY, sanitized);
+    } catch {}
+  }
+
+  // Cross-reference with authoritative active program progression
+  // If selectedDay is 0 (or default) but active program has progressed beyond Day 1, preserve program progress!
+  try {
+    const activeProgram = getActiveJeffProgram();
+    if (activeProgram && Number.isInteger(activeProgram.currentDayIndex) && activeProgram.currentDayIndex > 0) {
+      if (!saved || saved.selectedDay === 0 || saved.selectedDay === undefined) {
+        sanitized.selectedDay = activeProgram.currentDayIndex;
+      }
+    }
+  } catch {}
+
+  return sanitized;
+}
+
 
 function epley1RM(weight: number, reps: number): number {
   return reps <= 1 ? weight : weight * (1 + reps / 30);
@@ -2852,13 +2903,13 @@ function playCountdownBeep(freq = 660) {
 }
 
 export default function Page() {
-  const initialUiState = sanitizeUiState(readJson<PersistedUiState | null>(UI_STATE_KEY, null));
+  const initialUiState = useMemo(() => loadPersistedUiState(), []);
 
   const [mode, setMode] = useState<AppMode>(initialUiState.mode);
   const [days, setDays] = useState<3 | 4 | 5>(initialUiState.days);
   const [fiveDayMode, setFiveDayMode] = useState<"twoLegDays" | "oneLegDay">(initialUiState.fiveDayMode);
   const [selectedDay, setSelectedDay] = useState(initialUiState.selectedDay);
-  const [logs, setLogs] = useState<LogSet[]>([]);
+  const [logs, setLogs] = useState<LogSet[]>(() => readJson<LogSet[]>(LATEST_LOGS_KEY, []));
   const [recordsMap, setRecordsMap] = useState<Record<string, ExerciseRecords>>(() => loadPermanentRecords());
   const [historyRange, setHistoryRange] = useState<"all" | "30d" | "14d">("all");
   const [machineTags, setMachineTags] = useState<Record<string, string>>(() => readJson<Record<string, string>>(MACHINE_TAGS_KEY, {}));
@@ -2936,14 +2987,51 @@ export default function Page() {
   function handleSelectJeffProgram(activatedState: ActiveJeffProgramState) {
     const program = findProgramById(activatedState.programId);
     if (!program) return;
-    // A newly activated program starts at its first workout; the calendar gates rest/training days.
+
+    // Check if this program has existing progress (either currently active or in the progress archive)
+    const archive = getProgramProgressArchive();
+    const archivedProgress = archive[activatedState.programId];
+    const isSameAsActive = activeJeffProgram && activeJeffProgram.programId === activatedState.programId;
+
+    let preservedWeek = 1;
+    let preservedDayIndex = 0;
+    let preservedCompletedDays: string[] = [];
+    let preservedRescheduled = activatedState.rescheduledSessions || [];
+    let preservedSkipped = activatedState.skippedDates || [];
+
+    if (isSameAsActive) {
+      preservedWeek = activeJeffProgram.currentWeek;
+      preservedDayIndex = activeJeffProgram.currentDayIndex;
+      preservedCompletedDays = activeJeffProgram.completedDays;
+      preservedRescheduled = activeJeffProgram.rescheduledSessions || [];
+      preservedSkipped = activeJeffProgram.skippedDates || [];
+    } else if (archivedProgress) {
+      preservedWeek = archivedProgress.currentWeek ?? 1;
+      preservedDayIndex = archivedProgress.currentDayIndex ?? 0;
+      preservedCompletedDays = archivedProgress.completedDays ?? [];
+      preservedRescheduled = archivedProgress.rescheduledSessions || [];
+      preservedSkipped = archivedProgress.skippedDates || [];
+    } else if (Number.isInteger(activatedState.currentDayIndex) && activatedState.currentDayIndex > 0) {
+      preservedDayIndex = activatedState.currentDayIndex;
+      preservedWeek = activatedState.currentWeek || 1;
+      preservedCompletedDays = activatedState.completedDays || [];
+    } else if (Array.isArray(activatedState.completedDays) && activatedState.completedDays.length > 0) {
+      preservedCompletedDays = activatedState.completedDays;
+      preservedDayIndex = activatedState.currentDayIndex || 0;
+      preservedWeek = activatedState.currentWeek || 1;
+    }
+
     const newState: ActiveJeffProgramState = {
       ...activatedState,
-      currentDayIndex: 0,
+      currentWeek: preservedWeek,
+      currentDayIndex: preservedDayIndex,
+      completedDays: preservedCompletedDays,
+      rescheduledSessions: preservedRescheduled,
+      skippedDates: preservedSkipped,
     };
     saveActiveJeffProgram(newState);
     setActiveJeffProgram(newState);
-    setSelectedDay(0);
+    setSelectedDay(preservedDayIndex);
     setActiveExerciseIndex(0);
     setMode("today");
   }
@@ -2971,6 +3059,39 @@ export default function Page() {
     setActiveJeffProgram(updatedState);
     setSelectedDay(updatedState.currentDayIndex);
     setActiveExerciseIndex(0);
+  }
+
+  function handleConfirmRecovery(plan: RecoveryPlan) {
+    if (!activeJeffProgram) return;
+    const updatedState = confirmRecoveryPlan(activeJeffProgram, plan);
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
+    setSelectedDay(updatedState.currentDayIndex);
+  }
+
+  function handleDeclineRecovery() {
+    if (!activeJeffProgram) return;
+    const updatedState = declineRecoveryPlan(activeJeffProgram);
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
+  }
+
+  function handleMoveSession(fromDate: string, toDate: string) {
+    if (!activeJeffProgram) return;
+    const result = moveWorkoutSession(activeJeffProgram, fromDate, toDate);
+    if (!result.success && result.error) {
+      alert(result.error);
+      return;
+    }
+    saveActiveJeffProgram(result.state);
+    setActiveJeffProgram(result.state);
+  }
+
+  function handleCancelMove(moveId: string) {
+    if (!activeJeffProgram) return;
+    const updatedState = cancelManualMove(activeJeffProgram, moveId);
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
   }
 
   function handleSwitchProgram() {
@@ -3203,8 +3324,19 @@ export default function Page() {
   const [machineUnits, setMachineUnits] = useState<Record<string, WeightUnit>>(() => getMachineUnitsMap());
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => getUserProfile());
 
-  const globalWeightUnit: WeightUnit = userProfile?.preferredWeightUnit || "kg";
+  const globalWeightUnit: WeightUnit = userProfile?.preferredWeightUnit || getPersistentWeightUnit();
   const currentGender: Gender = userProfile?.gender || "male";
+
+  useEffect(() => {
+    const onUnitChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{ unit: WeightUnit }>;
+      if (customEvent.detail?.unit) {
+        setUserProfile((prev) => (prev ? { ...prev, preferredWeightUnit: customEvent.detail.unit } : prev));
+      }
+    };
+    window.addEventListener("hait-unit-change", onUnitChange);
+    return () => window.removeEventListener("hait-unit-change", onUnitChange);
+  }, []);
 
   function getEffectiveUnitForExercise(exerciseName: string, machineTag?: string): WeightUnit {
     const trimmed = (machineTag ?? "").trim();
@@ -3217,10 +3349,9 @@ export default function Page() {
     return globalWeightUnit;
   }
 
-  function handleToggleExerciseUnit(exercise: PlanExercise, machineTag?: string, defaultSets?: number) {
+  function handleSetExerciseUnit(exercise: { id: string; name: string; sets?: number; movement?: string }, targetUnit: WeightUnit, machineTag?: string, defaultSets?: number) {
     const currentUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
-    const targetUnit: WeightUnit = currentUnit === "kg" ? "lbs" : "kg";
-    const isIso = exercise.movement.toLowerCase().includes("isolation") || exercise.movement.toLowerCase().includes("curl") || exercise.movement.toLowerCase().includes("raise") || exercise.movement.toLowerCase().includes("ext");
+    if (currentUnit === targetUnit) return;
 
     const trimmed = (machineTag ?? "").trim();
     if (trimmed) {
@@ -3230,14 +3361,13 @@ export default function Page() {
     saveExerciseUnit(exercise.name, targetUnit);
     setExerciseUnits((prev) => ({ ...prev, [exercise.name]: targetUnit }));
 
-    const setsCount = defaultSets || exercise.sets;
+    const setsCount = defaultSets || exercise.sets || 3;
     setInputs((old: Record<string, SetInput[]>) => {
       const cur = normalizeSetInputs(old[exercise.id], setsCount);
       const converted = cur.map((s) => {
-        const numVal = parseFloat(s.weightLbs);
-        if (!Number.isFinite(numVal) || numVal <= 0) return s;
-        const convertedVal = convertAndSnapWeight(numVal, currentUnit, targetUnit, isIso);
-        return { ...s, weightLbs: String(convertedVal) };
+        if (!s.weightLbs || s.weightLbs.trim() === "") return s;
+        const convertedVal = convertInputWeight(s.weightLbs, currentUnit, targetUnit);
+        return { ...s, weightLbs: convertedVal };
       });
       const nextInputs = { ...old, [exercise.id]: converted };
       writeLocalJson(SET_INPUTS_KEY, nextInputs);
@@ -3245,7 +3375,14 @@ export default function Page() {
     });
   }
 
+  function handleToggleExerciseUnit(exercise: PlanExercise, machineTag?: string, defaultSets?: number) {
+    const currentUnit = getEffectiveUnitForExercise(exercise.name, machineTag);
+    const targetUnit: WeightUnit = currentUnit === "kg" ? "lbs" : "kg";
+    handleSetExerciseUnit(exercise, targetUnit, machineTag, defaultSets);
+  }
+
   function handleSetGlobalUnit(newUnit: WeightUnit) {
+    setPersistentWeightUnit(newUnit);
     if (userProfile) {
       const updated: UserProfile = { ...userProfile, preferredWeightUnit: newUnit, updatedAt: new Date().toISOString() };
       saveUserProfile(updated);
@@ -3807,10 +3944,10 @@ export default function Page() {
   }, [hasRestoredScroll, mode, days, selectedDay, fiveDayMode, showHistory, showLibrary, selectedCustomPlan?.id, selectedCustomDay]);
 
   useEffect(() => {
-    if (isPresetLike && selectedDay >= activePresetPlan.length) setSelectedDay(0);
-    if (mode === "custom" && selectedCustomDay >= activePlan.length) setSelectedCustomDay(0);
+    if (isPresetLike && activePlan.length > 0 && selectedDay >= activePlan.length) setSelectedDay(0);
+    if (mode === "custom" && activePlan.length > 0 && selectedCustomDay >= activePlan.length) setSelectedCustomDay(0);
     if (activeExerciseIndex >= (day?.exercises.length ?? 0)) setActiveExerciseIndex(0);
-  }, [mode, selectedDay, selectedCustomDay, activePresetPlan.length, activePlan.length, isPresetLike, activeExerciseIndex, day?.exercises.length]);
+  }, [mode, selectedDay, selectedCustomDay, activePlan.length, isPresetLike, activeExerciseIndex, day?.exercises.length]);
 
   // Robust timestamp-based interval + visibility sync (no drift on tab backgrounding/phone lock)
   useEffect(() => {
@@ -5211,9 +5348,17 @@ export default function Page() {
             {/* Active Jeff Nippard Program Hero Widget */}
             {activeJeffProgram && (
               <div className="space-y-3">
+                <MissedRecoveryPrompt
+                  activeState={activeJeffProgram}
+                  onConfirmRecovery={handleConfirmRecovery}
+                  onDeclineRecovery={handleDeclineRecovery}
+                  language={appLanguage}
+                />
                 <JeffProgramTodayCard
                   activeState={activeJeffProgram}
                   onMarkDayComplete={handleMarkJeffDayComplete}
+                  onMoveSession={handleMoveSession}
+                  onCancelMove={handleCancelMove}
                   language={appLanguage}
                 />
               </div>
@@ -5646,12 +5791,20 @@ export default function Page() {
         {mode === "programs" && (
           <div className="mt-4 space-y-4">
             {activeJeffProgram && (
-              <ActiveProgramDashboard
-                activeState={activeJeffProgram}
-                onNavigateToPrograms={handleSwitchProgram}
-                onStopProgram={handleResetProgram}
-                language={appLanguage}
-              />
+              <>
+                <MissedRecoveryPrompt
+                  activeState={activeJeffProgram}
+                  onConfirmRecovery={handleConfirmRecovery}
+                  onDeclineRecovery={handleDeclineRecovery}
+                  language={appLanguage}
+                />
+                <ActiveProgramDashboard
+                  activeState={activeJeffProgram}
+                  onNavigateToPrograms={handleSwitchProgram}
+                  onStopProgram={handleResetProgram}
+                  language={appLanguage}
+                />
+              </>
             )}
             <JeffProgramPicker
               onProgramActivated={handleSelectJeffProgram}
@@ -6575,12 +6728,21 @@ export default function Page() {
                       <div className="mb-2 grid grid-cols-[28px_1fr_1fr_40px] gap-1.5 sm:gap-2 items-center text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 px-1">
                         <span className="w-7 text-center font-mono font-bold text-xs text-zinc-400">SET</span>
                         <div className="flex items-center justify-center gap-1">
-                          <span>WEIGHT ({effectiveUnit.toUpperCase()})</span>
-                          <button
-                            type="button"
-                            onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
-                            className="text-yellow-400 hover:underline text-[9px]"
-                          >⇄</button>
+                          <span className="hidden sm:inline">WEIGHT</span>
+                          <div className="inline-flex rounded-md bg-zinc-950 p-0.5 border border-zinc-800 text-[9px] font-bold">
+                            <button
+                              type="button"
+                              onClick={() => handleSetExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, "kg", currentMachine, effectiveSets)}
+                              className={`px-1.5 py-0.5 rounded transition ${effectiveUnit === "kg" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
+                              aria-label="Set weight unit to kilograms"
+                            >kg</button>
+                            <button
+                              type="button"
+                              onClick={() => handleSetExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, "lbs", currentMachine, effectiveSets)}
+                              className={`px-1.5 py-0.5 rounded transition ${effectiveUnit === "lbs" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
+                              aria-label="Set weight unit to pounds"
+                            >lb</button>
+                          </div>
                         </div>
                         <span className="text-center">REPS</span>
                         <span className="text-center">DONE</span>
@@ -6607,7 +6769,7 @@ export default function Page() {
                               {/* Compact Benchmark Note */}
                               {latestSet && (
                                 <p className="text-[10px] text-zinc-500 font-mono truncate px-1 mb-0.5">
-                                  ครั้งก่อน: <span className="text-yellow-400/90 font-bold">{latestSet.rawValue ?? latestSet.weightLbs} {latestSet.unit || "lbs"} × {latestSet.reps} reps</span>
+                                  ครั้งก่อน: <span className="text-yellow-400/90 font-bold">{latestSet.rawValue ?? latestSet.weightLbs} {formatUnitLabel(latestSet.unit || "lbs")} × {latestSet.reps} reps</span>
                                 </p>
                               )}
 
@@ -6617,7 +6779,7 @@ export default function Page() {
                                   {String(setIndex + 1).padStart(2, '0')}
                                 </div>
 
-                                {/* Weight Input Box */}
+                                {/* Weight Input Box with visible unit badge */}
                                 <div className="flex flex-col w-full min-w-0">
                                   <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
                                     <button
@@ -6625,15 +6787,20 @@ export default function Page() {
                                       onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
                                       className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
                                     >−</button>
-                                    <input
-                                      id={`weight-input-${baseExercise.id}-${setIndex}`}
-                                      inputMode="decimal"
-                                      value={set.weightLbs}
-                                      onChange={(e) => updateSet(baseExercise.id, setIndex, "weightLbs", e.target.value, effectiveSets)}
-                                      onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs", currentMachine)}
-                                      className="w-full text-center font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
-                                      placeholder={String(effectivePlaceholderWeight || 0)}
-                                    />
+                                    <div className="flex-1 flex items-center justify-center min-w-0 px-1">
+                                      <input
+                                        id={`weight-input-${baseExercise.id}-${setIndex}`}
+                                        inputMode="decimal"
+                                        value={set.weightLbs}
+                                        onChange={(e) => updateSet(baseExercise.id, setIndex, "weightLbs", e.target.value, effectiveSets)}
+                                        onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs", currentMachine)}
+                                        className="w-full text-right font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
+                                        placeholder={String(effectivePlaceholderWeight || 0)}
+                                      />
+                                      <span className="text-xs font-black uppercase text-yellow-400/90 select-none ml-1 shrink-0">
+                                        {formatUnitLabel(effectiveUnit)}
+                                      </span>
+                                    </div>
                                     <button
                                       type="button"
                                       onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
@@ -6654,8 +6821,8 @@ export default function Page() {
                                         return (
                                           <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                             {totalW > 0
-                                              ? `(เพลตรวมสองข้าง; ข้างละ ${perSideW} ${effectiveUnit}, ไม่รวมแรงต้านเริ่มต้น ${startW} ${effectiveUnit}/ข้าง)`
-                                              : `(เพลตรวมสองข้าง ไม่รวมแรงต้านเริ่มต้น ${startW} ${effectiveUnit}/ข้าง)`}
+                                              ? `(เพลตรวมสองข้าง; ข้างละ ${perSideW} ${formatUnitLabel(effectiveUnit)}, ไม่รวมแรงต้านเริ่มต้น ${startW} ${formatUnitLabel(effectiveUnit)}/ข้าง)`
+                                              : `(เพลตรวมสองข้าง ไม่รวมแรงต้านเริ่มต้น ${startW} ${formatUnitLabel(effectiveUnit)}/ข้าง)`}
                                           </span>
                                         );
                                       }
@@ -6663,8 +6830,8 @@ export default function Page() {
                                         return (
                                           <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                             {totalW > 0
-                                              ? `(เพลตใส่แกนกลาง ${totalW} ${effectiveUnit}, ไม่รวมแรงต้านเริ่มต้น ${startW} ${effectiveUnit})`
-                                              : `(เพลตใส่แกนกลาง ไม่รวมแรงต้านเริ่มต้น ${startW} ${effectiveUnit})`}
+                                              ? `(เพลตใส่แกนกลาง ${totalW} ${formatUnitLabel(effectiveUnit)}, ไม่รวมแรงต้านเริ่มต้น ${startW} ${formatUnitLabel(effectiveUnit)})`
+                                              : `(เพลตใส่แกนกลาง ไม่รวมแรงต้านเริ่มต้น ${startW} ${formatUnitLabel(effectiveUnit)})`}
                                           </span>
                                         );
                                       }
@@ -6672,8 +6839,8 @@ export default function Page() {
                                       return (
                                         <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                           {totalW > 0
-                                            ? `(เพลตรวมสองข้าง ${totalW} ${effectiveUnit}; ข้างละ ${perSideW} ${effectiveUnit}, ไม่รวมแรงต้านแคร่ ${startW} ${effectiveUnit})`
-                                            : `(เพลตรวมสองข้าง ไม่รวมแรงต้านแคร่ ${startW} ${effectiveUnit})`}
+                                            ? `(เพลตรวมสองข้าง ${totalW} ${formatUnitLabel(effectiveUnit)}; ข้างละ ${perSideW} ${formatUnitLabel(effectiveUnit)}, ไม่รวมแรงต้านแคร่ ${startW} ${formatUnitLabel(effectiveUnit)})`
+                                            : `(เพลตรวมสองข้าง ไม่รวมแรงต้านแคร่ ${startW} ${formatUnitLabel(effectiveUnit)})`}
                                         </span>
                                       );
                                     }
@@ -6805,29 +6972,43 @@ export default function Page() {
                           </p>
                           <div className="grid grid-cols-2 gap-2">
                             <div className="rounded-xl bg-zinc-900 px-3 py-2 cursor-pointer hover:border-yellow-400 border border-transparent transition" onClick={() => {
-                    setEditingPrExercise({ name: exercise.name, machine: currentMachine });
-                    setEditPrWeight(records.maxWeight ? (records.maxWeight.rawValue !== undefined ? records.maxWeight.rawValue.toString() : (records.maxWeight.unit === "kg" ? (records.maxWeight.weightLbs * 0.453592).toFixed(1) : records.maxWeight.weightLbs.toString())) : "");
-                    setEditPrReps(records.maxWeight?.reps?.toString() ?? "");
-                    setEditPrUnit(records.maxWeight?.unit ?? "kg");
-                  }}>
+                              setEditingPrExercise({ name: exercise.name, machine: currentMachine });
+                              const rec = records.maxWeight;
+                              const initialUnit: WeightUnit = rec?.unit ? normalizeWeightUnit(rec.unit) : globalWeightUnit;
+                              setEditPrUnit(initialUnit);
+                              if (rec) {
+                                if (rec.rawValue !== undefined && rec.unit) {
+                                  setEditPrWeight(String(rec.rawValue));
+                                } else {
+                                  // Legacy record in lbs
+                                  const val = initialUnit === "kg"
+                                    ? convertInputWeight(rec.weightLbs, "lbs", "kg")
+                                    : String(Math.round(rec.weightLbs * 10) / 10);
+                                  setEditPrWeight(val);
+                                }
+                              } else {
+                                setEditPrWeight("");
+                              }
+                              setEditPrReps(records.maxWeight?.reps?.toString() ?? "");
+                            }}>
                               <p className="text-[10px] font-bold uppercase text-zinc-500">Max</p>
                               <div className="mt-1">
-                                {records.maxWeight ? (
-                                  <>
-                                    <p className="text-sm font-black text-yellow-300">
-                                      {records.maxWeight.rawValue !== undefined && records.maxWeight.unit
-                                        ? `${records.maxWeight.rawValue} ${records.maxWeight.unit}`
-                                        : `${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs`}
-                                      {" × "}{records.maxWeight.reps}
-                                    </p>
-                    <span className="text-[10px] text-yellow-400 font-bold">แก้ไข/ประวัติ ✎</span>
-                                    <p className="text-[10px] text-zinc-500">
-                                      {records.maxWeight.unit === "kg" && records.maxWeight.rawValue !== undefined
-                                        ? `(${Math.round(records.maxWeight.weightLbs * 10) / 10} lbs)`
-                                        : `(${Math.round(records.maxWeight.weightLbs * 0.453592 * 10) / 10} kg)`}
-                                    </p>
-                                  </>
-                                ) : (
+                                {records.maxWeight ? (() => {
+                                  const disp = resolveRecordDisplay(records.maxWeight, globalWeightUnit);
+                                  return (
+                                    <>
+                                      <p className="text-sm font-black text-yellow-300">
+                                        {disp.primaryText}{" × "}{records.maxWeight.reps}
+                                      </p>
+                                      <span className="text-[10px] text-yellow-400 font-bold">แก้ไข/ประวัติ ✎</span>
+                                      {disp.secondaryText && (
+                                        <p className="text-[10px] text-zinc-500">
+                                          {disp.secondaryText}
+                                        </p>
+                                      )}
+                                    </>
+                                  );
+                                })() : (
                                   <p className="text-sm font-black text-zinc-500">—</p>
                                 )}
                               </div>
@@ -6835,21 +7016,21 @@ export default function Page() {
                             <div className="rounded-xl bg-zinc-900 px-3 py-2">
                               <p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p>
                               <div className="mt-1">
-                                {records.bestReps ? (
-                                  <>
-                                    <p className="text-sm font-black text-zinc-100">
-                                      {records.bestReps.rawValue !== undefined && records.bestReps.unit
-                                        ? `${records.bestReps.rawValue} ${records.bestReps.unit}`
-                                        : `${Math.round(records.bestReps.weightLbs * 10) / 10} lbs`}
-                                      {" × "}{records.bestReps.reps}
-                                    </p>
-                                    <p className="text-[10px] text-zinc-500">
-                                      {records.bestReps.unit === "kg" && records.bestReps.rawValue !== undefined
-                                        ? `(${Math.round(records.bestReps.weightLbs * 10) / 10} lbs)`
-                                        : `(${Math.round(records.bestReps.weightLbs * 0.453592 * 10) / 10} kg)`}
-                                    </p>
-                                  </>
-                                ) : (
+                                {records.bestReps ? (() => {
+                                  const disp = resolveRecordDisplay(records.bestReps, globalWeightUnit);
+                                  return (
+                                    <>
+                                      <p className="text-sm font-black text-zinc-100">
+                                        {disp.primaryText}{" × "}{records.bestReps.reps}
+                                      </p>
+                                      {disp.secondaryText && (
+                                        <p className="text-[10px] text-zinc-500">
+                                          {disp.secondaryText}
+                                        </p>
+                                      )}
+                                    </>
+                                  );
+                                })() : (
                                   <p className="text-sm font-black text-zinc-500">—</p>
                                 )}
                               </div>
@@ -6897,39 +7078,69 @@ export default function Page() {
 
                         {/* Edit target sets & reps */}
 {editingPrExercise && (
-  <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-    <div className="w-full max-w-md rounded-xl bg-zinc-950 p-6 border border-zinc-800">
-      <h2 className="text-lg font-bold text-yellow-300 mb-4">
-        Edit PR - {editingPrExercise.name}{editingPrExercise.machine ? ` (${editingPrExercise.machine})` : ''}
+  <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+    <div className="w-full max-w-md rounded-2xl bg-zinc-950 p-6 border border-zinc-800 shadow-2xl">
+      <h2 className="text-lg font-black text-yellow-300 mb-4 flex items-center gap-2">
+        <span>Edit PR - {editingPrExercise.name}</span>
+        {editingPrExercise.machine && <span className="text-xs text-zinc-400 font-semibold">({editingPrExercise.machine})</span>}
       </h2>
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="text-xs font-bold text-zinc-400">Weight & Unit</label>
+          <div className="inline-flex rounded-lg bg-zinc-900 p-0.5 border border-zinc-800 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                if (editPrUnit === "kg") return;
+                if (editPrWeight) setEditPrWeight(convertInputWeight(editPrWeight, "lbs", "kg"));
+                setEditPrUnit("kg");
+              }}
+              className={`px-2.5 py-1 rounded transition ${editPrUnit === "kg" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
+            >
+              kg
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (editPrUnit === "lbs") return;
+                if (editPrWeight) setEditPrWeight(convertInputWeight(editPrWeight, "kg", "lbs"));
+                setEditPrUnit("lbs");
+              }}
+              className={`px-2.5 py-1 rounded transition ${editPrUnit === "lbs" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
+            >
+              lb
+            </button>
+          </div>
+        </div>
+        <div className="relative flex items-center">
+          <input
+            type="number"
+            inputMode="decimal"
+            placeholder={editPrUnit === "kg" ? "e.g. 100" : "e.g. 225"}
+            value={editPrWeight}
+            onChange={e => setEditPrWeight(e.target.value)}
+            className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 pr-12 text-zinc-100 font-mono font-bold outline-none focus:border-yellow-400"
+          />
+          <span className="pointer-events-none absolute right-3 text-xs font-black uppercase text-yellow-400">
+            {formatUnitLabel(editPrUnit)}
+          </span>
+        </div>
+      </div>
+      <div className="mb-4">
+        <label className="text-xs font-bold text-zinc-400 block mb-1.5">Reps</label>
         <input
           type="number"
-          placeholder="Weight"
-          value={editPrWeight}
-          onChange={e => setEditPrWeight(e.target.value)}
-          className="rounded-xl bg-zinc-900 p-2 text-zinc-100"
+          inputMode="numeric"
+          placeholder="Reps"
+          value={editPrReps}
+          onChange={e => setEditPrReps(e.target.value)}
+          className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-zinc-100 font-mono font-bold outline-none focus:border-yellow-400"
         />
-        <select
-          value={editPrUnit}
-          onChange={e => setEditPrUnit(e.target.value as WeightUnit)}
-          className="rounded-xl bg-zinc-900 p-2 text-zinc-100"
-        >
-          <option value="kg">kg</option>
-          <option value="lbs">lbs</option>
-        </select>
       </div>
-      <input
-        type="number"
-        placeholder="Reps"
-        value={editPrReps}
-        onChange={e => setEditPrReps(e.target.value)}
-        className="w-full rounded-xl bg-zinc-900 p-2 mb-4 text-zinc-100"
-      />
       <div className="flex justify-end gap-2 mb-4">
         <button
           onClick={() => setEditingPrExercise(null)}
-          className="px-4 py-2 rounded-xl bg-zinc-800 text-zinc-200"
+          className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm font-bold border border-zinc-800 transition"
         >Cancel</button>
         <button
           onClick={() => {
@@ -6955,36 +7166,38 @@ export default function Page() {
             });
             setEditingPrExercise(null);
           }}
-          className="px-4 py-2 rounded-xl bg-yellow-400 text-black font-black"
+          className="px-4 py-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black text-sm transition"
         >Save</button>
       </div>
       <h3 className="text-sm font-bold text-zinc-400 mb-2">Recent Sets</h3>
-      <ul className="max-h-48 overflow-y-auto mb-4">
+      <ul className="max-h-48 overflow-y-auto mb-4 divide-y divide-zinc-800/80">
         {logs
           .filter(l => getEffectiveExerciseKey(l.exerciseName, l.machine) === getEffectiveExerciseKey(editingPrExercise.name, editingPrExercise.machine))
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
           .slice(0, 5)
-          .map((log, idx) => (
-            <li key={idx} className="flex justify-between items-center text-sm py-1 border-b border-zinc-800">
-              <span>{log.reps}× {log.unit === 'kg' ? `${log.rawValue} kg` : `${log.weightLbs} lbs`}</span>
-              <button
-                onClick={() => {
-                  setLogs(old => old.filter((_, i) => i !== logs.indexOf(log)));
-                  // simple PR recalculation placeholder: remove maxWeight if it matches deleted log
-                  const key = getEffectiveExerciseKey(log.exerciseName, log.machine);
-                  setRecordsMap(prev => {
-                    const newMap = { ...prev };
-                    const rec = newMap[key];
-                    if (rec && rec.maxWeight && rec.maxWeight.date === log.date) {
-                      delete rec.maxWeight;
-                    }
-                    return newMap;
-                  });
-                }}
-                className="text-xs text-red-500"
-              >Delete</button>
-            </li>
-          ))}
+          .map((log, idx) => {
+            const disp = resolveRecordDisplay(log, editPrUnit);
+            return (
+              <li key={idx} className="flex justify-between items-center text-sm py-2">
+                <span className="font-mono text-zinc-300">{log.reps} × <strong className="text-yellow-300">{disp.primaryText}</strong> {disp.secondaryText && <span className="text-zinc-500 text-xs font-normal">({disp.secondaryText})</span>}</span>
+                <button
+                  onClick={() => {
+                    setLogs(old => old.filter((_, i) => i !== logs.indexOf(log)));
+                    const key = getEffectiveExerciseKey(log.exerciseName, log.machine);
+                    setRecordsMap(prev => {
+                      const newMap = { ...prev };
+                      const rec = newMap[key];
+                      if (rec && rec.maxWeight && rec.maxWeight.date === log.date) {
+                        delete rec.maxWeight;
+                      }
+                      return newMap;
+                    });
+                  }}
+                  className="text-xs text-red-400 hover:underline px-2 py-1"
+                >Delete</button>
+              </li>
+            );
+          })}
       </ul>
     </div>
   </dialog>

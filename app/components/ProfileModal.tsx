@@ -2,10 +2,10 @@
 import React from "react";
 import { X, User, Trophy, Flame, Download, Settings, Info, Scale, ShieldCheck } from "lucide-react";
 import { getOnboardingResult } from "./OnboardingWizard";
-import { getMigrationResult } from "../lib/migration";
 import { getCurrentBodyweight } from "./BodyweightManager";
 import { getUserProfile, saveUserProfile, type Gender, type UserProfile } from "../lib/assessment";
-import type { WeightUnit } from "../lib/units";
+import { getMigrationResult } from "../lib/migration";
+import { type WeightUnit, setPersistentWeightUnit } from "../lib/units";
 import type { AppLanguage, FontScale } from "./OnboardingWizard";
 
 type Props = {
@@ -105,7 +105,7 @@ export function ProfileModal({
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-base font-black text-zinc-100">HA IT Athlete</p>
-                <p className="text-xs text-zinc-400">{levelLabels[level]}</p>
+                <p className="text-xs text-zinc-400">{levelLabels[level as keyof typeof levelLabels] || level}</p>
               </div>
               {streak > 0 && (
                 <span className="flex items-center gap-1 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-black text-amber-300">
@@ -152,7 +152,7 @@ export function ProfileModal({
             <div className="mt-3 grid grid-cols-3 gap-2 border-t border-zinc-800/80 pt-3 text-center">
               <div>
                 <p className="text-[10px] font-bold uppercase text-zinc-500">เป้าหมาย</p>
-                <p className="text-xs font-black text-yellow-300 mt-0.5">{goalLabels[goal]?.split(" ")[1] || goal}</p>
+                <p className="text-xs font-black text-yellow-300 mt-0.5">{goalLabels[goal as keyof typeof goalLabels]?.split(" ")[1] || goal}</p>
               </div>
               <div>
                 <p className="text-[10px] font-bold uppercase text-zinc-500">วันฝึก/สัปดาห์</p>
@@ -195,7 +195,10 @@ export function ProfileModal({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => onUnitChange?.("kg")}
+                onClick={() => {
+                  setPersistentWeightUnit("kg");
+                  onUnitChange?.("kg");
+                }}
                 className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition ${
                   preferredUnit === "kg"
                     ? "bg-yellow-400 text-black shadow-md shadow-yellow-500/20 font-black"
@@ -207,14 +210,17 @@ export function ProfileModal({
               </button>
               <button
                 type="button"
-                onClick={() => onUnitChange?.("lbs")}
+                onClick={() => {
+                  setPersistentWeightUnit("lbs");
+                  onUnitChange?.("lbs");
+                }}
                 className={`flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-black transition ${
                   preferredUnit === "lbs"
                     ? "bg-yellow-400 text-black shadow-md shadow-yellow-500/20 font-black"
                     : "bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 border border-zinc-800"
                 }`}
               >
-                <span>ปอนด์ (lbs)</span>
+                <span>ปอนด์ (lb)</span>
                 {preferredUnit === "lbs" && <span className="rounded-full bg-black/20 px-1.5 py-0.2 text-[10px] font-black">Active</span>}
               </button>
             </div>

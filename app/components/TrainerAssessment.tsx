@@ -25,7 +25,13 @@ import {
   type MuscleMassMode,
   type BiomechanicalResult,
 } from "../lib/assessment";
-import type { WeightUnit } from "../lib/units";
+import {
+  type WeightUnit,
+  getPersistentWeightUnit,
+  setPersistentWeightUnit,
+  convertInputWeight,
+  formatUnitLabel,
+} from "../lib/units";
 
 type Props = {
   open: boolean;
@@ -70,7 +76,7 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
         setGender(saved.gender);
         setAgeStr(String(saved.age));
         setHeightStr(String(saved.heightCm));
-        const unit = saved.preferredWeightUnit || "kg";
+        const unit = saved?.preferredWeightUnit || getPersistentWeightUnit();
         setPreferredWeightUnit(unit);
         if (unit === "lbs") {
           setWeightStr(String(Math.round((saved.weightKg / 0.453592) * 10) / 10));
@@ -248,25 +254,32 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                 <div>
                   <div className="mb-1 flex items-center justify-between">
                     <label className="text-[11px] font-bold text-zinc-400">น้ำหนักตัว</label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const nextUnit: WeightUnit = preferredWeightUnit === "kg" ? "lbs" : "kg";
-                        const num = Number(weightStr);
-                        if (num > 0) {
-                          if (nextUnit === "lbs") {
-                            setWeightStr(String(Math.round((num / 0.453592) * 10) / 10));
-                          } else {
-                            setWeightStr(String(Math.round((num * 0.453592) * 10) / 10));
-                          }
-                        }
-                        setPreferredWeightUnit(nextUnit);
-                      }}
-                      className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] font-black text-emerald-400 hover:bg-zinc-700 transition"
-                      title="กดเพื่อสลับหน่วย"
-                    >
-                      ⇄ {preferredWeightUnit}
-                    </button>
+                    <div className="inline-flex items-center rounded-lg bg-zinc-950 p-0.5 border border-zinc-800 text-[10px] font-black">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (preferredWeightUnit === "kg") return;
+                          if (weightStr) setWeightStr(convertInputWeight(weightStr, "lbs", "kg"));
+                          setPreferredWeightUnit("kg");
+                          setPersistentWeightUnit("kg");
+                        }}
+                        className={`px-2 py-0.5 rounded transition ${preferredWeightUnit === "kg" ? "bg-emerald-400 text-zinc-950 font-black shadow-sm" : "text-zinc-400 hover:text-white"}`}
+                      >
+                        kg
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (preferredWeightUnit === "lbs") return;
+                          if (weightStr) setWeightStr(convertInputWeight(weightStr, "kg", "lbs"));
+                          setPreferredWeightUnit("lbs");
+                          setPersistentWeightUnit("lbs");
+                        }}
+                        className={`px-2 py-0.5 rounded transition ${preferredWeightUnit === "lbs" ? "bg-emerald-400 text-zinc-950 font-black shadow-sm" : "text-zinc-400 hover:text-white"}`}
+                      >
+                        lb
+                      </button>
+                    </div>
                   </div>
                   <div className="relative">
                     <input
@@ -275,10 +288,10 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                       value={weightStr}
                       onChange={(e) => setWeightStr(e.target.value)}
                       placeholder={preferredWeightUnit === "lbs" ? "เช่น 155" : "เช่น 70"}
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-900 pl-3 pr-8 py-2 text-sm font-bold text-zinc-100 outline-none focus:border-emerald-400"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-900 pl-3 pr-10 py-2 text-sm font-bold text-zinc-100 outline-none focus:border-emerald-400"
                     />
-                    <span className="pointer-events-none absolute right-2.5 top-2 text-xs font-bold text-zinc-500">
-                      {preferredWeightUnit}
+                    <span className="pointer-events-none absolute right-2.5 top-2 text-xs font-black uppercase text-emerald-400">
+                      {formatUnitLabel(preferredWeightUnit)}
                     </span>
                   </div>
                 </div>
@@ -347,7 +360,10 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setPreferredWeightUnit("kg")}
+                    onClick={() => {
+                      setPreferredWeightUnit("kg");
+                      setPersistentWeightUnit("kg");
+                    }}
                     className={`rounded-xl py-2 text-xs font-bold transition ${
                       preferredWeightUnit === "kg"
                         ? "border border-emerald-400 bg-emerald-400 text-zinc-950 font-black"
@@ -358,14 +374,17 @@ export function TrainerAssessment({ open, onClose, onApplyPlan }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPreferredWeightUnit("lbs")}
+                    onClick={() => {
+                      setPreferredWeightUnit("lbs");
+                      setPersistentWeightUnit("lbs");
+                    }}
                     className={`rounded-xl py-2 text-xs font-bold transition ${
                       preferredWeightUnit === "lbs"
                         ? "border border-emerald-400 bg-emerald-400 text-zinc-950 font-black"
                         : "border border-zinc-800 bg-zinc-900 text-zinc-400"
                     }`}
                   >
-                    ปอนด์ (lbs)
+                    ปอนด์ (lb)
                   </button>
                 </div>
               </div>
