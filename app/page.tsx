@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   ArrowDown,
@@ -58,6 +58,9 @@ import {
   resolveProgramDayForDate,
   advanceJeffProgramAfterFinish,
   isJeffProgramComplete,
+  resolveRescheduledSession,
+  detectMissedSessions,
+  planRescheduledSessions,
   getProgramDateKey as getJeffProgramDateKey,
 } from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
@@ -2942,6 +2945,17 @@ export default function Page() {
     setActiveExerciseIndex(0);
   }
 
+  function handleSkipMakeUpSession(sessionId: string) {
+    if (!activeJeffProgram) return;
+    const confirmed = window.confirm("คุณต้องการข้ามเซสชันชดเชยนี้ใช่หรือไม่? (ระบบจะบันทึกการข้าม เคลียร์ภาระชดเชย และกลับสู่ตารางปกติของคุณ)");
+    if (!confirmed) return;
+    const updatedState = resolveRescheduledSession(activeJeffProgram, sessionId, "skip");
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
+    setSelectedDay(updatedState.currentDayIndex);
+    setActiveExerciseIndex(0);
+  }
+
   function handleSwitchProgram() {
     setMode("programs");
   }
@@ -2975,12 +2989,41 @@ export default function Page() {
   const [showFinishCelebration, setShowFinishCelebration] = useState(false);
   const [finishedWorkoutStats, setFinishedWorkoutStats] = useState<{ durationStr: string; totalSets: number; totalVolumeKg: number } | null>(null);
 
+  const sessionLastTickRef = useRef<number>(Date.now());
+
   useEffect(() => {
     if (!isSessionRunning) return;
+    sessionLastTickRef.current = Date.now();
     const timer = setInterval(() => {
-      setSessionElapsedSeconds((prev) => prev + 1);
+      const now = Date.now();
+      const delta = Math.max(1, Math.floor((now - sessionLastTickRef.current) / 1000));
+      sessionLastTickRef.current = now;
+      setSessionElapsedSeconds((prev) => prev + delta);
     }, 1000);
-    return () => clearInterval(timer);
+
+    const handleSync = () => {
+      if (document.visibilityState === "visible") {
+        const now = Date.now();
+        const delta = Math.max(0, Math.floor((now - sessionLastTickRef.current) / 1000));
+        if (delta > 0) {
+          sessionLastTickRef.current = now;
+          setSessionElapsedSeconds((prev) => prev + delta);
+        }
+      } else {
+        sessionLastTickRef.current = Date.now();
+      }
+    };
+
+    window.addEventListener("visibilitychange", handleSync);
+    window.addEventListener("focus", handleSync);
+    window.addEventListener("pageshow", handleSync);
+
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("visibilitychange", handleSync);
+      window.removeEventListener("focus", handleSync);
+      window.removeEventListener("pageshow", handleSync);
+    };
   }, [isSessionRunning]);
 
   // Persist active session state to localStorage
@@ -5636,7 +5679,38 @@ export default function Page() {
 
         {(mode === "today" || mode === "preset" || mode === "custom") && day && !(activeJeffProgram && isJeffProgramComplete(activeJeffProgram)) && (
           <>
-            {mode === "today" && isTodayScheduledRest && (
+            {mode === "today" && jeffCalendarStatus?.isRescheduledMakeUp && jeffCalendarStatus?.rescheduledSession && (
+              <div className="mt-3 rounded-2xl border border-amber-500/40 bg-gradient-to-r from-amber-950/40 via-zinc-900 to-black p-4 shadow-xl">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">⚡</span>
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-wider text-amber-400">
+                        ตารางซ้อมชดเชย (Make-Up Session)
+                      </p>
+                      <h4 className="text-sm font-black text-white">
+                        {jeffCalendarStatus.rescheduledSession.dayLabel}: {jeffCalendarStatus.rescheduledSession.focusLabel}
+                      </h4>
+                      <p className="text-[11px] text-zinc-400 mt-0.5">
+                        ยกมาซ้อมชดเชยจากวันที่ {jeffCalendarStatus.rescheduledSession.originalDateKey} เมื่อฝึกเสร็จหรือกดข้าม ระบบจะเคลียร์ภาระชดเชยและกลับสู่ตารางปกติ
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSkipMakeUpSession(jeffCalendarStatus.rescheduledSession!.id)}
+                      className="rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 text-xs font-bold text-zinc-300 transition active:scale-95"
+                      title="ข้ามเซสชันนี้ ไม่นับซ้อม และกลับสู่ตารางเดิม"
+                    >
+                      ข้ามเซสชันนี้ (Skip)
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {mode === "today" && isTodayScheduledRest && !jeffCalendarStatus?.isRescheduledMakeUp && (
               <div className="mt-3 rounded-2xl border border-yellow-500/30 bg-gradient-to-r from-zinc-950 via-zinc-900 to-black p-4 shadow-xl">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="flex items-center gap-3">
@@ -5649,7 +5723,9 @@ export default function Page() {
                         วันนี้ตามตารางเป็น "วันพักผ่อน"
                       </h4>
                       <p className="text-[11px] text-zinc-400 mt-0.5">
-                        ระบบจัดตารางให้พักวันนี้ แต่คุณสามารถเลือกวันซ้อมอื่นหรือกดฝึกต่อได้เลยด้านล่าง
+                        {(jeffCalendarStatus?.pendingBacklogCount || 0) > 0
+                          ? `คุณมีเซสชันค้างชดเชย ${jeffCalendarStatus?.pendingBacklogCount} เซสชัน ซึ่งจะถูกจัดในวันฝึกถัดไปโดยอัตโนมัติ (หรือเลือกฝึกวันนี้ได้ด้านล่าง)`
+                          : `ระบบจัดตารางให้พักวันนี้ แต่คุณสามารถเลือกวันซ้อมอื่นหรือกดฝึกต่อได้เลยด้านล่าง`}
                       </p>
                     </div>
                   </div>
@@ -6210,12 +6286,15 @@ export default function Page() {
 
                       {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "plate-loaded" || (currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "specialty") && (() => {
                         const defaultEstimateKg = getDefaultMechanicalProfile(effectiveLoad, `${exercise.name} ${currentMachine || ""}`).tareWeight;
+                        const defaultEstimateDisplay = effectiveUnit === "lbs"
+                          ? Math.round(defaultEstimateKg * 2.20462 * 10) / 10
+                          : defaultEstimateKg;
                         const userVal = machineStartingResistances[machineResistanceKey];
                         return (
                           <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2">
                             <div className="flex items-center justify-between gap-2">
                               <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>
-                                ⚖️ {machineResistanceIsPerSide ? "แรงต้านเริ่มต้นต่อข้าง (kg) ถ้าทราบ" : "แรงต้านเริ่มต้นรวมของเครื่อง (kg) ถ้าทราบ"}
+                                ⚖️ {machineResistanceIsPerSide ? `แรงต้านเริ่มต้นต่อข้าง (${effectiveUnit}) ถ้าทราบ` : `แรงต้านเริ่มต้นรวมของเครื่อง (${effectiveUnit}) ถ้าทราบ`}
                               </label>
                               {userVal !== undefined && userVal !== "" && (
                                 <button
@@ -6224,13 +6303,13 @@ export default function Page() {
                                   className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline"
                                   title="กลับไปใช้ค่าประมาณเริ่มต้นของระบบ"
                                 >
-                                  ใช้ค่าประมาณ ({defaultEstimateKg} kg)
+                                  ใช้ค่าประมาณ ({defaultEstimateDisplay} {effectiveUnit})
                                 </button>
                               )}
                             </div>
                             <input
                               id={`machine-start-resistance-${baseExercise.id}`}
-                              aria-label="แรงต้านเริ่มต้นของเครื่อง (kg)"
+                              aria-label={`แรงต้านเริ่มต้นของเครื่อง (${effectiveUnit})`}
                               type="number"
                               min="0"
                               max="1000"
@@ -6238,11 +6317,11 @@ export default function Page() {
                               inputMode="decimal"
                               value={userVal ?? ""}
                               onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)}
-                              placeholder={`ค่าประมาณ: ${defaultEstimateKg} kg`}
+                              placeholder={`ค่าประมาณ: ${defaultEstimateDisplay} ${effectiveUnit}`}
                               className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-100 outline-none focus:border-yellow-400"
                             />
                             <p className="text-[10px] leading-relaxed text-zinc-500">
-                              {userVal ? `✓ บันทึกค่ากำหนดเองแล้ว (${userVal} kg)` : `ค่าเริ่มต้น: ประมาณ ${defaultEstimateKg} kg (กรอกค่าจริงได้ถ้าทราบ หรือเว้นว่างไว้)`}
+                              {userVal ? `✓ บันทึกค่ากำหนดเองแล้ว (${userVal} ${effectiveUnit})` : `ค่าเริ่มต้น: ประมาณ ${defaultEstimateDisplay} ${effectiveUnit} (กรอกค่าจริงได้ถ้าทราบ หรือเว้นว่างไว้)`}
                             </p>
                           </div>
                         );
@@ -6407,7 +6486,22 @@ export default function Page() {
                             const muscleMode = userProfile.muscleMassMode ?? "smm";
                             const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
                             const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-                            const bioRes = calculatePrescriptionWeight(exercise.name, effectiveLoad, exercise.reps, userProfile, safeModifier, currentMachine, effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined, undefined, machineStartingResistances[machineResistanceKey]?.trim() ? Number(machineStartingResistances[machineResistanceKey]) : undefined);
+                            const startingOverrideRaw = machineStartingResistances[machineResistanceKey]?.trim();
+                            const startingOverrideVal = startingOverrideRaw ? Number(startingOverrideRaw) : undefined;
+                            const startingResistanceKg = startingOverrideVal !== undefined && Number.isFinite(startingOverrideVal)
+                              ? (effectiveUnit === "lbs" ? startingOverrideVal / 2.20462 : startingOverrideVal)
+                              : undefined;
+                            const bioRes = calculatePrescriptionWeight(
+                              exercise.name,
+                              effectiveLoad,
+                              exercise.reps,
+                              userProfile,
+                              safeModifier,
+                              currentMachine,
+                              effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined,
+                              undefined,
+                              startingResistanceKg
+                            );
                             return effectiveUnit === "lbs"
                               ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
                               : bioRes.hardwareWeightKg;
@@ -6469,35 +6563,35 @@ export default function Page() {
                                     if (isIsoPlate) {
                                       const perSideW = Math.round((totalW / 2) * 10) / 10;
                                       return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                           {totalW > 0 ? `(เพลตรวมสองข้าง; ข้างละ ${perSideW} ${effectiveUnit}, ไม่รวมแรงต้านเครื่อง)` : `(เพลตรวมสองข้าง ไม่รวมแรงต้านเครื่อง)`}
                                         </span>
                                       );
                                     }
                                     if (isPlateLoaded && !isIsoPlate) {
                                       return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                           (เพลตที่ใส่เพิ่ม ไม่รวมแรงต้านเริ่มต้นของเครื่อง)
                                         </span>
                                       );
                                     }
                                     if (isDumbbell) {
                                       return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                           (ดัมเบลต่อข้าง)
                                         </span>
                                       );
                                     }
                                     if (isBarbell) {
                                       return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                           (น้ำหนักรวมคาน)
                                         </span>
                                       );
                                     }
                                     if (isCable) {
                                       return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate">
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                           (สลักพิน รอก {selectedPulley}:1)
                                         </span>
                                       );

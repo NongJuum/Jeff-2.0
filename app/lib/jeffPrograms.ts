@@ -1303,6 +1303,30 @@ export const ACTIVE_JEFF_PROGRAM_KEY = "haitActiveJeffProgramV1";
 export const JEFF_PROGRAM_START_DATE_KEY = "haitJeffProgramStartDateV1";
 export const JEFF_PROGRAM_SCHEDULE_KEY = "haitJeffProgramScheduleV1";
 
+export type RescheduledSessionStatus = "pending" | "completed" | "skipped";
+
+export interface RescheduledSession {
+  id: string; // Unique ID, e.g. "missed_2026-10-16_d3"
+  originalDateKey: string; // Date originally scheduled
+  targetDateKey?: string; // Planned slot for make-up
+  sourceWeek: number; // Program week
+  dayIndex: number; // 0-based day within week
+  dayLabel: string; // e.g. "Day 4"
+  focusLabel: string; // e.g. "Upper Body A"
+  status: RescheduledSessionStatus;
+  resolvedAt?: string; // Date key when completed or explicitly skipped
+}
+
+export interface ProgramDayResolution {
+  isTrainingDay: boolean;
+  scheduledDayIndex: number;
+  isCompleted: boolean;
+  dateKey: string;
+  isRescheduledMakeUp?: boolean;
+  rescheduledSession?: RescheduledSession;
+  pendingBacklogCount?: number;
+}
+
 export interface ActiveJeffProgramState {
   programId: string;
   startDate: string; // ISO date YYYY-MM-DD
@@ -1310,6 +1334,8 @@ export interface ActiveJeffProgramState {
   currentDayIndex: number; // 0-indexed day within current week
   completedDays: string[]; // ISO date keys of completed workout days (e.g. "2026-10-15")
   scheduleDays: number[]; // 0=Mon ... 6=Sun
+  rescheduledSessions?: RescheduledSession[];
+  skippedDates?: string[]; // Date keys explicitly skipped
 }
 
 export function getActiveJeffProgram(): ActiveJeffProgramState | null {
@@ -1411,38 +1437,333 @@ export function getProgramScheduledDates(
 }
 
 /**
+ * Detects missed training sessions between program startDate and asOfDate.
+ * Only identifies dates that were configured training days under scheduleDays,
+ * and have neither been completed, explicitly skipped, nor already tracked.
+ */
+export function detectMissedSessions(
+  state: ActiveJeffProgramState,
+  asOfDate: Date = new Date()
+): ActiveJeffProgramState {
+  if (!state.startDate || !Array.isArray(state.scheduleDays) || state.scheduleDays.length === 0) {
+    return state;
+  }
+  const asOfKey = getProgramDateKey(asOfDate);
+  if (asOfKey <= state.startDate) {
+    return state;
+  }
+
+  const existingRescheduled = state.rescheduledSessions ? [...state.rescheduledSessions] : [];
+  const existingPending = existingRescheduled.filter((s) => s.status === "pending");
+  const trackedDates = new Set<string>([
+    ...state.completedDays,
+    ...(state.skippedDates ?? []),
+    ...existingRescheduled.map((s) => s.originalDateKey),
+  ]);
+
+  const scheduleDaysSorted = [...state.scheduleDays].sort((a, b) => a - b);
+  const weekData = getProgramCurrentWeek(state);
+  const daysInWeek = weekData?.days.length || scheduleDaysSorted.length || 4;
+
+  let current = new Date(`${state.startDate}T12:00:00`);
+  if (!Number.isFinite(current.getTime())) return state;
+
+  const pastScheduledDates: string[] = [];
+  while (getProgramDateKey(current) < asOfKey) {
+    const dKey = getProgramDateKey(current);
+    const dayOfWeek = (current.getDay() + 6) % 7;
+    if (state.scheduleDays.includes(dayOfWeek)) {
+      pastScheduledDates.push(dKey);
+    }
+    current.setDate(current.getDate() + 1);
+  }
+
+  const totalResolved = state.completedDays.length + (state.skippedDates?.length || 0);
+  const totalTrackedOrResolved = totalResolved + existingPending.length;
+
+  const newObligations: RescheduledSession[] = [];
+
+  for (let i = 0; i < pastScheduledDates.length; i++) {
+    const dKey = pastScheduledDates[i];
+    if (!trackedDates.has(dKey) && totalTrackedOrResolved + newObligations.length < pastScheduledDates.length) {
+      const targetDayIndex = (totalTrackedOrResolved + newObligations.length) % daysInWeek;
+      const dayDef = weekData?.days[targetDayIndex];
+      newObligations.push({
+        id: `missed_${dKey}_d${targetDayIndex}`,
+        originalDateKey: dKey,
+        sourceWeek: state.currentWeek,
+        dayIndex: targetDayIndex,
+        dayLabel: dayDef?.dayLabel || `Day ${targetDayIndex + 1}`,
+        focusLabel: dayDef?.focusLabel || "Make-up Workout",
+        status: "pending",
+      });
+      trackedDates.add(dKey);
+    }
+  }
+
+  // Check if any scheduled session was displaced because a past slot was used for an earlier make-up
+  const deficit = pastScheduledDates.length - (totalTrackedOrResolved + newObligations.length);
+  if (deficit > 0) {
+    for (let d = 0; d < deficit; d++) {
+      const targetDayIndex = (totalTrackedOrResolved + newObligations.length) % daysInWeek;
+      const fallbackDate = pastScheduledDates[pastScheduledDates.length - 1 - d] || asOfKey;
+      const sessionKey = `${fallbackDate}_displaced_${targetDayIndex}`;
+      if (!existingRescheduled.some((s) => s.id === sessionKey || (s.originalDateKey === fallbackDate && s.dayIndex === targetDayIndex))) {
+        const dayDef = weekData?.days[targetDayIndex];
+        newObligations.push({
+          id: sessionKey,
+          originalDateKey: fallbackDate,
+          sourceWeek: state.currentWeek,
+          dayIndex: targetDayIndex,
+          dayLabel: dayDef?.dayLabel || `Day ${targetDayIndex + 1}`,
+          focusLabel: dayDef?.focusLabel || "Make-up Workout",
+          status: "pending",
+        });
+      }
+    }
+  }
+
+  if (newObligations.length === 0) {
+    return state;
+  }
+
+  return {
+    ...state,
+    rescheduledSessions: [...existingRescheduled, ...newObligations],
+  };
+}
+
+/**
+ * Places pending make-up sessions into upcoming available training slots,
+ * respecting fixed rest days, recovery, and program structure.
+ */
+export function planRescheduledSessions(
+  state: ActiveJeffProgramState,
+  asOfDate: Date = new Date()
+): ActiveJeffProgramState {
+  if (!state.rescheduledSessions || state.rescheduledSessions.length === 0) {
+    return state;
+  }
+
+  const asOfKey = getProgramDateKey(asOfDate);
+  const pendingSessions = state.rescheduledSessions.filter((s) => s.status === "pending");
+  if (pendingSessions.length === 0) return state;
+
+  const scheduledDays = Array.isArray(state.scheduleDays) ? state.scheduleDays : [];
+  if (scheduledDays.length === 0) return state;
+
+  const reservedDates = new Set<string>([
+    ...state.completedDays,
+    ...(state.skippedDates ?? []),
+  ]);
+
+  state.rescheduledSessions.forEach((s) => {
+    if (s.status === "pending" && s.targetDateKey && s.targetDateKey >= asOfKey) {
+      reservedDates.add(s.targetDateKey);
+    }
+  });
+
+  let cursor = new Date(`${asOfKey}T12:00:00`);
+  const updatedSessions = [...state.rescheduledSessions];
+  let changed = false;
+
+  for (let i = 0; i < updatedSessions.length; i++) {
+    const session = updatedSessions[i];
+    if (session.status !== "pending") continue;
+
+    if (session.targetDateKey && session.targetDateKey >= asOfKey) {
+      continue;
+    }
+
+    let foundSlot: string | null = null;
+    const lookahead = new Date(cursor);
+    for (let offset = 0; offset < 28; offset++) {
+      const candidateKey = getProgramDateKey(lookahead);
+      const dayOfWeek = (lookahead.getDay() + 6) % 7;
+      if (scheduledDays.includes(dayOfWeek) && !reservedDates.has(candidateKey)) {
+        foundSlot = candidateKey;
+        reservedDates.add(candidateKey);
+        lookahead.setDate(lookahead.getDate() + 1);
+        cursor = new Date(lookahead);
+        break;
+      }
+      lookahead.setDate(lookahead.getDate() + 1);
+    }
+
+    if (foundSlot) {
+      updatedSessions[i] = {
+        ...session,
+        targetDateKey: foundSlot,
+      };
+      changed = true;
+    }
+  }
+
+  if (!changed) return state;
+
+  return {
+    ...state,
+    rescheduledSessions: updatedSessions,
+  };
+}
+
+/**
+ * Resolves a temporary rescheduled obligation through completion or explicit skip.
+ * Once resolved, the obligation is permanently cleared from active make-up obligations
+ * and the application returns to the original recurring schedule.
+ */
+export function resolveRescheduledSession(
+  state: ActiveJeffProgramState,
+  sessionId: string,
+  action: "complete" | "skip",
+  completedDateKey?: string
+): ActiveJeffProgramState {
+  if (!state.rescheduledSessions || state.rescheduledSessions.length === 0) {
+    return state;
+  }
+
+  const targetIdx = state.rescheduledSessions.findIndex((s) => s.id === sessionId);
+  if (targetIdx === -1) return state;
+
+  const targetSession = state.rescheduledSessions[targetIdx];
+  const resolvedDate = completedDateKey || getProgramDateKey();
+  const updatedSessions = [...state.rescheduledSessions];
+
+  if (action === "complete") {
+    updatedSessions[targetIdx] = {
+      ...targetSession,
+      status: "completed",
+      resolvedAt: resolvedDate,
+    };
+    const alreadyCompleted = state.completedDays.includes(resolvedDate);
+    const updatedCompleted = alreadyCompleted ? state.completedDays : [...state.completedDays, resolvedDate];
+
+    const weekData = getProgramCurrentWeek(state);
+    const totalDaysInWeek = weekData?.days.length || state.scheduleDays.length || 4;
+    let nextDayIdx = Math.max(state.currentDayIndex, targetSession.dayIndex) + 1;
+    let nextWeek = state.currentWeek;
+    if (nextDayIdx >= totalDaysInWeek) {
+      nextDayIdx = 0;
+      const program = findProgramById(state.programId);
+      nextWeek = Math.min(program?.durationWeeks || 8, state.currentWeek + 1);
+    }
+
+    return {
+      ...state,
+      rescheduledSessions: updatedSessions,
+      completedDays: updatedCompleted,
+      currentDayIndex: nextDayIdx,
+      currentWeek: nextWeek,
+    };
+  } else {
+    // Explicit skip
+    updatedSessions[targetIdx] = {
+      ...targetSession,
+      status: "skipped",
+      resolvedAt: resolvedDate,
+    };
+    const skipped = new Set(state.skippedDates ?? []);
+    skipped.add(targetSession.originalDateKey);
+    if (targetSession.targetDateKey) {
+      skipped.add(targetSession.targetDateKey);
+    }
+
+    return {
+      ...state,
+      rescheduledSessions: updatedSessions,
+      skippedDates: Array.from(skipped),
+    };
+  }
+}
+
+/**
+ * Cancels a temporary rescheduling adjustment without falsely completing or skipping the workout.
+ */
+export function cancelRescheduledSession(
+  state: ActiveJeffProgramState,
+  sessionId: string
+): ActiveJeffProgramState {
+  if (!state.rescheduledSessions) return state;
+  const updatedSessions = state.rescheduledSessions.map((s) => {
+    if (s.id === sessionId && s.status === "pending") {
+      const { targetDateKey, ...rest } = s;
+      return rest as RescheduledSession;
+    }
+    return s;
+  });
+  return {
+    ...state,
+    rescheduledSessions: updatedSessions,
+  };
+}
+
+/**
  * Calendar-aware schedule resolver:
- * Checks whether a given calendar date is scheduled as a training day,
- * and if so, maps which program workout day index (Day 1, Day 2, etc.) corresponds to it.
+ * Evaluates configured training/rest days, pending make-up sessions, and progression.
+ * Returns to normal recurring schedule once all temporary exceptions are resolved.
  */
 export function resolveProgramDayForDate(
   state: ActiveJeffProgramState,
   date: Date = new Date()
-): { isTrainingDay: boolean; scheduledDayIndex: number; isCompleted: boolean; dateKey: string } {
+): ProgramDayResolution {
   const dateKey = getProgramDateKey(date);
   const dayOfWeek0to6 = (date.getDay() + 6) % 7; // Mon=0 ... Sun=6
   const scheduleDays = Array.isArray(state.scheduleDays) ? state.scheduleDays : [];
   const isAfterStartDate = !state.startDate || dateKey >= state.startDate;
-  const isTrainingDay = isAfterStartDate && scheduleDays.includes(dayOfWeek0to6);
+  const isScheduledTrainingDay = isAfterStartDate && scheduleDays.includes(dayOfWeek0to6);
   const isCompleted = state.completedDays.includes(dateKey);
 
-  // Calendar decides whether today is a training day; workout progression stays sequential.
-  // Never map Monday back to Day 1 every week: currentDayIndex advances only on completion.
+  const pendingSessions = (state.rescheduledSessions ?? []).filter((s) => s.status === "pending");
+
+  // 1. Check if a pending rescheduled session is targeted for today
+  const targetedSession = pendingSessions.find((s) => s.targetDateKey === dateKey);
+  if (targetedSession) {
+    return {
+      isTrainingDay: true,
+      scheduledDayIndex: targetedSession.dayIndex,
+      isCompleted,
+      dateKey,
+      isRescheduledMakeUp: true,
+      rescheduledSession: targetedSession,
+      pendingBacklogCount: pendingSessions.length,
+    };
+  }
+
+  // 2. If today is a scheduled training day and there are pending make-up sessions,
+  // recommend the earliest pending session to preserve sequential order
+  if (isScheduledTrainingDay && pendingSessions.length > 0) {
+    const firstPending = pendingSessions[0];
+    return {
+      isTrainingDay: true,
+      scheduledDayIndex: firstPending.dayIndex,
+      isCompleted,
+      dateKey,
+      isRescheduledMakeUp: true,
+      rescheduledSession: firstPending,
+      pendingBacklogCount: pendingSessions.length,
+    };
+  }
+
+  // 3. Normal recurring program schedule
   const weekData = getProgramCurrentWeek(state);
   const dayCount = weekData?.days.length || 1;
   const scheduledDayIndex = Math.max(0, Math.min(state.currentDayIndex || 0, dayCount - 1));
 
   return {
-    isTrainingDay,
+    isTrainingDay: isScheduledTrainingDay,
     scheduledDayIndex,
     isCompleted,
     dateKey,
+    isRescheduledMakeUp: false,
+    rescheduledSession: pendingSessions.length > 0 ? pendingSessions[0] : undefined,
+    pendingBacklogCount: pendingSessions.length,
   };
 }
 
 /**
  * Advance program progression after finishing a session:
- * Marks date completed and advances day/week without corrupting calendar mapping.
+ * Marks date completed, resolves any corresponding make-up obligation exactly once,
+ * and advances day/week without corrupting calendar mapping.
  */
 export function advanceJeffProgramAfterFinish(
   currentState: ActiveJeffProgramState,
@@ -1454,6 +1775,16 @@ export function advanceJeffProgramAfterFinish(
     return currentState;
   }
 
+  // Check if this completion fulfills an active pending make-up obligation
+  const pendingList = (currentState.rescheduledSessions ?? []).filter((s) => s.status === "pending");
+  const matchingRescheduled = pendingList.find(
+    (s) => s.targetDateKey === completedDateKey || s.dayIndex === completedDayIndex
+  );
+
+  if (matchingRescheduled) {
+    return resolveRescheduledSession(currentState, matchingRescheduled.id, "complete", completedDateKey);
+  }
+
   const program = findProgramById(currentState.programId);
   const weekData = getProgramCurrentWeek(currentState);
   const totalDaysInWeek = weekData?.days.length || currentState.scheduleDays.length || 4;
@@ -1462,8 +1793,6 @@ export function advanceJeffProgramAfterFinish(
     ? Math.max(0, Math.min(completedDayIndex, totalDaysInWeek - 1))
     : currentState.currentDayIndex;
 
-  // If the user intentionally chose a later day from the day switcher, progress follows
-  // that completed workout. Choosing an earlier day must never move progress backwards.
   let nextDayIdx = Math.max(currentState.currentDayIndex, safeCompletedIndex) + 1;
   let nextWeek = currentState.currentWeek;
 
