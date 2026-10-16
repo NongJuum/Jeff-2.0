@@ -32,6 +32,7 @@ import {
   type RecoveryPlan,
   type RecoveryPlanSession,
   type ManualScheduleMove,
+  type EligibleSessionOption,
   JEFF_PROGRAMS,
   recommendPrograms,
   getActiveJeffProgram,
@@ -47,6 +48,8 @@ import {
   resolveProgramDayForDate,
   buildRecoveryPlan,
   getValidMoveDates,
+  getEligibleSessionsForDate,
+  scheduleTodayOverride,
 } from "../lib/jeffPrograms";
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getUserProfile } from "../lib/assessment";
@@ -826,6 +829,126 @@ export function JeffProgramPicker({
 }
 
 // ─────────────────────────────────────────────────────────────────
+// SELECT TODAY WORKOUT MODAL
+// ─────────────────────────────────────────────────────────────────
+export function SelectTodayWorkoutModal({
+  activeState,
+  onSelectSession,
+  onClose,
+  language = "th",
+}: {
+  activeState: ActiveJeffProgramState;
+  onSelectSession: (option: EligibleSessionOption) => void;
+  onClose: () => void;
+  language?: AppLanguage;
+}) {
+  const todayKey = getProgramDateKey(new Date());
+  const options = getEligibleSessionsForDate(activeState, todayKey);
+  const program = findProgramById(activeState.programId);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/90 backdrop-blur-md sm:items-center p-4">
+      <div className="w-full max-w-md rounded-3xl border border-zinc-800 bg-zinc-950 overflow-hidden shadow-2xl">
+        {/* Header */}
+        <div className={`bg-gradient-to-r ${program?.color || "from-amber-600 to-yellow-600"} p-5`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <span className="text-2xl">⚡</span>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-white/70">
+                  {language === "th" ? "เลือกเซสชันสำหรับวันนี้" : "Select Workout for Today"}
+                </p>
+                <h2 className="text-base font-black text-white">
+                  {language === "th" ? "เลือกเซสชันที่ต้องการฝึก" : "Choose Session to Train"}
+                </h2>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="rounded-full bg-black/30 p-2 text-white/80 hover:text-white transition"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Sessions list */}
+        <div className="p-4 space-y-2.5 max-h-[65vh] overflow-y-auto">
+          <p className="text-xs text-zinc-400">
+            {language === "th"
+              ? "คุณสามารถเลือกเซสชันที่ค้างชดเชย หรือเซสชันถัดไปในโปรแกรม เพื่อซ้อมในวันนี้ได้ทันที:"
+              : "You can select a pending make-up session or the next program workout to train today:"}
+          </p>
+
+          {options.length === 0 ? (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 text-center text-xs text-zinc-400">
+              {language === "th" ? "ไม่มีเซสชันที่พร้อมให้เลือกฝึกในวันนี้" : "No eligible sessions available for today"}
+            </div>
+          ) : (
+            options.map((opt) => (
+              <button
+                key={opt.id}
+                disabled={opt.hasConflict}
+                onClick={() => onSelectSession(opt)}
+                className={`w-full text-left rounded-2xl border p-3.5 transition flex items-center justify-between gap-3 ${
+                  opt.hasConflict
+                    ? "border-zinc-800 bg-zinc-900/30 opacity-60 cursor-not-allowed"
+                    : "border-zinc-700 bg-zinc-900 hover:border-yellow-400/50 hover:bg-zinc-850 active:scale-[0.99]"
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    {opt.type === "missed_recovery" && (
+                      <span className="inline-flex items-center rounded-md bg-amber-500/25 border border-amber-400/40 px-2 py-0.5 text-[10px] font-black uppercase text-amber-300">
+                        ⚡ {language === "th" ? "ซ้อมชดเชย" : "Make-up"}
+                      </span>
+                    )}
+                    {opt.type === "next_scheduled" && (
+                      <span className="inline-flex items-center rounded-md bg-emerald-500/25 border border-emerald-400/40 px-2 py-0.5 text-[10px] font-black uppercase text-emerald-300">
+                        🎯 {language === "th" ? "เซสชันถัดไป" : "Next Up"}
+                      </span>
+                    )}
+                    {opt.type === "current_week" && (
+                      <span className="inline-flex items-center rounded-md bg-blue-500/25 border border-blue-400/40 px-2 py-0.5 text-[10px] font-black uppercase text-blue-300">
+                        📅 {language === "th" ? "ในสัปดาห์นี้" : "This Week"}
+                      </span>
+                    )}
+                    <span className="text-[11px] font-bold text-zinc-400">
+                      {language === "th" ? `สัปดาห์ ${opt.sourceWeek}` : `Week ${opt.sourceWeek}`}
+                    </span>
+                  </div>
+                  <h4 className="text-sm font-black text-white truncate">
+                    {opt.dayLabel}: {opt.focusLabel}
+                  </h4>
+                  {opt.hasConflict && opt.conflictReason && (
+                    <p className="text-[11px] text-amber-400 mt-1 font-medium">
+                      ⚠️ {opt.conflictReason}
+                    </p>
+                  )}
+                </div>
+                <div className="shrink-0 flex items-center justify-center h-8 w-8 rounded-xl bg-zinc-800 text-zinc-300">
+                  <ChevronRight size={16} />
+                </div>
+              </button>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-4 border-t border-zinc-800 bg-zinc-950">
+          <button
+            onClick={onClose}
+            className="w-full rounded-xl bg-zinc-900 py-2.5 text-xs font-bold text-zinc-400 hover:text-white border border-zinc-800 transition"
+          >
+            {language === "th" ? "ปิด" : "Close"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
 // TODAY'S JEFF PROGRAM WORKOUT CARD
 // ─────────────────────────────────────────────────────────────────
 export function JeffProgramTodayCard({
@@ -833,15 +956,20 @@ export function JeffProgramTodayCard({
   onMarkDayComplete,
   onMoveSession,
   onCancelMove,
+  onStartWorkout,
+  onSelectTodaySession,
   language = "th",
 }: {
   activeState: ActiveJeffProgramState;
   onMarkDayComplete: (date: string, completedDayIndex?: number) => void;
   onMoveSession?: (fromDate: string, toDate: string) => void;
   onCancelMove?: (moveId: string) => void;
+  onStartWorkout?: () => void;
+  onSelectTodaySession?: (session: EligibleSessionOption) => void;
   language?: AppLanguage;
 }) {
   const [showMoveModal, setShowMoveModal] = useState(false);
+  const [showSelectTodayModal, setShowSelectTodayModal] = useState(false);
   const program = findProgramById(activeState.programId);
   const currentWeekData = getProgramCurrentWeek(activeState);
   const todayKey = getProgramDateKey(new Date());
@@ -880,7 +1008,7 @@ export function JeffProgramTodayCard({
         })()
       : null;
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-center space-y-2">
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-4 text-center space-y-3">
         <p className="text-2xl mb-1">😴</p>
         <p className="font-black text-white">{language === "th" ? "วันนี้เป็นวันพัก" : "Today is a rest day"}</p>
         <p className="text-xs text-zinc-400">
@@ -898,6 +1026,29 @@ export function JeffProgramTodayCard({
               </button>
             )}
           </div>
+        )}
+
+        {/* Action to choose session to train today */}
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowSelectTodayModal(true)}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-2.5 text-xs font-black text-yellow-300 hover:bg-yellow-400/20 transition active:scale-95"
+          >
+            ⚡ {language === "th" ? "เลือกซ้อมวันนี้ (Train Today)" : "Select Workout for Today"}
+          </button>
+        </div>
+
+        {showSelectTodayModal && (
+          <SelectTodayWorkoutModal
+            activeState={activeState}
+            onSelectSession={(opt) => {
+              setShowSelectTodayModal(false);
+              onSelectTodaySession?.(opt);
+            }}
+            onClose={() => setShowSelectTodayModal(false)}
+            language={language}
+          />
         )}
       </div>
     );
@@ -1003,27 +1154,61 @@ export function JeffProgramTodayCard({
             <span className="text-sm font-black text-emerald-300">{language === "th" ? "ฝึกเสร็จแล้ววันนี้! 💪" : "Workout completed today! 💪"}</span>
           </div>
         ) : (
-          <div className="flex gap-2">
-            <button
-              onClick={() => onMarkDayComplete(todayKey, safeDayIndex)}
-              className={`flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
-            >
-              <CheckCircle size={15} />
-              {language === "th" ? "บันทึกว่าฝึกเสร็จแล้ว" : "Mark complete"}
-            </button>
-            {onMoveSession && (
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              {onStartWorkout && (
+                <button
+                  type="button"
+                  onClick={onStartWorkout}
+                  className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-yellow-400 py-3 text-sm font-black text-black hover:bg-yellow-300 shadow-lg active:scale-95 transition"
+                >
+                  <Play size={15} className="fill-black" />
+                  {language === "th" ? "เริ่มฝึกเซสชันนี้" : "Start Workout"}
+                </button>
+              )}
               <button
-                onClick={() => setShowMoveModal(true)}
-                title={language === "th" ? "ย้ายเซสชันนี้ไปยังวันอื่น" : "Move workout to another date"}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-800 px-3.5 py-3 text-xs font-black text-zinc-300 hover:bg-zinc-700 transition"
+                onClick={() => onMarkDayComplete(todayKey, safeDayIndex)}
+                className={`flex-1 flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
               >
-                <ArrowRightLeft size={14} className="text-yellow-400" />
-                <span>{language === "th" ? "ย้ายวัน" : "Move"}</span>
+                <CheckCircle size={15} />
+                {language === "th" ? "บันทึกว่าฝึกเสร็จแล้ว" : "Mark complete"}
               </button>
-            )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSelectTodayModal(true)}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-700 transition"
+              >
+                <span>⚡ {language === "th" ? "สลับเซสชันวันนี้" : "Select Different Session"}</span>
+              </button>
+              {onMoveSession && (
+                <button
+                  onClick={() => setShowMoveModal(true)}
+                  title={language === "th" ? "ย้ายเซสชันนี้ไปยังวันอื่น" : "Move workout to another date"}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-zinc-700 bg-zinc-800 px-3.5 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-700 transition"
+                >
+                  <ArrowRightLeft size={13} className="text-yellow-400" />
+                  <span>{language === "th" ? "ย้ายวัน" : "Move"}</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
+
+      {/* Select Today Workout Modal */}
+      {showSelectTodayModal && (
+        <SelectTodayWorkoutModal
+          activeState={activeState}
+          onSelectSession={(opt) => {
+            setShowSelectTodayModal(false);
+            onSelectTodaySession?.(opt);
+          }}
+          onClose={() => setShowSelectTodayModal(false)}
+          language={language}
+        />
+      )}
 
       {/* Move Workout Modal */}
       {showMoveModal && onMoveSession && (

@@ -70,6 +70,8 @@ import {
   moveWorkoutSession,
   cancelManualMove,
   getProgramDateKey as getJeffProgramDateKey,
+  type EligibleSessionOption,
+  scheduleTodayOverride,
 } from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
@@ -3031,6 +3033,21 @@ export default function Page() {
     };
     saveActiveJeffProgram(newState);
     setActiveJeffProgram(newState);
+
+    if (Array.isArray(newState.scheduleDays) && newState.scheduleDays.length > 0) {
+      const syncedWeekly: WeeklySchedule = {
+        mon: newState.scheduleDays.includes(0),
+        tue: newState.scheduleDays.includes(1),
+        wed: newState.scheduleDays.includes(2),
+        thu: newState.scheduleDays.includes(3),
+        fri: newState.scheduleDays.includes(4),
+        sat: newState.scheduleDays.includes(5),
+        sun: newState.scheduleDays.includes(6),
+      };
+      setWeeklySchedule(syncedWeekly);
+      writeLocalJson(WEEKLY_SCHEDULE_KEY, syncedWeekly);
+    }
+
     setSelectedDay(preservedDayIndex);
     setActiveExerciseIndex(0);
     setMode("today");
@@ -3092,6 +3109,33 @@ export default function Page() {
     const updatedState = cancelManualMove(activeJeffProgram, moveId);
     saveActiveJeffProgram(updatedState);
     setActiveJeffProgram(updatedState);
+  }
+
+  function handleSelectTodayWorkout(session: EligibleSessionOption) {
+    if (!activeJeffProgram) return;
+    const todayKey = getJeffProgramDateKey(new Date());
+    const result = scheduleTodayOverride(
+      activeJeffProgram,
+      {
+        dayIndex: session.dayIndex,
+        sourceWeek: session.sourceWeek,
+        rescheduledSessionId: session.rescheduledSessionId,
+      },
+      todayKey
+    );
+
+    if (!result.success && result.error) {
+      alert(result.error);
+      return;
+    }
+
+    saveActiveJeffProgram(result.state);
+    setActiveJeffProgram(result.state);
+    setSelectedDay(session.dayIndex);
+    setActiveExerciseIndex(0);
+    setSessionStage("lifting");
+    setMode("today");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleSwitchProgram() {
@@ -3560,6 +3604,29 @@ export default function Page() {
     setWeeklySchedule((prev) => {
       const next = { ...prev, [dayKey]: !prev[dayKey] };
       writeLocalJson(WEEKLY_SCHEDULE_KEY, next);
+
+      if (activeJeffProgram) {
+        const reverseMap: Record<keyof WeeklySchedule, number> = {
+          mon: 0,
+          tue: 1,
+          wed: 2,
+          thu: 3,
+          fri: 4,
+          sat: 5,
+          sun: 6,
+        };
+        const activeDays = (Object.keys(next) as (keyof WeeklySchedule)[])
+          .filter((k) => next[k])
+          .map((k) => reverseMap[k])
+          .sort((a, b) => a - b);
+        const updatedProgram: ActiveJeffProgramState = {
+          ...activeJeffProgram,
+          scheduleDays: activeDays.length > 0 ? activeDays : activeJeffProgram.scheduleDays,
+        };
+        saveActiveJeffProgram(updatedProgram);
+        setActiveJeffProgram(updatedProgram);
+      }
+
       return next;
     });
   }
@@ -5359,6 +5426,12 @@ export default function Page() {
                   onMarkDayComplete={handleMarkJeffDayComplete}
                   onMoveSession={handleMoveSession}
                   onCancelMove={handleCancelMove}
+                  onStartWorkout={() => {
+                    setSessionStage("lifting");
+                    setMode("today");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onSelectTodaySession={handleSelectTodayWorkout}
                   language={appLanguage}
                 />
               </div>
