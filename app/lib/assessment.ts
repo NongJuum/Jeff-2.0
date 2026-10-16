@@ -231,13 +231,14 @@ export const PLATE_LOADED_MACHINE_DEFAULTS: PlateLoadedMachineDefault[] = [
   // for independent-arm machines, and total for bilateral sled/carriage machines.
   { aliases: ["life fitness plate loaded incline press", "life fitness incline press"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "manufacturer-spec" },
   { aliases: ["hammer strength iso-lateral wide chest", "hammer strength wide chest"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "manufacturer-spec" },
+  { aliases: ["chest supported t-bar row", "t-bar row", "t-bar"], startingResistanceKg: 10, perSide: false, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["45° leg press high foot", "45 degree leg press high foot", "45° leg press", "45 degree leg press", "linear leg press", "leg press calf raise", "leg press"], startingResistanceKg: 50, perSide: false, plateStepKg: 10, source: "category-estimate" },
   { aliases: ["hack squat", "v-squat machine", "v-squat", "pendulum squat"], startingResistanceKg: 25, perSide: false, plateStepKg: 10, source: "category-estimate" },
   { aliases: ["belt squat"], startingResistanceKg: 15, perSide: false, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["standing calf raise", "seated calf raise", "calf raise"], startingResistanceKg: 15, perSide: false, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["iso-lateral incline press", "incline converging chest press", "incline machine bench"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["iso-lateral chest press", "plate-loaded chest press", "machine chest press", "pin-loaded chest press", "chest press", "bench press", "incline press", "decline press", "wide chest"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
-  { aliases: ["machine high row", "chest supported t-bar row", "iso-lateral low row", "iso-lateral pulldown", "high row", "low row", "pulldown", "pullover", "row"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
+  { aliases: ["machine high row", "iso-lateral low row", "iso-lateral pulldown", "high row", "low row", "pulldown", "pullover", "row"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["machine hip thrust", "hip thrust", "glute drive"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["leg extension", "seated hamstring curl", "lying leg curl", "hamstring curl"], startingResistanceKg: 5, perSide: false, plateStepKg: 5, source: "category-estimate" },
   { aliases: ["machine shoulder press", "shoulder press", "overhead press"], startingResistanceKg: 5, perSide: true, plateStepKg: 5, source: "category-estimate" },
@@ -316,6 +317,16 @@ export function resolveMechanicalProfile(exerciseName: string, machineTag = ""):
   const isIso = text.includes("iso-lateral") || text.includes("iso lateral") || text.includes("hammer") || text.includes("mts");
   const isChestSupported = text.includes("chest support") || text.includes("supported") || text.includes("seal row") || text.includes("t-bar");
 
+  // Prevent curls, extensions, raises, and leg press from colliding with chest press
+  const isCurlOrExtOrLeg =
+    text.includes("curl") ||
+    text.includes("extension") ||
+    text.includes("ext") ||
+    text.includes("raise") ||
+    text.includes("leg press") ||
+    text.includes("squat") ||
+    text.includes("calf");
+
   // 2. Row Category
   if (text.includes("high row")) {
     return { baseRatio: { male: 0.36, female: 0.24 }, pulleyRatio: 1.0, isPerHand: true, stabilityFactor: 1.15 };
@@ -331,14 +342,16 @@ export function resolveMechanicalProfile(exerciseName: string, machineTag = ""):
   }
 
   // 3. Chest Press Category
-  if (text.includes("incline")) {
-    return { baseRatio: { male: isIso ? 0.35 : 0.65, female: isIso ? 0.23 : 0.42 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.10 };
-  }
-  if (text.includes("decline")) {
-    return { baseRatio: { male: isIso ? 0.45 : 0.85, female: isIso ? 0.30 : 0.55 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.10 };
-  }
-  if (text.includes("chest press") || text.includes("bench")) {
-    return { baseRatio: { male: isIso ? 0.40 : 0.78, female: isIso ? 0.26 : 0.50 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.05 };
+  if (!isCurlOrExtOrLeg) {
+    if (text.includes("incline")) {
+      return { baseRatio: { male: isIso ? 0.35 : 0.65, female: isIso ? 0.23 : 0.42 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.10 };
+    }
+    if (text.includes("decline")) {
+      return { baseRatio: { male: isIso ? 0.45 : 0.85, female: isIso ? 0.30 : 0.55 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.10 };
+    }
+    if (text.includes("chest press") || text.includes("bench")) {
+      return { baseRatio: { male: isIso ? 0.40 : 0.78, female: isIso ? 0.26 : 0.50 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.05 };
+    }
   }
 
   // 4. Pulldowns
@@ -672,8 +685,8 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   // Glute/cable kickback: isolation movement, use RearDelt as proxy ratio (light)
   if (name.includes("kickback")) return "RearDelt";
   if (name.includes("hip thrust") || name.includes("glute")) return "HipThrust";
-  if (name.includes("incline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "InclineMachinePress";
-  if (name.includes("decline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "DeclineMachinePress";
+  if (!name.includes("curl") && !name.includes("tricep") && name.includes("incline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "InclineMachinePress";
+  if (!name.includes("curl") && !name.includes("tricep") && name.includes("decline") && (name.includes("machine") || name.includes("plate") || name.includes("pin") || name.includes("iso"))) return "DeclineMachinePress";
   // rear delt before flye: "DB Rear Delt Flye" → RearDelt not Flye
   if (name.includes("rear delt") || name.includes("face pull") || name.includes("reverse pec deck") || name.includes("reverse cable crossover")) return "RearDelt";
   if (name.includes("flye") || name.includes("crossover") || name.includes("pec deck")) return "Flye";
@@ -697,18 +710,55 @@ export function getExerciseStrengthCategory(exerciseName: string): string {
   return "Bench";
 }
 
+export type LoadSemanticType =
+  | "barbell"
+  | "dumbbell"
+  | "smith"
+  | "plate-loaded"
+  | "selectorized"
+  | "cable"
+  | "bodyweight"
+  | "specialty";
+
+export type LoadType = LoadSemanticType;
+
+export type MachineConfiguration =
+  | "single-stack"
+  | "independent-arms"
+  | "bilateral-sled"
+  | "single-sleeve"
+  | "barbell"
+  | "dumbbell"
+  | "standard";
+
 export interface BiomechanicalResult {
+  exerciseId?: string;
   exerciseName: string;
-  targetWeightKg: number;
+  loadType: LoadSemanticType;
+  /** Primary hardware load recommendation to set or load (in kg) */
+  recommendedHardwareWeightKg: number;
+  /** Backward-compatible alias for recommendedHardwareWeightKg */
   hardwareWeightKg: number;
   /** Human-readable meaning of hardwareWeightKg. Plate-loaded values are added plate mass only; iso-lateral values are summed across both sides. */
   hardwareLoadLabel: string;
+  /** Explicit high-level classification label clarifying exact mechanics and semantics */
+  explicitLoadTypeLabel: string;
   /** Plate mass per side, always stored in kg regardless of display unit. */
   platesPerSideKg?: number;
+  /** Total added plates across both sleeves in kg, when applicable. */
+  totalAddedPlatesKg?: number;
+  /** Built-in starting resistance (tare weight) in kg. */
+  startingResistanceKg: number;
   /** Effective machine resistance after adding the built-in starting resistance. */
+  effectiveTotalResistanceKg?: number;
+  /** Effective machine resistance after adding the built-in starting resistance (backward-compat alias). */
   effectiveHardwareWeightKg?: number;
   tareWeightKg: number;
+  targetWeightKg: number;
+  pulleyRatio?: number;
   isPerHand: boolean;
+  configuration?: MachineConfiguration;
+  resistanceSource: "manufacturer-spec" | "category-estimate" | "user-override";
   minHardwareStep: number;
   /** True when the available hardware minimum exceeds the calculated target. */
   hardwareExceedsTarget: boolean;
@@ -799,8 +849,18 @@ export function quantizeToHardware(
   profile: MechanicalProfile,
   isIsolation: boolean,
   isCable: boolean = false,
-  unit: WeightUnit = "kg"
-): { hardwareWeightKg: number; platesPerSideKg?: number; effectiveHardwareWeightKg?: number; hardwareExceedsTarget: boolean; displayNote: string } {
+  unit: WeightUnit = "kg",
+  resistanceSource: MachineResistanceSource | "user-override" = "category-estimate",
+  configuration?: MachineConfiguration
+): {
+  hardwareWeightKg: number;
+  platesPerSideKg?: number;
+  totalAddedPlatesKg?: number;
+  effectiveHardwareWeightKg?: number;
+  hardwareExceedsTarget: boolean;
+  displayNote: string;
+  explicitLoadTypeLabel: string;
+} {
   const safeRawKg = Number.isFinite(rawWeightKg) ? Math.max(0, rawWeightKg) : 0;
   const tareKg = Math.max(0, Number.isFinite(profile.tareWeight) ? profile.tareWeight : 0);
   const isLbs = unit === "lbs";
@@ -836,31 +896,72 @@ export function quantizeToHardware(
     const displayedPlateTotal = profile.isPerHand ? snappedPlatesDisplay * 2 : snappedPlatesDisplay;
     const displayedEffectiveTotal = profile.isPerHand ? effectiveDisplay * 2 : effectiveDisplay;
     const displayedStartingTotal = profile.isPerHand ? startDisplay * 2 : startDisplay;
+    const totalAddedPlatesKg = Math.round(toKg(displayedPlateTotal) * 100) / 100;
+
+    const sourceTag = resistanceSource === "manufacturer-spec"
+      ? " · สเปกเครื่อง"
+      : resistanceSource === "user-override"
+      ? " · กำหนดเอง"
+      : " · ค่าประมาณ";
+
+    let platesPerSideKg: number | undefined;
+    let explicitLoadTypeLabel = "";
+
+    if (profile.isPerHand) {
+      platesPerSideKg = Math.round(platesKg * 100) / 100;
+      explicitLoadTypeLabel = `Plate-Loaded (แขนแยกอิสระ · เพลตต่อข้าง${sourceTag})`;
+    } else if (configuration === "single-sleeve") {
+      platesPerSideKg = undefined;
+      explicitLoadTypeLabel = `Plate-Loaded (แกนเดี่ยวกลาง · เพลตรวม${sourceTag})`;
+    } else if (configuration === "bilateral-sled") {
+      platesPerSideKg = Math.round((toKg(displayedPlateTotal) / 2) * 100) / 100;
+      explicitLoadTypeLabel = `Plate-Loaded (แคร่รวม · เพลตรวมสองข้าง${sourceTag})`;
+    } else {
+      platesPerSideKg = Math.round((toKg(displayedPlateTotal) / 2) * 100) / 100;
+      explicitLoadTypeLabel = `Plate-Loaded (เพลตรวม${sourceTag})`;
+    }
+
     const note = profile.isPerHand
       ? (snappedPlatesDisplay > 0
         ? `ใส่เพลตข้างละ ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} ต่อข้าง (เพลตรวมสองข้าง ${roundDisplay(displayedPlateTotal)} ${unitLabel}) + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel}/ข้าง (รวม ${roundDisplay(displayedStartingTotal)} ${unitLabel}) = โหลดรวมโดยประมาณ ${roundDisplay(displayedEffectiveTotal)} ${unitLabel}${warning(effectiveKg)}`
         : `ไม่ต้องใส่เพลต; แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel}/ข้าง (รวม ${roundDisplay(displayedStartingTotal)} ${unitLabel}) = โหลดรวมโดยประมาณ ${roundDisplay(displayedEffectiveTotal)} ${unitLabel}${warning(effectiveKg)}`)
-      : (snappedPlatesDisplay > 0
-        ? `ใส่เพลตเพิ่ม ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} (ไม่รวมแรงต้านเครื่อง) + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`
-        : `ไม่ต้องใส่เพลต; แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`);
+      : (configuration === "single-sleeve"
+        ? (snappedPlatesDisplay > 0
+          ? `ใส่เพลตที่แกน ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`
+          : `ไม่ต้องใส่เพลต; แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`)
+        : (snappedPlatesDisplay > 0
+          ? `ใส่เพลตเพิ่ม ${roundDisplay(snappedPlatesDisplay)} ${unitLabel} (ไม่รวมแรงต้านเครื่อง) + แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`
+          : `ไม่ต้องใส่เพลต; แรงต้านเริ่มต้นประมาณ ${roundDisplay(startDisplay)} ${unitLabel} = โหลดรวมโดยประมาณ ${roundDisplay(effectiveDisplay)} ${unitLabel}${warning(effectiveKg)}`));
+
     return {
-      hardwareWeightKg: Math.round(toKg(displayedPlateTotal) * 100) / 100,
-      platesPerSideKg: profile.isPerHand ? Math.round(platesKg * 100) / 100 : undefined,
+      hardwareWeightKg: totalAddedPlatesKg,
+      platesPerSideKg,
+      totalAddedPlatesKg,
       effectiveHardwareWeightKg: Math.round(toKg(displayedEffectiveTotal) * 100) / 100,
       hardwareExceedsTarget: exceeds,
       displayNote: note,
+      explicitLoadTypeLabel,
     };
   }
 
   // Barbell / Smith: total load includes the bar. Plates are always reported in kg internally.
   if (tareKg > 0 && !profile.isPerHand) {
+    const isSmith = configuration === "standard" || tareKg !== STANDARD_EQUIPMENT_DEFAULTS.olympicBarKg;
+    const sourceTag = resistanceSource === "user-override" ? " · กำหนดเอง" : isSmith ? " · ค่าประมาณ" : " · สเปกคาน 20 kg";
+    const explicitLoadTypeLabel = isSmith
+      ? `Smith Machine (รวมแรงต้านบาร์สมิท ${roundDisplay(tareDisplay)} ${unitLabel}${sourceTag})`
+      : `Barbell (น้ำหนักรวมคานมาตรฐาน 20 kg)`;
+
     if (safeRawKg <= tareKg) {
       const exceeds = tareKg > safeRawKg + 0.05;
       return {
         hardwareWeightKg: tareKg,
         platesPerSideKg: 0,
+        totalAddedPlatesKg: 0,
+        effectiveHardwareWeightKg: tareKg,
         hardwareExceedsTarget: exceeds,
         displayNote: `คานเปล่า ${roundDisplay(tareDisplay)} ${unitLabel} (ไม่ต้องใส่แผ่น)${warning(tareKg)}`,
+        explicitLoadTypeLabel,
       };
     }
 
@@ -870,15 +971,19 @@ export function quantizeToHardware(
     const totalDisplay = tareDisplay + platesPerSideDisplay * 2;
     const actualKg = toKg(totalDisplay);
     const platesPerSideKg = toKg(platesPerSideDisplay);
+    const totalAddedPlatesKg = Math.round(toKg(platesPerSideDisplay * 2) * 100) / 100;
     const exceeds = actualKg > safeRawKg + 0.05;
 
     return {
       hardwareWeightKg: Math.round(actualKg * 10) / 10,
       platesPerSideKg: Math.round(platesPerSideKg * 100) / 100,
+      totalAddedPlatesKg,
+      effectiveHardwareWeightKg: Math.round(actualKg * 10) / 10,
       hardwareExceedsTarget: exceeds,
       displayNote: platesPerSideDisplay > 0
         ? `ใส่แผ่นข้างละ ${roundDisplay(platesPerSideDisplay)} ${unitLabel} (รวมคาน ${roundDisplay(totalDisplay)} ${unitLabel})${warning(actualKg)}`
         : `คานเปล่า ${roundDisplay(tareDisplay)} ${unitLabel} (ไม่ต้องใส่แผ่น)${warning(actualKg)}`,
+      explicitLoadTypeLabel,
     };
   }
 
@@ -889,22 +994,42 @@ export function quantizeToHardware(
   const exceeds = actualKg > safeRawKg + 0.05;
 
   let displayNote: string;
+  let explicitLoadTypeLabel: string;
+  let effectiveHardwareWeightKg: number = actualKg;
+
   if (isCable) {
+    const effectiveAtHandle = Math.round((actualKg / (profile.pulleyRatio || 1)) * 10) / 10;
+    effectiveHardwareWeightKg = effectiveAtHandle;
+    explicitLoadTypeLabel = profile.isPerHand
+      ? `Cable (สลักพินต่อฝั่ง · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`
+      : `Cable (สลักพิน · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`;
     displayNote = `เสียบสลักพิน ${roundDisplay(snappedDisplay)} ${unitLabel}${profile.isPerHand ? " ต่อฝั่ง" : ""} (รอกทด ${profile.pulleyRatio}:1)`;
   } else if (profile.isPerHand) {
+    explicitLoadTypeLabel = "Dumbbell (น้ำหนักต่อข้าง/ต่อมือ)";
     displayNote = `ดัมเบล/โหลด ${roundDisplay(snappedDisplay)} ${unitLabel} ต่อข้าง`;
+    effectiveHardwareWeightKg = actualKg;
   } else if (profile.pulleyRatio > 1) {
+    const effectiveAtHandle = Math.round((actualKg / profile.pulleyRatio) * 10) / 10;
+    effectiveHardwareWeightKg = effectiveAtHandle;
+    explicitLoadTypeLabel = `Selectorized (สลักพิน · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`;
     displayNote = `เสียบสลักพิน ${roundDisplay(snappedDisplay)} ${unitLabel} (รอกทด ${profile.pulleyRatio}:1)`;
   } else {
-    displayNote = `แผ่น/สลักน้ำหนัก ${roundDisplay(snappedDisplay)} ${unitLabel}`;
+    explicitLoadTypeLabel = "Selectorized (สลักพินน้ำหนักเครื่อง · ค่าประมาณ)";
+    displayNote = `เสียบสลักพิน ${roundDisplay(snappedDisplay)} ${unitLabel} (สลักน้ำหนักเครื่องตามจริง)`;
+    effectiveHardwareWeightKg = actualKg;
   }
 
   return {
     hardwareWeightKg: actualKg,
+    platesPerSideKg: undefined,
+    totalAddedPlatesKg: undefined,
+    effectiveHardwareWeightKg,
     hardwareExceedsTarget: exceeds,
     displayNote: displayNote + warning(actualKg),
+    explicitLoadTypeLabel,
   };
 }
+
 /**
  * Master Calculation Formula:
  * Force = BW * S_ratio * E_exp * R_rep * G_goal * M_musc * Safety_factor
@@ -922,11 +1047,21 @@ export function calculatePrescriptionWeight(
   machineTag: string = "",
   pulleyRatioOverride?: number,
   safetyFactorOverride?: number,
-  startingResistanceOverrideKg?: number
+  startingResistanceOverrideKg?: number,
+  exerciseId?: string,
+  targetUnit?: WeightUnit,
+  forcedTier?: ExperienceTier | "Beginner" | "Intermediate" | "Advanced" | "Elite"
 ): BiomechanicalResult {
   const bw = userProfile.weightKg;
   const isFemale = userProfile.gender === "female";
-  const e_exp = getExperienceModifier(userProfile.expMonths).modifier;
+  let e_exp = getExperienceModifier(userProfile.expMonths).modifier;
+  if (forcedTier) {
+    if (forcedTier === "Beginner" || forcedTier === "<6m") e_exp = 0.45;
+    else if (forcedTier === "6-12m") e_exp = 0.65;
+    else if (forcedTier === "Intermediate" || forcedTier === "1-2y") e_exp = 0.85;
+    else if (forcedTier === "Advanced" || forcedTier === ">2y") e_exp = 1.00;
+    else if (forcedTier === "Elite") e_exp = 1.15;
+  }
   const r_rep = getRepsModifier(repsStr);
   const g_goal = getGoalModifier(userProfile.goal);
   const m_musc = mMusc;
@@ -939,18 +1074,74 @@ export function calculatePrescriptionWeight(
     : computedSafety;
 
   const combinedText = `${exerciseName} ${machineTag}`.toLowerCase();
+  const isPlateLoadedSpecialtyMachine = load === "specialty" && ["hack squat", "belt squat", "pendulum squat", "v-squat"].some((name) => combinedText.includes(name));
+  const isFreeWeightLoad = ["barbell", "dumbbell", "smith", "plate-loaded"].includes(load) || isPlateLoadedSpecialtyMachine;
+
+  // Unweighted bodyweight check
+  if (!shouldAutoPrescribeAddedLoad(load, exerciseName)) {
+    return {
+      exerciseId,
+      exerciseName,
+      loadType: "bodyweight",
+      recommendedHardwareWeightKg: 0,
+      hardwareWeightKg: 0,
+      hardwareLoadLabel: "น้ำหนักตัว",
+      explicitLoadTypeLabel: "Bodyweight (น้ำหนักตัว ไม่ใช้น้ำหนักภายนอก)",
+      platesPerSideKg: undefined,
+      totalAddedPlatesKg: undefined,
+      startingResistanceKg: 0,
+      effectiveTotalResistanceKg: 0,
+      effectiveHardwareWeightKg: 0,
+      tareWeightKg: 0,
+      targetWeightKg: 0,
+      pulleyRatio: 1,
+      isPerHand: false,
+      configuration: "standard",
+      resistanceSource: "category-estimate",
+      minHardwareStep: 2.5,
+      hardwareExceedsTarget: false,
+      displayNote: "ใช้เฉพาะน้ำหนักตัว (Bodyweight)",
+    };
+  }
+
+  // Determine machine mechanical layout configuration
+  const lowerName = exerciseName.toLowerCase();
+  let resolvedConfig: MachineConfiguration;
+  if (load === "barbell") resolvedConfig = "barbell";
+  else if (load === "dumbbell") resolvedConfig = "dumbbell";
+  else if (load === "plate-loaded" || isPlateLoadedSpecialtyMachine) {
+    if (lowerName.includes("t-bar")) resolvedConfig = "single-sleeve";
+    else if (lowerName.includes("leg press") || lowerName.includes("squat") || lowerName.includes("v-squat") || lowerName.includes("calf")) resolvedConfig = "bilateral-sled";
+    else if (getDefaultMechanicalProfile(load, exerciseName).isPerHand) resolvedConfig = "independent-arms";
+    else resolvedConfig = "standard";
+  } else if (load === "cable" || load === "selectorized") {
+    resolvedConfig = getDefaultMechanicalProfile(load, exerciseName, pulleyRatioOverride).isPerHand ? "independent-arms" : "single-stack";
+  } else {
+    resolvedConfig = "standard";
+  }
+
+  // Determine resistance source
+  let resSource: "manufacturer-spec" | "category-estimate" | "user-override";
+  if (startingResistanceOverrideKg !== undefined && Number.isFinite(startingResistanceOverrideKg) && startingResistanceOverrideKg >= 0) {
+    resSource = "user-override";
+  } else if (load === "plate-loaded") {
+    resSource = getPlateLoadedMachineDefault(exerciseName, machineTag).source;
+  } else if (load === "barbell") {
+    resSource = "manufacturer-spec";
+  } else {
+    resSource = "category-estimate";
+  }
+
+  const unit = targetUnit || userProfile.preferredWeightUnit || "kg";
+
+  // Check if we should use specialized resolveMechanicalProfile
+  const mechProfile = resolveMechanicalProfile(exerciseName, machineTag);
   const isRowChestOrPulldown =
     combinedText.includes("row") ||
     combinedText.includes("press") ||
     combinedText.includes("bench") ||
     combinedText.includes("pulldown") ||
     combinedText.includes("pull down");
-
-  const isPlateLoadedSpecialtyMachine = load === "specialty" && ["hack squat", "belt squat", "pendulum squat", "v-squat"].some((name) => combinedText.includes(name));
-  const isFreeWeightLoad = ["barbell", "dumbbell", "smith", "plate-loaded"].includes(load) || isPlateLoadedSpecialtyMachine;
-
-  // Check if we should use specialized resolveMechanicalProfile
-  const mechProfile = resolveMechanicalProfile(exerciseName, machineTag);
 
   if (!isFreeWeightLoad && isRowChestOrPulldown && mechProfile.baseRatio.male !== 0.40) {
     const baseRatio = isFemale ? mechProfile.baseRatio.female : mechProfile.baseRatio.male;
@@ -961,7 +1152,6 @@ export function calculatePrescriptionWeight(
     // Physical pin load = physiological force * pulley mechanical advantage ratio
     const rawWeightKg = f_physio * selectedPulleyRatio;
 
-    const unit = userProfile.preferredWeightUnit || "kg";
     const isIsolation = cat === "LatRaise" || cat === "Flye" || cat === "Bicep" || cat === "Tricep" || cat === "RearDelt";
     const quantProfile: MechanicalProfile = {
       leverageRatio: 1.0,
@@ -974,19 +1164,41 @@ export function calculatePrescriptionWeight(
       minHardwareStep: 2.5,
       tareWeight: 0,
     };
-    const quantized = quantizeToHardware(rawWeightKg, quantProfile, isIsolation, load === "cable", unit);
+    const quantized = quantizeToHardware(rawWeightKg, quantProfile, isIsolation, load === "cable", unit, resSource, resolvedConfig);
+
+    const resolvedHardwareLoadLabel = load === "barbell"
+      ? "น้ำหนักรวมคาน"
+      : load === "smith"
+      ? "น้ำหนักรวมบาร์สมิท"
+      : load === "dumbbell"
+      ? "น้ำหนักดัมเบลต่อข้าง"
+      : (load === "plate-loaded" || mechProfile.isPlateLoaded)
+      ? (mechProfile.isPerHand ? "เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)" : "เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)")
+      : load === "cable"
+      ? (mechProfile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน")
+      : "น้ำหนักเครื่อง";
 
     return {
+      exerciseId,
       exerciseName,
-      targetWeightKg: Math.round(rawWeightKg * 10) / 10,
+      loadType: load as LoadSemanticType,
+      recommendedHardwareWeightKg: quantized.hardwareWeightKg,
       hardwareWeightKg: quantized.hardwareWeightKg,
-      hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : (load === "plate-loaded" || mechProfile.isPlateLoaded) ? (mechProfile.isPerHand ? "เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)" : "เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)") : load === "cable" ? (mechProfile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : "น้ำหนักเครื่อง",
+      hardwareLoadLabel: resolvedHardwareLoadLabel,
+      explicitLoadTypeLabel: quantized.explicitLoadTypeLabel,
       platesPerSideKg: quantized.platesPerSideKg,
-      effectiveHardwareWeightKg: quantized.effectiveHardwareWeightKg,
-      hardwareExceedsTarget: quantized.hardwareExceedsTarget,
+      totalAddedPlatesKg: quantized.totalAddedPlatesKg,
+      startingResistanceKg: 0,
       tareWeightKg: 0,
+      effectiveTotalResistanceKg: quantized.effectiveHardwareWeightKg,
+      effectiveHardwareWeightKg: quantized.effectiveHardwareWeightKg,
+      pulleyRatio: selectedPulleyRatio,
       isPerHand: mechProfile.isPerHand,
+      configuration: resolvedConfig,
+      resistanceSource: resSource,
       minHardwareStep: 2.5,
+      hardwareExceedsTarget: quantized.hardwareExceedsTarget,
+      targetWeightKg: Math.round(rawWeightKg * 10) / 10,
       displayNote: quantized.displayNote,
     };
   }
@@ -1008,7 +1220,6 @@ export function calculatePrescriptionWeight(
     force = (force / 2) * (profile.bilateralDeficit ? 0.88 : 1.0);
   }
 
-  const lowerName = exerciseName.toLowerCase();
   const radAngle = (profile.angleThetaDeg * Math.PI) / 180;
   const denominator = Math.cos(radAngle) + profile.frictionCoeff;
   const fallbackPulleyRatio = Number.isFinite(profile.pulleyRatio) && profile.pulleyRatio > 0
@@ -1030,20 +1241,43 @@ export function calculatePrescriptionWeight(
   const isIsolation = cat === "LatRaise" || cat === "Flye" || cat === "Bicep" || cat === "Tricep" || cat === "RearDelt" || cat === "LegExt" || cat === "LegCurl" || cat === "SeatedCalf";
 
   const quantizeProfile = { ...profile, pulleyRatio: selectedPulleyRatio };
-  const unit = userProfile.preferredWeightUnit || "kg";
-  const quantized = quantizeToHardware(rawWeightKg, quantizeProfile, isIsolation, load === "cable", unit);
+  const quantized = quantizeToHardware(rawWeightKg, quantizeProfile, isIsolation, load === "cable", unit, resSource, resolvedConfig);
+
+  const resolvedHardwareLoadLabel = load === "barbell"
+    ? "น้ำหนักรวมคาน"
+    : load === "smith"
+    ? "น้ำหนักรวมบาร์สมิท"
+    : load === "dumbbell"
+    ? "น้ำหนักดัมเบลต่อข้าง"
+    : (load === "plate-loaded" || profile.isPlateLoaded)
+    ? (profile.isPerHand ? "เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)" : "เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)")
+    : load === "cable"
+    ? (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน")
+    : load === "selectorized"
+    ? "น้ำหนักสลักพิน"
+    : "น้ำหนักอุปกรณ์";
 
   return {
+    exerciseId,
     exerciseName,
-    targetWeightKg: Math.round(rawWeightKg * 10) / 10,
+    loadType: load as LoadSemanticType,
+    recommendedHardwareWeightKg: quantized.hardwareWeightKg,
     hardwareWeightKg: quantized.hardwareWeightKg,
-    hardwareLoadLabel: load === "barbell" ? "น้ำหนักรวมคาน" : load === "smith" ? "น้ำหนักรวมบาร์สมิท" : load === "dumbbell" ? "น้ำหนักดัมเบลต่อข้าง" : (load === "plate-loaded" || profile.isPlateLoaded) ? (profile.isPerHand ? "เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)" : "เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)") : load === "cable" ? (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน") : load === "selectorized" ? "น้ำหนักสลักพิน" : "น้ำหนักอุปกรณ์",
+    hardwareLoadLabel: resolvedHardwareLoadLabel,
+    explicitLoadTypeLabel: quantized.explicitLoadTypeLabel,
     platesPerSideKg: quantized.platesPerSideKg,
+    totalAddedPlatesKg: quantized.totalAddedPlatesKg,
+    startingResistanceKg: profile.tareWeight,
+    effectiveTotalResistanceKg: quantized.effectiveHardwareWeightKg,
     effectiveHardwareWeightKg: quantized.effectiveHardwareWeightKg,
-    hardwareExceedsTarget: quantized.hardwareExceedsTarget,
     tareWeightKg: profile.tareWeight,
+    targetWeightKg: Math.round(rawWeightKg * 10) / 10,
+    pulleyRatio: selectedPulleyRatio,
     isPerHand: profile.isPerHand,
+    configuration: resolvedConfig,
+    resistanceSource: resSource,
     minHardwareStep: profile.minHardwareStep,
+    hardwareExceedsTarget: quantized.hardwareExceedsTarget,
     displayNote: quantized.displayNote,
   };
 }

@@ -2912,9 +2912,25 @@ export default function Page() {
   // Active Jeff Nippard Scientific Workout Program State
   const [activeJeffProgram, setActiveJeffProgram] = useState<ActiveJeffProgramState | null>(() => getActiveJeffProgram());
 
-  // Keep the visible day aligned with persisted program progression after reloads and Finish.
+  // On mount and program change, detect missed sessions and plan make-up obligations deterministically
   useEffect(() => {
-    if (activeJeffProgram) setSelectedDay(activeJeffProgram.currentDayIndex);
+    if (!activeJeffProgram) return;
+    const withMissed = detectMissedSessions(activeJeffProgram, new Date());
+    const planned = planRescheduledSessions(withMissed, new Date());
+    if (
+      JSON.stringify(planned.rescheduledSessions) !== JSON.stringify(activeJeffProgram.rescheduledSessions) ||
+      JSON.stringify(planned.skippedDates) !== JSON.stringify(activeJeffProgram.skippedDates)
+    ) {
+      saveActiveJeffProgram(planned);
+      setActiveJeffProgram(planned);
+    }
+  }, [activeJeffProgram?.programId, activeJeffProgram?.startDate]);
+
+  // Keep the visible day aligned with authoritative progression
+  useEffect(() => {
+    if (!activeJeffProgram) return;
+    const resolution = resolveProgramDayForDate(activeJeffProgram, new Date());
+    setSelectedDay(resolution.scheduledDayIndex);
   }, [activeJeffProgram?.programId, activeJeffProgram?.currentWeek, activeJeffProgram?.currentDayIndex]);
 
   function handleSelectJeffProgram(activatedState: ActiveJeffProgramState) {
@@ -2934,10 +2950,11 @@ export default function Page() {
 
   function handleMarkJeffDayComplete(dateStr: string, completedDayIndex?: number) {
     if (!activeJeffProgram) return;
+    const effectiveDayIdx = completedDayIndex ?? activeJeffProgram.currentDayIndex;
     const updatedState = advanceJeffProgramAfterFinish(
       activeJeffProgram,
       dateStr,
-      completedDayIndex ?? activeJeffProgram.currentDayIndex
+      effectiveDayIdx
     );
     saveActiveJeffProgram(updatedState);
     setActiveJeffProgram(updatedState);
@@ -3498,7 +3515,9 @@ export default function Page() {
 
   const activeDayIndex = isPresetLike
     ? (activeJeffProgram
-        ? (selectedDay !== undefined && selectedDay !== null ? selectedDay : jeffCalendarStatus?.scheduledDayIndex ?? activeJeffProgram.currentDayIndex)
+        ? (mode === "today"
+            ? (jeffCalendarStatus?.scheduledDayIndex ?? activeJeffProgram.currentDayIndex)
+            : (selectedDay !== undefined && selectedDay !== null ? selectedDay : jeffCalendarStatus?.scheduledDayIndex ?? activeJeffProgram.currentDayIndex))
         : selectedDay)
     : selectedCustomDay;
   const rawDay = activePlan[activeDayIndex] ?? activePlan[0];
@@ -4637,6 +4656,41 @@ export default function Page() {
       const copy = { ...old };
       delete copy[currentExercise.id];
       writeLocalJson(SET_INPUTS_KEY, copy);
+      return copy;
+    });
+
+    // Clear manual tier overrides for this slot so the new exercise evaluates naturally
+    setManualTierMap((old) => {
+      const copy = { ...old };
+      delete copy[currentExercise.id];
+      return copy;
+    });
+
+    // Clear custom rest overrides for this slot
+    setCustomRestMap((old) => {
+      const copy = { ...old };
+      delete copy[currentExercise.id];
+      return copy;
+    });
+    setRestModeMap((old) => {
+      const copy = { ...old };
+      delete copy[currentExercise.id];
+      return copy;
+    });
+
+    // Clear machine starting resistance overrides for this slot
+    setMachineStartingResistances((old) => {
+      const copy = { ...old };
+      let changed = false;
+      for (const k of Object.keys(copy)) {
+        if (k === currentExercise.id || k.startsWith(`${currentExercise.id}::`)) {
+          delete copy[k];
+          changed = true;
+        }
+      }
+      if (changed) {
+        writeLocalJson(MACHINE_STARTING_RESISTANCES_KEY, copy);
+      }
       return copy;
     });
 
@@ -6076,6 +6130,39 @@ export default function Page() {
       : 0;
 
     const forcedTier = manualTierMap[baseExercise.id];
+    const startingOverrideRaw = machineStartingResistances[machineResistanceKey]?.trim();
+    const startingOverrideVal = startingOverrideRaw ? Number(startingOverrideRaw) : undefined;
+    const startingResistanceKg = startingOverrideVal !== undefined && Number.isFinite(startingOverrideVal)
+      ? (effectiveUnit === "lbs" ? startingOverrideVal / 2.20462 : startingOverrideVal)
+      : undefined;
+
+    const muscleMass = userProfile?.muscleMassKg ?? Math.round((userProfile?.weightKg ?? 70) * 0.42);
+    const muscleMode = userProfile?.muscleMassMode ?? "smm";
+    const muscleInfo = evaluateMuscleMass(currentGender, userProfile?.weightKg ?? 70, muscleMass, muscleMode);
+    const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
+    const effectivePulleyRatio = effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined;
+
+    const prescriptionResult = userProfile ? calculatePrescriptionWeight(
+      exercise.name,
+      effectiveLoad,
+      exercise.reps,
+      userProfile,
+      safeModifier,
+      currentMachine,
+      effectivePulleyRatio,
+      undefined,
+      startingResistanceKg,
+      exercise.id,
+      effectiveUnit,
+      forcedTier
+    ) : null;
+
+    const displayedPrescriptionWeight = prescriptionResult
+      ? (effectiveUnit === "lbs"
+          ? Math.round(prescriptionResult.recommendedHardwareWeightKg * 2.20462 * 10) / 10
+          : prescriptionResult.recommendedHardwareWeightKg)
+      : 0;
+
     const strengthTierInfo = userBwLbs > 0
       ? evaluateRelativeStrength(
           exercise.name,
@@ -6092,8 +6179,10 @@ export default function Page() {
         )
       : null;
 
-    // Cleanly synchronize baseline working weight: use logged/input weight first, then tier target weight
-    const fallbackStartingWeight = strengthTierInfo?.targetDisplayWeight ?? (effectiveUnit === "kg" ? 20 : 45);
+    // Cleanly synchronize baseline working weight: use logged/input weight first, then prescription weight
+    const fallbackStartingWeight = displayedPrescriptionWeight > 0
+      ? displayedPrescriptionWeight
+      : (strengthTierInfo?.targetDisplayWeight ?? (effectiveUnit === "kg" ? 20 : 45));
 
     const baselineWorkingWeight = 
       (Number.isFinite(inputWeightSet1) && inputWeightSet1 > 0) ? inputWeightSet1 :
@@ -6212,28 +6301,55 @@ export default function Page() {
                           </div>
 
                           {strengthTierInfo && (
-                            <div className="mt-2.5 flex items-center justify-between flex-wrap gap-2 rounded-xl bg-zinc-950/80 border border-zinc-800 p-2.5">
-                              {/* Interactive Click-to-Cycle Tier Badge */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const order: ("Beginner" | "Intermediate" | "Advanced" | "Elite")[] = ["Beginner", "Intermediate", "Advanced", "Elite"];
-                                  const nextIdx = (order.indexOf(strengthTierInfo.tier) + 1) % order.length;
-                                  setManualTierMap((prev) => ({ ...prev, [baseExercise.id]: order[nextIdx] }));
-                                }}
-                                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-black uppercase transition active:scale-95 ${strengthTierInfo.badgeClass}`}
-                                title="แตะเพื่อสลับระดับเป้าหมายที่ต้องการคำนวณ"
-                              >
-                                <span>{strengthTierInfo.label}</span>
-                                <span className="text-[10px] text-zinc-500 font-normal">✎</span>
-                              </button>
+                            <div className="mt-2.5 flex flex-col gap-2 rounded-xl bg-zinc-950/80 border border-zinc-800 p-2.5">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                {/* Interactive Click-to-Cycle Tier Badge */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const order: ("Beginner" | "Intermediate" | "Advanced" | "Elite")[] = ["Beginner", "Intermediate", "Advanced", "Elite"];
+                                    const nextIdx = (order.indexOf(strengthTierInfo.tier) + 1) % order.length;
+                                    setManualTierMap((prev) => ({ ...prev, [baseExercise.id]: order[nextIdx] }));
+                                  }}
+                                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-black uppercase transition active:scale-95 ${strengthTierInfo.badgeClass}`}
+                                  title="แตะเพื่อสลับระดับเป้าหมายที่ต้องการคำนวณ"
+                                >
+                                  <span>{strengthTierInfo.label}</span>
+                                  <span className="text-[10px] text-zinc-500 font-normal">✎</span>
+                                </button>
 
-                              {/* Clear Actionable Goal Message */}
-                              <div className="flex items-center gap-1.5 text-xs">
-                                <span className="font-bold text-yellow-300">
-                                  {strengthTierInfo.actionableMessage}
-                                </span>
+                                {/* Clear Actionable Goal Message Synchronized with Prescription */}
+                                <div className="flex items-center gap-1.5 text-xs">
+                                  <span className="font-bold text-yellow-300">
+                                    {(() => {
+                                      if (!shouldAutoPrescribeAddedLoad(effectiveLoad, exercise.name)) {
+                                        return "ใช้เฉพาะน้ำหนักตัวก่อน; ระบบยังไม่แนะนำให้เพิ่มน้ำหนักภายนอกอัตโนมัติ";
+                                      }
+                                      if (strengthTierInfo.tier === "Elite" && e1RMLbs > 0) {
+                                        return "🏆 ระดับสูงสุด (Elite): มุ่งเน้นการรักษาฟอร์มและการพัฒนาต่อเนื่อง";
+                                      }
+                                      const targetLabel = (e1RMLbs > 0) ? `สู่ระดับ ${strengthTierInfo.nextTierLabel}` : `แนะนำเริ่มต้น (${strengthTierInfo.tier})`;
+                                      const sideDetail = prescriptionResult?.isPerHand
+                                        ? (effectiveLoad === "plate-loaded"
+                                            ? (prescriptionResult.platesPerSideKg !== undefined
+                                                ? ` (เพลตข้างละ ${effectiveUnit === "lbs" ? Math.round(prescriptionResult.platesPerSideKg * 2.20462 * 10) / 10 : prescriptionResult.platesPerSideKg} ${effectiveUnit})`
+                                                : "")
+                                            : " (ต่อข้าง)")
+                                        : "";
+                                      return `🎯 ${targetLabel}: ยก ${displayedPrescriptionWeight} ${effectiveUnit}${sideDetail} × ${exercise.reps.split(" ")[0] || 8} ครั้ง`;
+                                    })()}
+                                  </span>
+                                </div>
                               </div>
+
+                              {/* Explicit Equipment Mechanics & Load Type Strip */}
+                              {prescriptionResult && (
+                                <div className="flex items-start gap-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800/80 px-2.5 py-1.5 text-[11px] leading-relaxed text-zinc-300">
+                                  <span className="font-bold text-yellow-400 shrink-0">⚙️ {prescriptionResult.explicitLoadTypeLabel}</span>
+                                  <span className="text-zinc-500">·</span>
+                                  <span className="text-zinc-400">{prescriptionResult.displayNote}</span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
@@ -6480,32 +6596,7 @@ export default function Page() {
                               : convertAndSnapWeight(latestSet.weightLbs, "lbs", effectiveUnit, isIso)
                             : 0;
 
-                          const aiWeightSuggestion = userProfile ? (() => {
-                            if (!shouldAutoPrescribeAddedLoad(effectiveLoad, exercise.name)) return 0;
-                            const muscleMass = userProfile.muscleMassKg ?? Math.round(userProfile.weightKg * 0.42);
-                            const muscleMode = userProfile.muscleMassMode ?? "smm";
-                            const muscleInfo = evaluateMuscleMass(currentGender, userProfile.weightKg, muscleMass, muscleMode);
-                            const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
-                            const startingOverrideRaw = machineStartingResistances[machineResistanceKey]?.trim();
-                            const startingOverrideVal = startingOverrideRaw ? Number(startingOverrideRaw) : undefined;
-                            const startingResistanceKg = startingOverrideVal !== undefined && Number.isFinite(startingOverrideVal)
-                              ? (effectiveUnit === "lbs" ? startingOverrideVal / 2.20462 : startingOverrideVal)
-                              : undefined;
-                            const bioRes = calculatePrescriptionWeight(
-                              exercise.name,
-                              effectiveLoad,
-                              exercise.reps,
-                              userProfile,
-                              safeModifier,
-                              currentMachine,
-                              effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined,
-                              undefined,
-                              startingResistanceKg
-                            );
-                            return effectiveUnit === "lbs"
-                              ? Math.round(bioRes.hardwareWeightKg * 2.20462 * 10) / 10
-                              : bioRes.hardwareWeightKg;
-                          })() : 0;
+                          const aiWeightSuggestion = displayedPrescriptionWeight;
 
                           const effectivePlaceholderWeight = fallbackWeightVal > 0
                             ? fallbackWeightVal
@@ -6551,48 +6642,77 @@ export default function Page() {
                                   </div>
                                   {(() => {
                                     const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
-                                    const lowerName = exercise.name.toLowerCase();
-                                    const machineNameLower = (currentMachine || "").toLowerCase();
-                                    const isPlateLoaded = effectiveLoad === "plate-loaded" || effectiveLoad === "specialty";
-                                    const isIsoPlate = effectiveLoad === "plate-loaded" && (lowerName.includes("iso-lateral") || lowerName.includes("iso ") || machineNameLower.includes("iso-lateral") || machineNameLower.includes("iso ")) && !lowerName.includes("t-bar") && !machineNameLower.includes("t-bar");
-                                    const isDumbbell = effectiveLoad === "dumbbell";
-                                    const isBarbell = effectiveLoad === "barbell" || effectiveLoad === "smith";
-                                    const isCable = effectiveLoad === "cable";
-                                    const selectedPulley = pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name);
+                                    if (!prescriptionResult) return null;
 
-                                    if (isIsoPlate) {
+                                    if (prescriptionResult.loadType === "plate-loaded" || effectiveLoad === "plate-loaded" || effectiveLoad === "specialty") {
+                                      const startW = effectiveUnit === "lbs"
+                                        ? Math.round(prescriptionResult.startingResistanceKg * 2.20462 * 10) / 10
+                                        : prescriptionResult.startingResistanceKg;
+
+                                      if (prescriptionResult.isPerHand) {
+                                        const perSideW = Math.round((totalW / 2) * 10) / 10;
+                                        return (
+                                          <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
+                                            {totalW > 0
+                                              ? `(เพลตรวมสองข้าง; ข้างละ ${perSideW} ${effectiveUnit}, ไม่รวมแรงต้านเริ่มต้น ${startW} ${effectiveUnit}/ข้าง)`
+                                              : `(เพลตรวมสองข้าง ไม่รวมแรงต้านเริ่มต้น ${startW} ${effectiveUnit}/ข้าง)`}
+                                          </span>
+                                        );
+                                      }
+                                      if (prescriptionResult.configuration === "single-sleeve") {
+                                        return (
+                                          <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
+                                            {totalW > 0
+                                              ? `(เพลตใส่แกนกลาง ${totalW} ${effectiveUnit}, ไม่รวมแรงต้านเริ่มต้น ${startW} ${effectiveUnit})`
+                                              : `(เพลตใส่แกนกลาง ไม่รวมแรงต้านเริ่มต้น ${startW} ${effectiveUnit})`}
+                                          </span>
+                                        );
+                                      }
                                       const perSideW = Math.round((totalW / 2) * 10) / 10;
                                       return (
                                         <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          {totalW > 0 ? `(เพลตรวมสองข้าง; ข้างละ ${perSideW} ${effectiveUnit}, ไม่รวมแรงต้านเครื่อง)` : `(เพลตรวมสองข้าง ไม่รวมแรงต้านเครื่อง)`}
+                                          {totalW > 0
+                                            ? `(เพลตรวมสองข้าง ${totalW} ${effectiveUnit}; ข้างละ ${perSideW} ${effectiveUnit}, ไม่รวมแรงต้านแคร่ ${startW} ${effectiveUnit})`
+                                            : `(เพลตรวมสองข้าง ไม่รวมแรงต้านแคร่ ${startW} ${effectiveUnit})`}
                                         </span>
                                       );
                                     }
-                                    if (isPlateLoaded && !isIsoPlate) {
-                                      return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          (เพลตที่ใส่เพิ่ม ไม่รวมแรงต้านเริ่มต้นของเครื่อง)
-                                        </span>
-                                      );
-                                    }
-                                    if (isDumbbell) {
+                                    if (effectiveLoad === "dumbbell" || prescriptionResult.loadType === "dumbbell") {
                                       return (
                                         <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
                                           (ดัมเบลต่อข้าง)
                                         </span>
                                       );
                                     }
-                                    if (isBarbell) {
+                                    if (effectiveLoad === "barbell" || prescriptionResult.loadType === "barbell") {
                                       return (
                                         <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          (น้ำหนักรวมคาน)
+                                          (น้ำหนักรวมคานมาตรฐาน 20 kg)
                                         </span>
                                       );
                                     }
-                                    if (isCable) {
+                                    if (effectiveLoad === "smith" || prescriptionResult.loadType === "smith") {
+                                      const startW = effectiveUnit === "lbs"
+                                        ? Math.round(prescriptionResult.startingResistanceKg * 2.20462 * 10) / 10
+                                        : prescriptionResult.startingResistanceKg;
                                       return (
                                         <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          (สลักพิน รอก {selectedPulley}:1)
+                                          (รวมแรงต้านบาร์สมิท ${startW} ${effectiveUnit})
+                                        </span>
+                                      );
+                                    }
+                                    if (effectiveLoad === "cable" || prescriptionResult.loadType === "cable") {
+                                      const ratio = prescriptionResult.pulleyRatio ?? (pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name));
+                                      return (
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
+                                          (สลักพิน{prescriptionResult.isPerHand ? "ต่อฝั่ง" : ""} · รอก {ratio}:1)
+                                        </span>
+                                      );
+                                    }
+                                    if (effectiveLoad === "selectorized" || prescriptionResult.loadType === "selectorized") {
+                                      return (
+                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
+                                          (สลักพินน้ำหนักเครื่อง)
                                         </span>
                                       );
                                     }

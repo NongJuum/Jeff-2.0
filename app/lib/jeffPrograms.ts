@@ -1305,16 +1305,54 @@ export const JEFF_PROGRAM_SCHEDULE_KEY = "haitJeffProgramScheduleV1";
 
 export type RescheduledSessionStatus = "pending" | "completed" | "skipped";
 
+export type SchedulingModel =
+  | "fixed_weekday"       // Bound to specific days of week (0=Mon...6=Sun)
+  | "sequential_rotation" // Rotates through sessions in order whenever trained
+  | "cycle_pattern";      // Repeating microcycle of N days (e.g. 3 on 1 off)
+
+export type MissedSessionPolicy =
+  | "shift_sequence"            // Missed workout shifts to next training day; rest days preserved
+  | "reschedule_to_next_available" // Alias / standard for shift_sequence
+  | "reschedule_to_rest_day"    // Place make-up session onto nearest upcoming rest day
+  | "skip_and_maintain";        // Missed session skipped; calendar stays fixed
+
 export interface RescheduledSession {
-  id: string; // Unique ID, e.g. "missed_2026-10-16_d3"
+  id: string; // Unique, deterministic ID: e.g. "missed_2026-10-16_d3"
   originalDateKey: string; // Date originally scheduled
   targetDateKey?: string; // Planned slot for make-up
-  sourceWeek: number; // Program week
-  dayIndex: number; // 0-based day within week
+  sourceWeek: number; // Program week or cycle index (1-indexed)
+  dayIndex: number; // 0-based day within week/cycle
   dayLabel: string; // e.g. "Day 4"
   focusLabel: string; // e.g. "Upper Body A"
   status: RescheduledSessionStatus;
   resolvedAt?: string; // Date key when completed or explicitly skipped
+}
+
+export interface UniversalWorkoutDay {
+  dayLabel: string;
+  focusLabel: string;
+  exercises?: JeffExercise[];
+}
+
+export interface UniversalProgramWeek {
+  weekNumber: number;
+  label?: string;
+  days: UniversalWorkoutDay[];
+}
+
+export interface UniversalProgramDefinition {
+  id: string;
+  name: string;
+  splitType?: string;
+  daysPerWeek?: number;
+  durationWeeks?: number;
+  cycleLengthDays?: number;
+  cyclePattern?: boolean[];
+  defaultScheduleDays?: number[];
+  defaultSchedulingModel?: SchedulingModel;
+  defaultMissedSessionPolicy?: MissedSessionPolicy;
+  weeks?: UniversalProgramWeek[];
+  days?: UniversalWorkoutDay[];
 }
 
 export interface ProgramDayResolution {
@@ -1325,6 +1363,9 @@ export interface ProgramDayResolution {
   isRescheduledMakeUp?: boolean;
   rescheduledSession?: RescheduledSession;
   pendingBacklogCount?: number;
+  isRestDay: boolean;
+  cycleNumber: number;
+  reason?: "scheduled_session" | "make_up_session" | "scheduled_rest" | "program_completed" | "before_start";
 }
 
 export interface ActiveJeffProgramState {
@@ -1336,6 +1377,14 @@ export interface ActiveJeffProgramState {
   scheduleDays: number[]; // 0=Mon ... 6=Sun
   rescheduledSessions?: RescheduledSession[];
   skippedDates?: string[]; // Date keys explicitly skipped
+  // Universal engine extensions
+  schedulingModel?: SchedulingModel;
+  cycleLengthDays?: number; // Defaults to 7 for weekly splits; can be any integer >= 1
+  cyclePattern?: boolean[]; // For cycle_pattern: e.g. [true, true, true, false]
+  missedSessionPolicy?: MissedSessionPolicy;
+  completedSessionIds?: string[];
+  skippedSessionIds?: string[];
+  customProgramDefinition?: UniversalProgramDefinition;
 }
 
 export function getActiveJeffProgram(): ActiveJeffProgramState | null {
@@ -1366,17 +1415,84 @@ export function findProgramById(id: string): JeffProgram | undefined {
   return JEFF_PROGRAMS.find((p) => p.id === id);
 }
 
-export function getProgramCurrentWeek(state: ActiveJeffProgramState): JeffProgramWeek | null {
-  const program = findProgramById(state.programId);
-  if (!program) return null;
-  // Find the week template closest to current week
-  const sortedWeeks = [...program.weeks].sort((a, b) => a.weekNumber - b.weekNumber);
-  let matchedWeek = sortedWeeks[0];
-  for (const week of sortedWeeks) {
-    if (week.weekNumber <= state.currentWeek) matchedWeek = week;
-    else break;
+/**
+ * Resolves the universal program structure from an active state,
+ * supporting built-in Jeff programs, custom definitions, or resilient fallbacks.
+ */
+export function resolveProgramDefinition(state: ActiveJeffProgramState): UniversalProgramDefinition {
+  if (state.customProgramDefinition) {
+    return state.customProgramDefinition;
   }
-  return matchedWeek;
+  const found = findProgramById(state.programId);
+  if (found) {
+    return {
+      id: found.id,
+      name: found.name,
+      splitType: found.split,
+      daysPerWeek: found.daysPerWeek,
+      durationWeeks: found.durationWeeks,
+      cycleLengthDays: 7,
+      defaultScheduleDays: found.defaultScheduleDays,
+      defaultSchedulingModel: "fixed_weekday",
+      defaultMissedSessionPolicy: "shift_sequence",
+      weeks: found.weeks,
+    };
+  }
+  const scheduleCount = Array.isArray(state.scheduleDays) && state.scheduleDays.length > 0
+    ? state.scheduleDays.length
+    : 3;
+  return {
+    id: state.programId || "custom_program",
+    name: "Custom Workout Program",
+    daysPerWeek: scheduleCount,
+    durationWeeks: 8,
+    cycleLengthDays: state.cycleLengthDays || 7,
+    defaultScheduleDays: state.scheduleDays || [0, 2, 4],
+    defaultSchedulingModel: state.schedulingModel || "fixed_weekday",
+    defaultMissedSessionPolicy: state.missedSessionPolicy || "shift_sequence",
+    weeks: [
+      {
+        weekNumber: 1,
+        days: Array.from({ length: scheduleCount }, (_, i) => ({
+          dayLabel: `Day ${i + 1}`,
+          focusLabel: `Workout ${i + 1}`,
+          exercises: [],
+        })),
+      },
+    ],
+  };
+}
+
+export function getProgramCurrentWeek(state: ActiveJeffProgramState): JeffProgramWeek | null {
+  const def = resolveProgramDefinition(state);
+  if (def.weeks && def.weeks.length > 0) {
+    const sortedWeeks = [...def.weeks].sort((a, b) => a.weekNumber - b.weekNumber);
+    let matchedWeek = sortedWeeks[0];
+    for (const week of sortedWeeks) {
+      if (week.weekNumber <= state.currentWeek) matchedWeek = week;
+      else break;
+    }
+    return {
+      weekNumber: matchedWeek.weekNumber,
+      label: matchedWeek.label,
+      days: matchedWeek.days.map((d) => ({
+        dayLabel: d.dayLabel,
+        focusLabel: d.focusLabel,
+        exercises: d.exercises || [],
+      })),
+    };
+  }
+  if (def.days && def.days.length > 0) {
+    return {
+      weekNumber: state.currentWeek,
+      days: def.days.map((d) => ({
+        dayLabel: d.dayLabel,
+        focusLabel: d.focusLabel,
+        exercises: d.exercises || [],
+      })),
+    };
+  }
+  return null;
 }
 
 export function getProgramDateKey(date: Date = new Date()): string {
@@ -1386,51 +1502,127 @@ export function getProgramDateKey(date: Date = new Date()): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Resolves the effective scheduling model for an active program.
+ */
+export function getProgramSchedulingModel(state: ActiveJeffProgramState): SchedulingModel {
+  if (state.schedulingModel) return state.schedulingModel;
+  const def = resolveProgramDefinition(state);
+  if (def.defaultSchedulingModel) return def.defaultSchedulingModel;
+  if (state.cyclePattern && state.cyclePattern.length > 0) return "cycle_pattern";
+  return "fixed_weekday";
+}
+
+/**
+ * Resolves the effective missed session policy for an active program.
+ */
+export function getProgramMissedPolicy(state: ActiveJeffProgramState): MissedSessionPolicy {
+  if (state.missedSessionPolicy) return state.missedSessionPolicy;
+  const def = resolveProgramDefinition(state);
+  return def.defaultMissedSessionPolicy || "shift_sequence";
+}
+
+/**
+ * Checks whether a given calendar date is scheduled as a training day under the program's policy.
+ */
+export function isDateScheduledTrainingDay(
+  state: ActiveJeffProgramState,
+  date: Date
+): boolean {
+  const dateKey = getProgramDateKey(date);
+  if (state.startDate && dateKey < state.startDate) return false;
+
+  const model = getProgramSchedulingModel(state);
+
+  if (model === "sequential_rotation") {
+    const scheduleDays = Array.isArray(state.scheduleDays) ? state.scheduleDays : [];
+    if (scheduleDays.length === 0) return true;
+    const dayOfWeek = (date.getDay() + 6) % 7;
+    return scheduleDays.includes(dayOfWeek);
+  }
+
+  if (model === "cycle_pattern") {
+    const cycleLength = state.cycleLengthDays || 4;
+    const pattern = state.cyclePattern || [true, true, true, false];
+    const startDate = new Date(`${state.startDate || dateKey}T12:00:00`);
+    const targetDate = new Date(`${dateKey}T12:00:00`);
+    const diffDays = Math.round((targetDate.getTime() - startDate.getTime()) / 86400000);
+    if (diffDays < 0) return false;
+    const cycleIndex = ((diffDays % cycleLength) + cycleLength) % cycleLength;
+    return Boolean(pattern[cycleIndex]);
+  }
+
+  // fixed_weekday
+  const scheduleDays = Array.isArray(state.scheduleDays)
+    ? state.scheduleDays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+    : [];
+  if (scheduleDays.length === 0) return false;
+  const dayOfWeek = (date.getDay() + 6) % 7;
+  return scheduleDays.includes(dayOfWeek);
+}
+
 export function getNextProgramTrainingDate(
   state: ActiveJeffProgramState,
   fromDate: Date = new Date()
 ): string | null {
-  const scheduleDays = Array.isArray(state.scheduleDays)
-    ? state.scheduleDays.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
-    : [];
-  if (scheduleDays.length === 0) return null;
-
   const fromKey = getProgramDateKey(fromDate);
   const firstKey = state.startDate && state.startDate > fromKey ? state.startDate : fromKey;
   const current = new Date(`${firstKey}T12:00:00`);
   if (!Number.isFinite(current.getTime())) return null;
 
-  // Find the next scheduled date within the following week, respecting a future start date.
-  for (let offset = 0; offset <= 7; offset += 1) {
-    const dayOfWeek = (current.getDay() + 6) % 7; // Mon=0 ... Sun=6
-    if (scheduleDays.includes(dayOfWeek)) return getProgramDateKey(current);
+  const model = getProgramSchedulingModel(state);
+  const maxLookahead = model === "cycle_pattern" ? Math.max(14, (state.cycleLengthDays || 4) * 2) : 14;
+
+  for (let offset = 0; offset <= maxLookahead; offset += 1) {
+    if (isDateScheduledTrainingDay(state, current)) {
+      return getProgramDateKey(current);
+    }
     current.setDate(current.getDate() + 1);
   }
   return null;
 }
 
 export function isJeffProgramComplete(state: ActiveJeffProgramState): boolean {
-  const program = findProgramById(state.programId);
-  if (!program) return false;
-  return state.completedDays.length >= program.durationWeeks * program.daysPerWeek;
+  const def = resolveProgramDefinition(state);
+  const totalWeeks = def.durationWeeks || 8;
+  const daysInCycle = def.days?.length || def.weeks?.[0]?.days.length || def.daysPerWeek || state.scheduleDays?.length || 3;
+  const totalPlannedSessions = totalWeeks * daysInCycle;
+  return state.completedDays.length >= totalPlannedSessions;
 }
 
 export function getProgramScheduledDates(
   startDate: string,
   scheduleDays: number[],
-  totalWeeks: number
+  totalWeeks: number,
+  schedulingModel: SchedulingModel = "fixed_weekday",
+  cycleLengthDays: number = 7,
+  cyclePattern: boolean[] = []
 ): string[] {
   const dates: string[] = [];
-  // Parse at local noon to avoid UTC date shifts around midnight and DST boundaries.
   const start = new Date(`${startDate}T12:00:00`);
   if (!Number.isFinite(start.getTime()) || totalWeeks <= 0) return dates;
+
+  const mockState: ActiveJeffProgramState = {
+    programId: "preview",
+    startDate,
+    currentWeek: 1,
+    currentDayIndex: 0,
+    completedDays: [],
+    scheduleDays,
+    schedulingModel,
+    cycleLengthDays,
+    cyclePattern,
+  };
+
+  const totalCalendarDays = totalWeeks * (schedulingModel === "cycle_pattern" ? cycleLengthDays : 7);
   const end = new Date(start);
-  end.setDate(end.getDate() + totalWeeks * 7);
+  end.setDate(end.getDate() + totalCalendarDays);
 
   const current = new Date(start);
   while (current < end) {
-    const dayOfWeek = (current.getDay() + 6) % 7; // Mon=0 ... Sun=6
-    if (scheduleDays.includes(dayOfWeek)) dates.push(getProgramDateKey(current));
+    if (isDateScheduledTrainingDay(mockState, current)) {
+      dates.push(getProgramDateKey(current));
+    }
     current.setDate(current.getDate() + 1);
   }
   return dates;
@@ -1438,20 +1630,29 @@ export function getProgramScheduledDates(
 
 /**
  * Detects missed training sessions between program startDate and asOfDate.
- * Only identifies dates that were configured training days under scheduleDays,
- * and have neither been completed, explicitly skipped, nor already tracked.
+ * Respects scheduling model and missed session policy:
+ * - sequential_rotation: no calendar backlogs; sequence waits for user.
+ * - skip_and_maintain: drops missed slots without creating pending make-ups.
+ * - shift_sequence / reschedule_to_next_available: tracks make-up obligations deterministically.
  */
 export function detectMissedSessions(
   state: ActiveJeffProgramState,
   asOfDate: Date = new Date()
 ): ActiveJeffProgramState {
-  if (!state.startDate || !Array.isArray(state.scheduleDays) || state.scheduleDays.length === 0) {
-    return state;
-  }
+  if (!state.startDate) return state;
   const asOfKey = getProgramDateKey(asOfDate);
-  if (asOfKey <= state.startDate) {
+  if (asOfKey <= state.startDate) return state;
+
+  const model = getProgramSchedulingModel(state);
+  if (model === "sequential_rotation") {
+    // Sequential programs advance purely by workout completion without date-bound missed slots.
     return state;
   }
+
+  const policy = getProgramMissedPolicy(state);
+  const def = resolveProgramDefinition(state);
+  const weekData = getProgramCurrentWeek(state);
+  const daysInCycle = weekData?.days.length || def.days?.length || (Array.isArray(state.scheduleDays) ? state.scheduleDays.length : 0) || 4;
 
   const existingRescheduled = state.rescheduledSessions ? [...state.rescheduledSessions] : [];
   const existingPending = existingRescheduled.filter((s) => s.status === "pending");
@@ -1461,37 +1662,46 @@ export function detectMissedSessions(
     ...existingRescheduled.map((s) => s.originalDateKey),
   ]);
 
-  const scheduleDaysSorted = [...state.scheduleDays].sort((a, b) => a - b);
-  const weekData = getProgramCurrentWeek(state);
-  const daysInWeek = weekData?.days.length || scheduleDaysSorted.length || 4;
-
   let current = new Date(`${state.startDate}T12:00:00`);
   if (!Number.isFinite(current.getTime())) return state;
 
   const pastScheduledDates: string[] = [];
   while (getProgramDateKey(current) < asOfKey) {
     const dKey = getProgramDateKey(current);
-    const dayOfWeek = (current.getDay() + 6) % 7;
-    if (state.scheduleDays.includes(dayOfWeek)) {
+    if (isDateScheduledTrainingDay(state, current)) {
       pastScheduledDates.push(dKey);
     }
     current.setDate(current.getDate() + 1);
   }
 
+  if (policy === "skip_and_maintain") {
+    const newSkipped = new Set(state.skippedDates ?? []);
+    pastScheduledDates.forEach((dKey) => {
+      if (!state.completedDays.includes(dKey)) {
+        newSkipped.add(dKey);
+      }
+    });
+    return {
+      ...state,
+      skippedDates: Array.from(newSkipped),
+    };
+  }
+
   const totalResolved = state.completedDays.length + (state.skippedDates?.length || 0);
   const totalTrackedOrResolved = totalResolved + existingPending.length;
-
   const newObligations: RescheduledSession[] = [];
 
   for (let i = 0; i < pastScheduledDates.length; i++) {
     const dKey = pastScheduledDates[i];
     if (!trackedDates.has(dKey) && totalTrackedOrResolved + newObligations.length < pastScheduledDates.length) {
-      const targetDayIndex = (totalTrackedOrResolved + newObligations.length) % daysInWeek;
+      const targetSeq = totalTrackedOrResolved + newObligations.length;
+      const targetDayIndex = targetSeq % daysInCycle;
+      const targetWeek = Math.floor(targetSeq / daysInCycle) + 1;
       const dayDef = weekData?.days[targetDayIndex];
       newObligations.push({
         id: `missed_${dKey}_d${targetDayIndex}`,
         originalDateKey: dKey,
-        sourceWeek: state.currentWeek,
+        sourceWeek: targetWeek,
         dayIndex: targetDayIndex,
         dayLabel: dayDef?.dayLabel || `Day ${targetDayIndex + 1}`,
         focusLabel: dayDef?.focusLabel || "Make-up Workout",
@@ -1505,7 +1715,9 @@ export function detectMissedSessions(
   const deficit = pastScheduledDates.length - (totalTrackedOrResolved + newObligations.length);
   if (deficit > 0) {
     for (let d = 0; d < deficit; d++) {
-      const targetDayIndex = (totalTrackedOrResolved + newObligations.length) % daysInWeek;
+      const targetSeq = totalTrackedOrResolved + newObligations.length;
+      const targetDayIndex = targetSeq % daysInCycle;
+      const targetWeek = Math.floor(targetSeq / daysInCycle) + 1;
       const fallbackDate = pastScheduledDates[pastScheduledDates.length - 1 - d] || asOfKey;
       const sessionKey = `${fallbackDate}_displaced_${targetDayIndex}`;
       if (!existingRescheduled.some((s) => s.id === sessionKey || (s.originalDateKey === fallbackDate && s.dayIndex === targetDayIndex))) {
@@ -1513,7 +1725,7 @@ export function detectMissedSessions(
         newObligations.push({
           id: sessionKey,
           originalDateKey: fallbackDate,
-          sourceWeek: state.currentWeek,
+          sourceWeek: targetWeek,
           dayIndex: targetDayIndex,
           dayLabel: dayDef?.dayLabel || `Day ${targetDayIndex + 1}`,
           focusLabel: dayDef?.focusLabel || "Make-up Workout",
@@ -1523,9 +1735,7 @@ export function detectMissedSessions(
     }
   }
 
-  if (newObligations.length === 0) {
-    return state;
-  }
+  if (newObligations.length === 0) return state;
 
   return {
     ...state,
@@ -1549,9 +1759,7 @@ export function planRescheduledSessions(
   const pendingSessions = state.rescheduledSessions.filter((s) => s.status === "pending");
   if (pendingSessions.length === 0) return state;
 
-  const scheduledDays = Array.isArray(state.scheduleDays) ? state.scheduleDays : [];
-  if (scheduledDays.length === 0) return state;
-
+  const policy = getProgramMissedPolicy(state);
   const reservedDates = new Set<string>([
     ...state.completedDays,
     ...(state.skippedDates ?? []),
@@ -1577,10 +1785,15 @@ export function planRescheduledSessions(
 
     let foundSlot: string | null = null;
     const lookahead = new Date(cursor);
-    for (let offset = 0; offset < 28; offset++) {
+    for (let offset = 0; offset < 56; offset++) {
       const candidateKey = getProgramDateKey(lookahead);
-      const dayOfWeek = (lookahead.getDay() + 6) % 7;
-      if (scheduledDays.includes(dayOfWeek) && !reservedDates.has(candidateKey)) {
+      const isCandidateTrainingDay = isDateScheduledTrainingDay(state, lookahead);
+
+      const isValidSlot = policy === "reschedule_to_rest_day"
+        ? !isCandidateTrainingDay && !reservedDates.has(candidateKey)
+        : isCandidateTrainingDay && !reservedDates.has(candidateKey);
+
+      if (isValidSlot) {
         foundSlot = candidateKey;
         reservedDates.add(candidateKey);
         lookahead.setDate(lookahead.getDate() + 1);
@@ -1638,14 +1851,20 @@ export function resolveRescheduledSession(
     const alreadyCompleted = state.completedDays.includes(resolvedDate);
     const updatedCompleted = alreadyCompleted ? state.completedDays : [...state.completedDays, resolvedDate];
 
+    const def = resolveProgramDefinition(state);
     const weekData = getProgramCurrentWeek(state);
-    const totalDaysInWeek = weekData?.days.length || state.scheduleDays.length || 4;
-    let nextDayIdx = Math.max(state.currentDayIndex, targetSession.dayIndex) + 1;
+    const totalDaysInWeek = weekData?.days.length || def.days?.length || (Array.isArray(state.scheduleDays) ? state.scheduleDays.length : 0) || 4;
+
+    let nextDayIdx = targetSession.dayIndex === state.currentDayIndex
+      ? targetSession.dayIndex + 1
+      : targetSession.dayIndex < state.currentDayIndex
+      ? state.currentDayIndex
+      : targetSession.dayIndex + 1;
+
     let nextWeek = state.currentWeek;
     if (nextDayIdx >= totalDaysInWeek) {
       nextDayIdx = 0;
-      const program = findProgramById(state.programId);
-      nextWeek = Math.min(program?.durationWeeks || 8, state.currentWeek + 1);
+      nextWeek = Math.min(def.durationWeeks || 8, state.currentWeek + 1);
     }
 
     return {
@@ -1698,22 +1917,63 @@ export function cancelRescheduledSession(
 }
 
 /**
- * Calendar-aware schedule resolver:
+ * Universal Calendar-aware schedule resolver:
  * Evaluates configured training/rest days, pending make-up sessions, and progression.
- * Returns to normal recurring schedule once all temporary exceptions are resolved.
+ * Returns authoritative schedule status and day recommendation for any date.
  */
 export function resolveProgramDayForDate(
   state: ActiveJeffProgramState,
   date: Date = new Date()
 ): ProgramDayResolution {
   const dateKey = getProgramDateKey(date);
-  const dayOfWeek0to6 = (date.getDay() + 6) % 7; // Mon=0 ... Sun=6
-  const scheduleDays = Array.isArray(state.scheduleDays) ? state.scheduleDays : [];
   const isAfterStartDate = !state.startDate || dateKey >= state.startDate;
-  const isScheduledTrainingDay = isAfterStartDate && scheduleDays.includes(dayOfWeek0to6);
-  const isCompleted = state.completedDays.includes(dateKey);
 
+  if (!isAfterStartDate) {
+    return {
+      isTrainingDay: false,
+      scheduledDayIndex: 0,
+      cycleNumber: 1,
+      isCompleted: false,
+      dateKey,
+      isRestDay: true,
+      reason: "before_start",
+    };
+  }
+
+  if (isJeffProgramComplete(state)) {
+    return {
+      isTrainingDay: false,
+      scheduledDayIndex: 0,
+      cycleNumber: state.currentWeek,
+      isCompleted: true,
+      dateKey,
+      isRestDay: true,
+      reason: "program_completed",
+    };
+  }
+
+  const model = getProgramSchedulingModel(state);
+  const isScheduledTraining = isDateScheduledTrainingDay(state, date);
+  const isCompleted = state.completedDays.includes(dateKey);
   const pendingSessions = (state.rescheduledSessions ?? []).filter((s) => s.status === "pending");
+
+  // Sequential rotation: workouts advance linearly when trained
+  if (model === "sequential_rotation") {
+    const weekData = getProgramCurrentWeek(state);
+    const dayCount = weekData?.days.length || 1;
+    const scheduledDayIndex = Math.max(0, Math.min(state.currentDayIndex || 0, dayCount - 1));
+    return {
+      isTrainingDay: isScheduledTraining,
+      scheduledDayIndex,
+      cycleNumber: state.currentWeek,
+      isCompleted,
+      dateKey,
+      isRescheduledMakeUp: false,
+      pendingBacklogCount: 0,
+      isRestDay: !isScheduledTraining,
+      reason: isScheduledTraining ? "scheduled_session" : "scheduled_rest",
+    };
+  }
 
   // 1. Check if a pending rescheduled session is targeted for today
   const targetedSession = pendingSessions.find((s) => s.targetDateKey === dateKey);
@@ -1721,26 +1981,32 @@ export function resolveProgramDayForDate(
     return {
       isTrainingDay: true,
       scheduledDayIndex: targetedSession.dayIndex,
+      cycleNumber: targetedSession.sourceWeek,
       isCompleted,
       dateKey,
       isRescheduledMakeUp: true,
       rescheduledSession: targetedSession,
       pendingBacklogCount: pendingSessions.length,
+      isRestDay: false,
+      reason: "make_up_session",
     };
   }
 
   // 2. If today is a scheduled training day and there are pending make-up sessions,
   // recommend the earliest pending session to preserve sequential order
-  if (isScheduledTrainingDay && pendingSessions.length > 0) {
+  if (isScheduledTraining && pendingSessions.length > 0) {
     const firstPending = pendingSessions[0];
     return {
       isTrainingDay: true,
       scheduledDayIndex: firstPending.dayIndex,
+      cycleNumber: firstPending.sourceWeek,
       isCompleted,
       dateKey,
       isRescheduledMakeUp: true,
       rescheduledSession: firstPending,
       pendingBacklogCount: pendingSessions.length,
+      isRestDay: false,
+      reason: "make_up_session",
     };
   }
 
@@ -1750,13 +2016,16 @@ export function resolveProgramDayForDate(
   const scheduledDayIndex = Math.max(0, Math.min(state.currentDayIndex || 0, dayCount - 1));
 
   return {
-    isTrainingDay: isScheduledTrainingDay,
+    isTrainingDay: isScheduledTraining,
     scheduledDayIndex,
+    cycleNumber: state.currentWeek,
     isCompleted,
     dateKey,
     isRescheduledMakeUp: false,
     rescheduledSession: pendingSessions.length > 0 ? pendingSessions[0] : undefined,
     pendingBacklogCount: pendingSessions.length,
+    isRestDay: !isScheduledTraining,
+    reason: isScheduledTraining ? "scheduled_session" : "scheduled_rest",
   };
 }
 
@@ -1785,9 +2054,9 @@ export function advanceJeffProgramAfterFinish(
     return resolveRescheduledSession(currentState, matchingRescheduled.id, "complete", completedDateKey);
   }
 
-  const program = findProgramById(currentState.programId);
+  const def = resolveProgramDefinition(currentState);
   const weekData = getProgramCurrentWeek(currentState);
-  const totalDaysInWeek = weekData?.days.length || currentState.scheduleDays.length || 4;
+  const totalDaysInWeek = weekData?.days.length || def.days?.length || (Array.isArray(currentState.scheduleDays) ? currentState.scheduleDays.length : 0) || 4;
   const updatedCompleted = [...currentState.completedDays, completedDateKey];
   const safeCompletedIndex = Number.isInteger(completedDayIndex)
     ? Math.max(0, Math.min(completedDayIndex, totalDaysInWeek - 1))
@@ -1798,7 +2067,7 @@ export function advanceJeffProgramAfterFinish(
 
   if (nextDayIdx >= totalDaysInWeek) {
     nextDayIdx = 0;
-    nextWeek = Math.min(program?.durationWeeks || 8, currentState.currentWeek + 1);
+    nextWeek = Math.min(def.durationWeeks || 8, currentState.currentWeek + 1);
   }
 
   return {
@@ -1808,3 +2077,4 @@ export function advanceJeffProgramAfterFinish(
     currentWeek: nextWeek,
   };
 }
+

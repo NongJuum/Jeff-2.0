@@ -489,8 +489,9 @@ export function ActiveProgramDashboard({
         return `${dayNames[(nextDate.getDay() + 6) % 7]} ${nextDate.getDate()}/${nextDate.getMonth() + 1}`;
       })()
     : null;
+  const targetDayIdx = scheduleStatus.scheduledDayIndex;
   const currentWorkout = currentWeekData?.days[
-    Math.max(0, Math.min(activeState.currentDayIndex, (currentWeekData?.days.length ?? 1) - 1))
+    Math.max(0, Math.min(targetDayIdx, (currentWeekData?.days.length ?? 1) - 1))
   ];
 
   // Progress percentage
@@ -806,7 +807,7 @@ export function JeffProgramTodayCard({
   language = "th",
 }: {
   activeState: ActiveJeffProgramState;
-  onMarkDayComplete: (date: string) => void;
+  onMarkDayComplete: (date: string, completedDayIndex?: number) => void;
   language?: AppLanguage;
 }) {
   const program = findProgramById(activeState.programId);
@@ -857,7 +858,7 @@ export function JeffProgramTodayCard({
     );
   }
 
-  const safeDayIndex = Math.max(0, Math.min(activeState.currentDayIndex, currentWeekData.days.length - 1));
+  const safeDayIndex = Math.max(0, Math.min(scheduleStatus.scheduledDayIndex, currentWeekData.days.length - 1));
   const todayWorkout = currentWeekData.days[safeDayIndex];
 
   return (
@@ -866,9 +867,16 @@ export function JeffProgramTodayCard({
       <div className={`bg-gradient-to-r ${program.color} p-4`}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider text-white/70">
-              {program.shortName} · สัปดาห์ {activeState.currentWeek}
-            </p>
+            <div className="flex items-center gap-2">
+              {scheduleStatus.isRescheduledMakeUp && (
+                <span className="inline-flex items-center rounded-md bg-amber-500/25 border border-amber-400/40 px-2 py-0.5 text-[10px] font-black uppercase text-amber-200">
+                  ⚡ {language === "th" ? "ซ้อมชดเชย" : "Make-up"}
+                </span>
+              )}
+              <p className="text-xs font-bold uppercase tracking-wider text-white/70">
+                {program.shortName} · {language === "th" ? `สัปดาห์ ${scheduleStatus.cycleNumber || activeState.currentWeek}` : `Week ${scheduleStatus.cycleNumber || activeState.currentWeek}`}
+              </p>
+            </div>
             <h3 className="text-lg font-black text-white mt-0.5">
               {todayWorkout.dayLabel}: {todayWorkout.focusLabel}
             </h3>
@@ -926,7 +934,7 @@ export function JeffProgramTodayCard({
           </div>
         ) : (
           <button
-            onClick={() => onMarkDayComplete(todayKey)}
+            onClick={() => onMarkDayComplete(todayKey, safeDayIndex)}
             className={`w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${program.color} py-3 text-sm font-black text-white shadow-lg active:scale-95 transition`}
           >
             <CheckCircle size={15} />
