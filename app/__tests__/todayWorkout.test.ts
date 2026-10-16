@@ -10,6 +10,12 @@ import {
   advanceJeffProgramAfterFinish,
   getProgramDateKey,
 } from "../lib/jeffPrograms";
+import {
+  deriveTargetMusclesFromJeffWorkout,
+  formatMuscleChips,
+  formatThaiDateLabel,
+  MUSCLE_REGION_THAI,
+} from "../components/JeffProgramPicker";
 
 describe("Train Today Scheduling & Selection Engine", () => {
   // Test date: Friday 2026-10-16
@@ -372,5 +378,69 @@ describe("Train Today Scheduling & Selection Engine", () => {
     const cycleResAfter = resolveProgramDayForDate(cycleOverride.state, testFridayDate);
     expect(cycleResAfter.isTrainingDay).toBe(true);
     expect(cycleResAfter.scheduledDayIndex).toBe(0);
+  });
+});
+
+describe("Today's Target Muscle Groups & Date Formatting", () => {
+  it("derives target muscles accurately from workout focus and exercises", () => {
+    const chestWorkout = {
+      focusLabel: "Day 1: Chest & Triceps",
+      exercises: [
+        { name: "Barbell Bench Press", sets: 3, reps: "6-8" },
+        { name: "Incline Dumbbell Press", sets: 3, reps: "8-10" },
+        { name: "Cable Flyes", sets: 3, reps: "12-15" },
+        { name: "Triceps Pushdown", sets: 3, reps: "10-12" },
+      ],
+    };
+
+    const derived = deriveTargetMusclesFromJeffWorkout(chestWorkout);
+    expect(derived.primary).toContain("chest");
+    expect(derived.primary).toContain("upperChest");
+    expect(derived.secondary).toContain("triceps");
+    // Ensure no duplication between primary and secondary
+    for (const p of derived.primary) {
+      expect(derived.secondary).not.toContain(p);
+    }
+  });
+
+  it("derives pull / back muscles accurately", () => {
+    const pullWorkout = {
+      focusLabel: "Day 2: Pull (Back & Biceps)",
+      exercises: [
+        { name: "Barbell Deadlift", sets: 3, reps: "5" },
+        { name: "Lat Pulldown", sets: 3, reps: "8-10" },
+        { name: "Chest Supported Row", sets: 3, reps: "10-12" },
+        { name: "Biceps Curl", sets: 3, reps: "12" },
+      ],
+    };
+
+    const derived = deriveTargetMusclesFromJeffWorkout(pullWorkout);
+    expect(derived.primary).toContain("lats");
+    expect(derived.primary).toContain("midBack");
+    expect(derived.secondary).toContain("biceps");
+  });
+
+  it("formats muscle chips into recognizable Thai labels without duplicate chips", () => {
+    const regions = ["chest", "upperChest", "chest", "triceps", "tricepsLong"];
+    const chips = formatMuscleChips(regions, "th");
+
+    expect(chips).toContain("อกกลาง");
+    expect(chips).toContain("อกบน");
+    expect(chips).toContain("หลังแขน");
+    // "อกกลาง" should only appear once
+    expect(chips.filter((c) => c === "อกกลาง").length).toBe(1);
+    // "หลังแขน" should only appear once (both triceps and tricepsLong map to หลังแขน)
+    expect(chips.filter((c) => c === "หลังแขน").length).toBe(1);
+  });
+
+  it("formats clear Thai date labels with weekday and date", () => {
+    // 2026-10-16 is Friday
+    const date = new Date("2026-10-16T12:00:00");
+    const thaiLabel = formatThaiDateLabel(date, "th");
+    expect(thaiLabel).toBe("วันศุกร์ · 16 ต.ค.");
+
+    const enLabel = formatThaiDateLabel(date, "en");
+    expect(enLabel).toContain("Fri");
+    expect(enLabel).toContain("16");
   });
 });

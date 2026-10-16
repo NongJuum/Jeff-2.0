@@ -47,7 +47,10 @@ import {
   ActiveProgramDashboard,
   JeffProgramTodayCard,
   MissedRecoveryPrompt,
+  WeeklyReviewModal,
   getExerciseDisplayName,
+  formatThaiDateLabel,
+  formatMuscleChips,
 } from "./components/JeffProgramPicker";
 import {
   type ActiveJeffProgramState,
@@ -72,6 +75,12 @@ import {
   getProgramDateKey as getJeffProgramDateKey,
   type EligibleSessionOption,
   scheduleTodayOverride,
+  detectWeeklyReview,
+  completeWeeklyReview,
+  recoverSessionThisWeek,
+  deferSessionToFutureWeek,
+  skipAndDismissSession,
+  decideRecoveryLater,
 } from "./lib/jeffPrograms";
 import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
@@ -2964,6 +2973,17 @@ export default function Page() {
 
   // Active Jeff Nippard Scientific Workout Program State
   const [activeJeffProgram, setActiveJeffProgram] = useState<ActiveJeffProgramState | null>(() => getActiveJeffProgram());
+  const [showWeeklyReviewModal, setShowWeeklyReviewModal] = useState(false);
+  const [showRecoveryPromptModal, setShowRecoveryPromptModal] = useState(false);
+
+  // Check for weekly review across week boundaries
+  useEffect(() => {
+    if (!activeJeffProgram) return;
+    const review = detectWeeklyReview(activeJeffProgram, new Date());
+    if (review && review.unresolvedSessions.length > 0) {
+      setShowWeeklyReviewModal(true);
+    }
+  }, [activeJeffProgram?.programId, activeJeffProgram?.startDate]);
 
   // On mount and program change, detect missed sessions and plan make-up obligations deterministically
   useEffect(() => {
@@ -3084,6 +3104,7 @@ export default function Page() {
     saveActiveJeffProgram(updatedState);
     setActiveJeffProgram(updatedState);
     setSelectedDay(updatedState.currentDayIndex);
+    setShowRecoveryPromptModal(false);
   }
 
   function handleDeclineRecovery() {
@@ -3091,6 +3112,55 @@ export default function Page() {
     const updatedState = declineRecoveryPlan(activeJeffProgram);
     saveActiveJeffProgram(updatedState);
     setActiveJeffProgram(updatedState);
+    setShowRecoveryPromptModal(false);
+  }
+
+  function handleCompleteWeeklyReview(
+    weekNumber: number,
+    decision: "recover_this_week" | "defer" | "skip" | "decide_later",
+    assignments?: Record<string, string>
+  ) {
+    if (!activeJeffProgram) return;
+    const updatedState = completeWeeklyReview(activeJeffProgram, weekNumber, decision, assignments);
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
+    setShowWeeklyReviewModal(false);
+  }
+
+  function handleRecoverThisWeek(sessionId: string, targetDateKey: string) {
+    if (!activeJeffProgram) return;
+    const res = recoverSessionThisWeek(activeJeffProgram, sessionId, targetDateKey);
+    if (!res.success && res.error) {
+      alert(res.error);
+      return;
+    }
+    saveActiveJeffProgram(res.state);
+    setActiveJeffProgram(res.state);
+    setShowRecoveryPromptModal(false);
+  }
+
+  function handleDeferSession(sessionId: string) {
+    if (!activeJeffProgram) return;
+    const updatedState = deferSessionToFutureWeek(activeJeffProgram, sessionId);
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
+    setShowRecoveryPromptModal(false);
+  }
+
+  function handleSkipSession(sessionId: string) {
+    if (!activeJeffProgram) return;
+    const updatedState = skipAndDismissSession(activeJeffProgram, sessionId);
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
+    setShowRecoveryPromptModal(false);
+  }
+
+  function handleDecideLater() {
+    if (!activeJeffProgram) return;
+    const updatedState = decideRecoveryLater(activeJeffProgram);
+    saveActiveJeffProgram(updatedState);
+    setActiveJeffProgram(updatedState);
+    setShowRecoveryPromptModal(false);
   }
 
   function handleMoveSession(fromDate: string, toDate: string) {
@@ -3475,6 +3545,7 @@ export default function Page() {
   // Stage 2 Trainer Assessment Modal state
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
   const [showScoreModal, setShowScoreModal] = useState(false);
+  const [isPresetExerciseDetailsOpen, setIsPresetExerciseDetailsOpen] = useState(false);
 
   function handleApplyAssessmentPlan(targetDays: 3 | 4 | 5, profile: UserProfile) {
     saveUserProfile(profile);
@@ -5412,152 +5483,8 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Active Jeff Nippard Program Hero Widget */}
-            {activeJeffProgram && (
-              <div className="space-y-3">
-                <MissedRecoveryPrompt
-                  activeState={activeJeffProgram}
-                  onConfirmRecovery={handleConfirmRecovery}
-                  onDeclineRecovery={handleDeclineRecovery}
-                  language={appLanguage}
-                />
-                <JeffProgramTodayCard
-                  activeState={activeJeffProgram}
-                  onMarkDayComplete={handleMarkJeffDayComplete}
-                  onMoveSession={handleMoveSession}
-                  onCancelMove={handleCancelMove}
-                  onStartWorkout={() => {
-                    setSessionStage("lifting");
-                    setMode("today");
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                  onSelectTodaySession={handleSelectTodayWorkout}
-                  language={appLanguage}
-                />
-              </div>
-            )}
-
-            {/* B. "Today's Workout" Visual Hero Card or Rest Day Card */}
-            {!activeJeffProgram && (
-            isTodayScheduledRest ? (
-              <div className="rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-5 shadow-2xl relative overflow-hidden">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-1 text-xs font-black text-yellow-300 uppercase tracking-wider">
-                      <span>😴 REST & RECOVERY DAY</span>
-                    </span>
-                    <h3 className="mt-2 text-xl sm:text-2xl font-black text-white tracking-tight">
-                      วันนี้เป็นวันพักผ่อน (Rest Day) 😴
-                    </h3>
-                    <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
-                      ร่างกายกำลังซ่อมแซมและสร้างกล้ามเนื้อ (Hypertrophy เกิดขึ้นขณะพักผ่อน) ดื่มน้ำ ทานโปรตีนให้เพียงพอ และนอนหลับให้เต็มอิ่ม 💙
-                    </p>
-
-                    <div className="mt-4 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMode("today");
-                          window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
-                        className="rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-2.5 text-xs font-black text-yellow-300 hover:bg-yellow-400/20 transition active:scale-95"
-                      >
-                        ⚡ ซ้อมต่อ / เลือกวันเอง
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900/60 text-4xl shrink-0 self-center sm:self-auto">
-                    🛋️
-                  </div>
-                </div>
-              </div>
-            ) : dashboardDay ? (
-              <div className="rounded-3xl border border-yellow-500/30 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-4 sm:p-5 shadow-2xl relative overflow-hidden">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  {/* Left: Program focus, muscles, and estimated time */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-1 text-xs font-black text-yellow-300 uppercase tracking-wider">
-                        <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse shadow-[0_0_8px_#FFE500]" />
-                        <span>TODAY'S WORKOUT</span>
-                      </span>
-                      <span className="text-[11px] font-mono text-zinc-400 font-bold">
-                        {dashboardDay.exercises.length} ท่า · ประมาณ 45-60 นาที
-                      </span>
-                    </div>
-
-                    <h3 className="mt-2 text-xl sm:text-2xl font-black text-white tracking-tight">
-                      วันนี้เล่น: <span className="text-yellow-300">{dashboardDay.title}</span>
-                    </h3>
-                    <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{dashboardDay.subtitle}</p>
-
-                    {/* Target Muscle Badges */}
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      {dashboardDay.focus.map((focusGroup, idx) => (
-                        <span
-                          key={focusGroup}
-                          className="inline-flex items-center gap-1 rounded-lg border border-yellow-500/20 bg-zinc-900/90 px-2.5 py-1 text-xs font-bold text-yellow-300"
-                        >
-                          <span className={idx === 0 ? "text-yellow-400" : "text-purple-400"}>●</span>
-                          <span>{focusGroup}</span>
-                        </span>
-                      ))}
-                      {dashboardMuscleSummary.primary.slice(0, 3).map((r) => (
-                        <span
-                          key={r}
-                          className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-0.5 text-[11px] font-mono text-zinc-400"
-                        >
-                          {MUSCLE_REGION_LABELS[r]}
-                        </span>
-                      ))}
-                    </div>
-
-                    {/* Direct CTA Button */}
-                    <div className="mt-4 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSessionStage("lifting");
-                          setMode("today");
-                          window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
-                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black py-3 px-6 font-black uppercase tracking-wider text-sm shadow-[0_0_25px_rgba(250,204,21,0.4)] transition active:scale-[0.98]"
-                      >
-                        <Play size={16} className="fill-black stroke-[2.5]" />
-                        <span>▶ เริ่มเวิร์กเอาต์วันนี้</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Right: Integrated 3D Anatomical Muscle Figure with Volt Yellow & Purple highlights */}
-                  <div className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/70 p-2.5 shrink-0 self-center sm:self-auto shadow-inner">
-                    <div className="text-center">
-                      <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-1">Front</p>
-                      <RealisticAnatomyFigure
-                        side="front"
-                        primary={dashboardMuscleSummary.primary}
-                        secondary={dashboardMuscleSummary.secondary}
-                        compact
-                      />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-1">Back</p>
-                      <RealisticAnatomyFigure
-                        side="back"
-                        primary={dashboardMuscleSummary.primary}
-                        secondary={dashboardMuscleSummary.secondary}
-                        compact
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : null
-            )}
-
-            {/* C. Performance Overview with Apple-Style Activity Ring & Embedded 6-Component Breakdown */}
-            <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4 sm:p-5 shadow-2xl space-y-4">
+            {/* 1. Score Section at the Top */}
+            <div className="rounded-3xl border border-zinc-800 bg-zinc-950 p-4 sm:p-5 shadow-2xl space-y-3.5">
               <AppleActivityRing
                 score={performanceReport.hasData ? performanceReport.score : 0}
                 rank={performanceReport.rank}
@@ -5566,7 +5493,7 @@ export default function Page() {
                 onOpenScoreDetails={() => setShowScoreModal(true)}
               />
 
-              {/* Directly Embedded 6 Component Score Breakdown */}
+              {/* Directly Embedded Score Breakdown */}
               <div className="pt-2 border-t border-zinc-800/80">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-bold uppercase tracking-wider text-yellow-300">
@@ -5603,6 +5530,231 @@ export default function Page() {
                 )}
               </div>
             </div>
+
+            {/* 2. Today's Workout Card: Jeff Program Hero Widget */}
+            {activeJeffProgram && (
+              <div className="space-y-3">
+                <MissedRecoveryPrompt
+                  activeState={activeJeffProgram}
+                  onConfirmRecovery={handleConfirmRecovery}
+                  onDeclineRecovery={handleDeclineRecovery}
+                  onRecoverThisWeek={handleRecoverThisWeek}
+                  onDeferSession={handleDeferSession}
+                  onSkipSession={handleSkipSession}
+                  onDecideLater={handleDecideLater}
+                  forceOpen={showRecoveryPromptModal}
+                  onClose={() => setShowRecoveryPromptModal(false)}
+                  language={appLanguage}
+                />
+                <JeffProgramTodayCard
+                  activeState={activeJeffProgram}
+                  onMarkDayComplete={handleMarkJeffDayComplete}
+                  onMoveSession={handleMoveSession}
+                  onCancelMove={handleCancelMove}
+                  onStartWorkout={() => {
+                    setSessionStage("lifting");
+                    setMode("today");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  onSelectTodaySession={handleSelectTodayWorkout}
+                  onOpenRecovery={() => setShowRecoveryPromptModal(true)}
+                  language={appLanguage}
+                  muscleSummary={dashboardMuscleSummary}
+                />
+              </div>
+            )}
+
+            {/* 2. Today's Workout Card: Preset or Custom Split */}
+            {!activeJeffProgram && (
+            isTodayScheduledRest ? (
+              <div className="rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-5 shadow-2xl relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-black/40 px-2.5 py-0.5 text-xs font-bold text-white/95">
+                        📅 {formatThaiDateLabel(new Date(), appLanguage)}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-2.5 py-0.5 text-xs font-black text-yellow-300 uppercase tracking-wider">
+                        <span>😴 REST & RECOVERY DAY</span>
+                      </span>
+                    </div>
+                    <h3 className="mt-2 text-xl sm:text-2xl font-black text-white tracking-tight">
+                      {appLanguage === "th" ? "วันนี้เป็นวันพักผ่อน (Rest Day) 😴" : "Today is a Rest Day 😴"}
+                    </h3>
+                    <p className="mt-1 text-xs text-zinc-400 leading-relaxed">
+                      {appLanguage === "th"
+                        ? "ร่างกายกำลังซ่อมแซมและสร้างกล้ามเนื้อ (Hypertrophy เกิดขึ้นขณะพักผ่อน) ดื่มน้ำ ทานโปรตีนให้เพียงพอ และนอนหลับให้เต็มอิ่ม 💙"
+                        : "Your muscles grow and recover while resting. Stay hydrated, eat enough protein, and get quality sleep! 💙"}
+                    </p>
+
+                    <div className="mt-4 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMode("today");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-2.5 text-xs font-black text-yellow-300 hover:bg-yellow-400/20 transition active:scale-95"
+                      >
+                        ⚡ {appLanguage === "th" ? "ซ้อมต่อ / เลือกวันเอง" : "Train Today / Choose Day"}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900/60 text-4xl shrink-0 self-center sm:self-auto">
+                    🛋️
+                  </div>
+                </div>
+              </div>
+            ) : dashboardDay ? (
+              <div className="rounded-3xl border border-yellow-500/30 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                  {/* Left: Program focus, muscles, and estimated time */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-black/40 border border-zinc-700/60 px-2.5 py-0.5 text-xs font-bold text-white/95">
+                        📅 {formatThaiDateLabel(new Date(), appLanguage)}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-2.5 py-0.5 text-xs font-black text-yellow-300 uppercase tracking-wider">
+                        <span className="h-2 w-2 rounded-full bg-yellow-400 animate-pulse shadow-[0_0_8px_#FFE500]" />
+                        <span>TODAY'S WORKOUT</span>
+                      </span>
+                      <span className="text-[11px] font-mono text-zinc-400 font-bold">
+                        {dashboardDay.exercises.length} ท่า · ประมาณ 45-60 นาที
+                      </span>
+                    </div>
+
+                    <h3 className="mt-1 text-xl sm:text-2xl font-black text-white tracking-tight">
+                      {appLanguage === "th" ? "วันนี้เล่น: " : "Today: "}
+                      <span className="text-yellow-300">{dashboardDay.title}</span>
+                    </h3>
+                    <p className="mt-0.5 text-xs text-zinc-400 line-clamp-1">{dashboardDay.subtitle}</p>
+
+                    {/* Target Muscle Badges directly below workout title */}
+                    {(() => {
+                      const primaryChips = formatMuscleChips(dashboardMuscleSummary.primary, appLanguage);
+                      const secondaryChips = formatMuscleChips(dashboardMuscleSummary.secondary, appLanguage).filter(
+                        (c) => !primaryChips.includes(c)
+                      );
+                      if (primaryChips.length === 0 && secondaryChips.length === 0 && dashboardDay.focus.length === 0) return null;
+                      return (
+                        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-zinc-400 mr-0.5">
+                            {appLanguage === "th" ? "กล้ามเนื้อเป้าหมาย:" : "Target Muscles:"}
+                          </span>
+                          {primaryChips.map((muscle) => (
+                            <span
+                              key={`preset-p-${muscle}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-yellow-500/40 bg-yellow-500/15 px-2.5 py-0.5 text-xs font-bold text-yellow-300"
+                            >
+                              <span className="text-yellow-400 text-[9px]">●</span>
+                              <span>{muscle}</span>
+                              <span className="text-[9px] text-yellow-400/80 font-normal">
+                                {appLanguage === "th" ? "(หลัก)" : "(Primary)"}
+                              </span>
+                            </span>
+                          ))}
+                          {secondaryChips.map((muscle) => (
+                            <span
+                              key={`preset-s-${muscle}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-zinc-700/60 bg-zinc-800/80 px-2 py-0.5 text-xs font-medium text-zinc-300"
+                            >
+                              <span className="text-zinc-400 text-[9px]">○</span>
+                              <span>{muscle}</span>
+                              <span className="text-[9px] text-zinc-400 font-normal">
+                                {appLanguage === "th" ? "(รอง)" : "(Secondary)"}
+                              </span>
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Collapsible Exercise Details Toggle */}
+                    <div className="mt-4 pt-3 border-t border-zinc-800/80">
+                      <button
+                        type="button"
+                        onClick={() => setIsPresetExerciseDetailsOpen((prev) => !prev)}
+                        className="w-full flex items-center justify-between text-left group hover:opacity-90 transition py-1 focus:outline-none"
+                        aria-expanded={isPresetExerciseDetailsOpen}
+                        aria-controls="preset-exercise-details-list"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-zinc-300 group-hover:text-white transition flex items-center gap-1.5">
+                            <span>🏋️‍♂️</span>
+                            <span>{dashboardDay.exercises.length} {appLanguage === "th" ? "ท่าฝึก" : "Exercises"}</span>
+                          </span>
+                          <span className="text-[11px] text-zinc-500 font-mono">
+                            ({dashboardDay.exercises.reduce((a, b) => a + (b.sets || 0), 0)} {appLanguage === "th" ? "เซตทั้งหมด" : "sets total"})
+                          </span>
+                        </div>
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-yellow-400 group-hover:text-yellow-300 transition">
+                          <span>{isPresetExerciseDetailsOpen ? (appLanguage === "th" ? "ซ่อนรายละเอียด" : "Hide details") : (appLanguage === "th" ? "ดูรายละเอียดท่าฝึก" : "View exercise details")}</span>
+                          <ChevronDown size={14} className={`transition-transform duration-200 ${isPresetExerciseDetailsOpen ? "rotate-180" : ""}`} />
+                        </span>
+                      </button>
+
+                      {isPresetExerciseDetailsOpen && (
+                        <div id="preset-exercise-details-list" className="mt-2.5 divide-y divide-zinc-800/60 border-t border-zinc-800/60">
+                          {dashboardDay.exercises.map((ex, idx) => (
+                            <div key={ex.id || idx} className="py-2.5 flex items-center justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-bold text-white truncate">{ex.name}</p>
+                                <p className="text-xs text-zinc-400 mt-0.5">
+                                  {ex.sets} sets × {ex.reps} {ex.warmup ? "· มี Warmup" : ""}
+                                </p>
+                              </div>
+                              <span className="text-xs font-mono font-bold text-zinc-500 bg-zinc-900 px-2 py-0.5 rounded-md">
+                                #{idx + 1}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Direct CTA Button */}
+                    <div className="mt-4 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSessionStage("lifting");
+                          setMode("today");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black py-3 px-6 font-black uppercase tracking-wider text-sm shadow-[0_0_25px_rgba(250,204,21,0.4)] transition active:scale-[0.98]"
+                      >
+                        <Play size={16} className="fill-black stroke-[2.5]" />
+                        <span>{appLanguage === "th" ? "▶ เริ่มเวิร์กเอาต์วันนี้" : "▶ Start Workout"}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right: Integrated 3D Anatomical Muscle Figure with Volt Yellow & Purple highlights */}
+                  <div className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/70 p-2.5 shrink-0 self-center sm:self-auto shadow-inner">
+                    <div className="text-center">
+                      <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-1">Front</p>
+                      <RealisticAnatomyFigure
+                        side="front"
+                        primary={dashboardMuscleSummary.primary}
+                        secondary={dashboardMuscleSummary.secondary}
+                        compact
+                      />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-[9px] font-mono font-bold uppercase tracking-wider text-zinc-500 mb-1">Back</p>
+                      <RealisticAnatomyFigure
+                        side="back"
+                        primary={dashboardMuscleSummary.primary}
+                        secondary={dashboardMuscleSummary.secondary}
+                        compact
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null
+            )}
 
             {/* Quick Status Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -5869,6 +6021,12 @@ export default function Page() {
                   activeState={activeJeffProgram}
                   onConfirmRecovery={handleConfirmRecovery}
                   onDeclineRecovery={handleDeclineRecovery}
+                  onRecoverThisWeek={handleRecoverThisWeek}
+                  onDeferSession={handleDeferSession}
+                  onSkipSession={handleSkipSession}
+                  onDecideLater={handleDecideLater}
+                  forceOpen={showRecoveryPromptModal}
+                  onClose={() => setShowRecoveryPromptModal(false)}
                   language={appLanguage}
                 />
                 <ActiveProgramDashboard
@@ -8031,6 +8189,15 @@ export default function Page() {
             </button>
           </div>
         </div>
+      )}
+
+      {showWeeklyReviewModal && activeJeffProgram && (
+        <WeeklyReviewModal
+          activeState={activeJeffProgram}
+          onCompleteReview={handleCompleteWeeklyReview}
+          onClose={() => setShowWeeklyReviewModal(false)}
+          language={appLanguage}
+        />
       )}
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">
