@@ -300,6 +300,316 @@ export interface MechanicalProfile {
   minHardwareStep: number;
   tareWeight: number; // bar/bar-start resistance in kg
   isPlateLoaded?: boolean;
+  cableConfig?: CableResistanceConfig;
+}
+
+export type StackLabelMeaning = "physical_stack_mass" | "effective_resistance_per_handle";
+export type CableLabelScope = "per_side" | "combined";
+
+/**
+ * Authoritative Machine-Level Cable Resistance Configuration.
+ * Accounts for manufacturer stack label semantics, internal pulley mechanical advantage,
+ * number of cable sides contributing to the selected attachment, and display scope.
+ */
+export interface CableResistanceConfig {
+  /**
+   * - "physical_stack_mass": Pin numbers represent physical iron mass (effective handle force = mass / pulley ratio).
+   * - "effective_resistance_per_handle": Pin numbers represent manufacturer-calibrated effective resistance at the handle.
+   */
+  stackLabelMeaning: StackLabelMeaning;
+  /**
+   * Pulley mechanical ratio (convention: cable displacement / stack displacement).
+   * e.g. 2.0 represents a 2:1 system (2m of cable pulled raises stack by 1m, 2:1 mechanical advantage).
+   */
+  pulleyRatio: number;
+  /**
+   * Number of cable sides connected to the user's attachment.
+   * e.g. 1 for unilateral/single handle; 2 for dual cables attached to one straight/lat pulldown bar.
+   */
+  contributingCableSides: number;
+  /**
+   * Scope of the printed stack label or console display:
+   * - "per_side": Printed label indicates weight on one stack/side.
+   * - "combined": Printed label or digital display indicates combined resistance across both cables.
+   */
+  labelScope: CableLabelScope;
+  machineName?: string;
+  notes?: string;
+}
+
+export interface CableResistanceResult {
+  /** The value printed on the weight stack pin plate (per stack if per_side, or total if combined) */
+  labelledWeightKg: number;
+  /** Effective resistance delivered at a single cable handle / side (kgf) */
+  effectivePerHandleKg: number;
+  /** Effective total combined resistance delivered to the lifter at the bar/attachment (kgf) */
+  effectiveCombinedResistanceKg: number;
+  /** Estimated physical iron mass of the weight stack (per stack) (kg) */
+  physicalStackMassKg: number;
+  /** Pulley ratio used in calculation */
+  pulleyRatio: number;
+  stackLabelMeaning: StackLabelMeaning;
+  labelScope: CableLabelScope;
+  contributingCableSides: number;
+  /** Human-readable explanation of the resistance mechanics */
+  displaySummary: string;
+}
+
+export interface CableMachineDefault {
+  aliases: string[];
+  config: CableResistanceConfig;
+  source: MachineResistanceSource;
+}
+
+/**
+ * Built-in commercial cable machine presets.
+ * Note: Machines with similar names may use different mechanical configurations;
+ * machine profiles define explicit semantics rather than inferring from name alone.
+ */
+export const CABLE_MACHINE_DEFAULTS: CableMachineDefault[] = [
+  {
+    aliases: [
+      "dual pulley cable pulldown",
+      "dual cable pulldown",
+      "dual pulley pulldown",
+      "dual-pulley pulldown",
+    ],
+    config: {
+      stackLabelMeaning: "effective_resistance_per_handle",
+      pulleyRatio: 2.0,
+      contributingCableSides: 2,
+      labelScope: "per_side",
+      machineName: "Dual Pulley Cable Pulldown",
+      notes: "Manufacturer-rated effective resistance per handle. Dual cables attach to single bar (combined resistance = 2x printed per-side setting).",
+    },
+    source: "manufacturer-spec",
+  },
+  {
+    aliases: [
+      "cable lat raise",
+      "cable lateral raise",
+      "behind back cable",
+      "cable y raise",
+      "cable rear delt",
+      "cable face pull",
+      "bayesian curl",
+      "cable curl",
+      "cable rope hammer",
+      "cable hammer",
+      "overhead cable ext",
+      "cable tricep",
+      "triceps pressdown",
+      "cable pressdown",
+      "cable kickback",
+      "glute kickback",
+      "katana",
+      "functional trainer",
+    ],
+    config: {
+      stackLabelMeaning: "physical_stack_mass",
+      pulleyRatio: 2.0,
+      contributingCableSides: 1,
+      labelScope: "per_side",
+      machineName: "Functional Trainer (2:1)",
+      notes: "Standard functional trainer with 2:1 pulley. Pin label represents physical stack mass.",
+    },
+    source: "category-estimate",
+  },
+  {
+    aliases: [
+      "lat pull down",
+      "lat pulldown",
+      "lat pull",
+      "cable row",
+      "seated cable row",
+      "cable crunch",
+      "straight arm pulldown",
+      "cable lat prayers",
+    ],
+    config: {
+      stackLabelMeaning: "physical_stack_mass",
+      pulleyRatio: 1.0,
+      contributingCableSides: 1,
+      labelScope: "combined",
+      machineName: "Standard Cable Lat Pulldown / Row (1:1)",
+      notes: "Standard commercial 1:1 direct selectorized cable stack.",
+    },
+    source: "category-estimate",
+  },
+];
+
+/**
+ * Resolves the baseline default cable configuration for an exercise or machine name.
+ */
+export function getCableMachineDefault(exerciseName: string, machineTag = ""): CableResistanceConfig {
+  const combined = `${exerciseName} ${machineTag}`.toLowerCase().replace(/\s+/g, " ").trim();
+  const matched = [...CABLE_MACHINE_DEFAULTS]
+    .sort((a, b) => Math.max(...b.aliases.map((alias) => alias.length)) - Math.max(...a.aliases.map((alias) => alias.length)))
+    .find((entry) => entry.aliases.some((alias) => combined.includes(alias)));
+
+  if (matched) {
+    return { ...matched.config };
+  }
+
+  const isDual = combined.includes("dual") || combined.includes("crossover");
+  return {
+    stackLabelMeaning: "physical_stack_mass",
+    pulleyRatio: 2.0,
+    contributingCableSides: isDual ? 2 : 1,
+    labelScope: "per_side",
+    machineName: "Generic Cable Machine",
+    notes: "Default category estimate: physical stack mass with 2:1 pulley.",
+  };
+}
+
+/**
+ * Resolves the active CableResistanceConfig by combining defaults with any user/machine overrides.
+ */
+export function resolveCableResistanceConfig(
+  exerciseName: string,
+  machineTag = "",
+  userOverride?: Partial<CableResistanceConfig>,
+  pulleyRatioOverride?: number
+): CableResistanceConfig {
+  const base = getCableMachineDefault(exerciseName, machineTag);
+  const resolved: CableResistanceConfig = {
+    ...base,
+    ...(userOverride || {}),
+  };
+  if (pulleyRatioOverride !== undefined && Number.isFinite(pulleyRatioOverride) && pulleyRatioOverride > 0) {
+    resolved.pulleyRatio = pulleyRatioOverride;
+  }
+  return resolved;
+}
+
+/**
+ * Authoritative Resistance Conversion Function.
+ * Calculates effective handle resistance, combined attachment resistance, and estimated physical stack mass.
+ *
+ * Rules to prevent errors:
+ * - When stackLabelMeaning === "effective_resistance_per_handle", pulley ratio is NOT multiplied or divided into handle resistance.
+ * - When labelScope === "combined", contributingCableSides is NOT multiplied again.
+ * - When labelScope === "per_side" and contributingCableSides === 2, combined resistance = per_side * 2.
+ */
+export function calculateCableEffectiveResistance(
+  labelledWeightKg: number,
+  config: CableResistanceConfig
+): CableResistanceResult {
+  const safeLabel = Number.isFinite(labelledWeightKg) && labelledWeightKg > 0 ? labelledWeightKg : 0;
+  const ratio = Number.isFinite(config.pulleyRatio) && config.pulleyRatio > 0 ? config.pulleyRatio : 1.0;
+  const sides = Number.isFinite(config.contributingCableSides) && config.contributingCableSides > 0
+    ? Math.round(config.contributingCableSides)
+    : 1;
+  const meaning = config.stackLabelMeaning || "physical_stack_mass";
+  const scope = config.labelScope || "per_side";
+
+  let effectivePerHandleKg: number;
+  let effectiveCombinedResistanceKg: number;
+  let physicalStackMassKg: number;
+
+  if (meaning === "effective_resistance_per_handle") {
+    // Manufacturer-rated: label already accounts for internal pulley ratio
+    if (scope === "per_side") {
+      effectivePerHandleKg = safeLabel;
+      effectiveCombinedResistanceKg = safeLabel * sides;
+      physicalStackMassKg = safeLabel * ratio;
+    } else {
+      // Label represents combined resistance
+      effectiveCombinedResistanceKg = safeLabel;
+      effectivePerHandleKg = safeLabel / sides;
+      physicalStackMassKg = (safeLabel / sides) * ratio;
+    }
+  } else {
+    // Physical stack mass: pulley ratio divides the physical mass into handle force
+    if (scope === "per_side") {
+      physicalStackMassKg = safeLabel;
+      effectivePerHandleKg = safeLabel / ratio;
+      effectiveCombinedResistanceKg = (safeLabel / ratio) * sides;
+    } else {
+      // Label is total physical mass across stacks
+      physicalStackMassKg = safeLabel / sides;
+      effectivePerHandleKg = (safeLabel / sides) / ratio;
+      effectiveCombinedResistanceKg = safeLabel / ratio;
+    }
+  }
+
+  let displaySummary = "";
+  if (meaning === "effective_resistance_per_handle") {
+    if (sides > 1 && scope === "per_side") {
+      displaySummary = `ป้ายพินข้างละ ${safeLabel} kg · ${sides} สายดึงรวมแรงต้าน ${Math.round(effectiveCombinedResistanceKg * 10) / 10} kgf (ผู้ผลิตระบุแรงต้านต่อด้ามจับ)`;
+    } else if (scope === "combined") {
+      displaySummary = `ป้ายระบุแรงต้านรวม ${safeLabel} kgf (${sides} สาย · ข้างละ ${Math.round(effectivePerHandleKg * 10) / 10} kgf)`;
+    } else {
+      displaySummary = `ป้ายระบุแรงต้านจริง ${safeLabel} kgf (รอก ${ratio}:1)`;
+    }
+  } else {
+    if (sides > 1) {
+      displaySummary = `มวลแผ่นพิน ${safeLabel} kg (รอกทด ${ratio}:1 · ${sides} สายดึงรวมแรงต้าน ${Math.round(effectiveCombinedResistanceKg * 10) / 10} kgf)`;
+    } else {
+      displaySummary = `มวลแผ่นพิน ${safeLabel} kg (รอกทด ${ratio}:1 · แรงต้านจริง ${Math.round(effectiveCombinedResistanceKg * 10) / 10} kgf)`;
+    }
+  }
+
+  return {
+    labelledWeightKg: Math.round(safeLabel * 100) / 100,
+    effectivePerHandleKg: Math.round(effectivePerHandleKg * 100) / 100,
+    effectiveCombinedResistanceKg: Math.round(effectiveCombinedResistanceKg * 100) / 100,
+    physicalStackMassKg: Math.round(physicalStackMassKg * 100) / 100,
+    pulleyRatio: ratio,
+    stackLabelMeaning: meaning,
+    labelScope: scope,
+    contributingCableSides: sides,
+    displaySummary,
+  };
+}
+
+/**
+ * Inverse Authoritative Resistance Conversion Function.
+ * Translates target physiological force (kgf) into the recommended stack pin setting (kg).
+ */
+export function calculateCableStackSettingFromTargetForce(
+  targetCombinedResistanceKg: number,
+  config: CableResistanceConfig
+): {
+  targetLabelledWeightKg: number;
+  targetEffectivePerHandleKg: number;
+  targetCombinedResistanceKg: number;
+  config: CableResistanceConfig;
+} {
+  const safeTarget = Number.isFinite(targetCombinedResistanceKg) && targetCombinedResistanceKg > 0
+    ? targetCombinedResistanceKg
+    : 0;
+  const ratio = Number.isFinite(config.pulleyRatio) && config.pulleyRatio > 0 ? config.pulleyRatio : 1.0;
+  const sides = Number.isFinite(config.contributingCableSides) && config.contributingCableSides > 0
+    ? Math.round(config.contributingCableSides)
+    : 1;
+  const meaning = config.stackLabelMeaning || "physical_stack_mass";
+  const scope = config.labelScope || "per_side";
+
+  const targetPerHandle = safeTarget / sides;
+  let targetLabelledWeightKg: number;
+
+  if (meaning === "effective_resistance_per_handle") {
+    if (scope === "per_side") {
+      targetLabelledWeightKg = targetPerHandle;
+    } else {
+      targetLabelledWeightKg = safeTarget;
+    }
+  } else {
+    // physical_stack_mass: requires targetPerHandle * pulleyRatio mass
+    if (scope === "per_side") {
+      targetLabelledWeightKg = targetPerHandle * ratio;
+    } else {
+      targetLabelledWeightKg = safeTarget * ratio;
+    }
+  }
+
+  return {
+    targetLabelledWeightKg: Math.round(targetLabelledWeightKg * 100) / 100,
+    targetEffectivePerHandleKg: Math.round(targetPerHandle * 100) / 100,
+    targetCombinedResistanceKg: Math.round(safeTarget * 100) / 100,
+    config,
+  };
 }
 
 export type BiomechanicalProfile = {
@@ -308,6 +618,7 @@ export type BiomechanicalProfile = {
   isPerHand: boolean;        // true = user plates/pins one arm at a time (Iso-Lateral / DB)
   stabilityFactor: number;  // 1.15 for chest-supported, 0.90 for free/core-loaded
   isPlateLoaded?: boolean;
+  cableConfig?: CableResistanceConfig;
 };
 
 export function resolveMechanicalProfile(exerciseName: string, machineTag = ""): BiomechanicalProfile {
@@ -356,6 +667,17 @@ export function resolveMechanicalProfile(exerciseName: string, machineTag = ""):
 
   // 4. Pulldowns
   if (text.includes("pulldown") || text.includes("pull down")) {
+    const isDual = text.includes("dual");
+    if (isDual) {
+      const cableCfg = getCableMachineDefault(exerciseName, machineTag);
+      return {
+        baseRatio: { male: 0.62, female: 0.40 },
+        pulleyRatio: cableCfg.pulleyRatio,
+        isPerHand: false,
+        stabilityFactor: 1.05,
+        cableConfig: cableCfg,
+      };
+    }
     return { baseRatio: { male: isIso ? 0.34 : 0.62, female: isIso ? 0.22 : 0.40 }, pulleyRatio: 1.0, isPerHand: isIso, stabilityFactor: 1.05 };
   }
 
@@ -763,6 +1085,8 @@ export interface BiomechanicalResult {
   /** True when the available hardware minimum exceeds the calculated target. */
   hardwareExceedsTarget: boolean;
   displayNote: string;
+  cableConfig?: CableResistanceConfig;
+  cableResult?: CableResistanceResult;
 }
 /**
  * Explicit Biomechanical Safety Factor (Conservative Load Margin)
@@ -860,6 +1184,7 @@ export function quantizeToHardware(
   hardwareExceedsTarget: boolean;
   displayNote: string;
   explicitLoadTypeLabel: string;
+  cableResult?: CableResistanceResult;
 } {
   const safeRawKg = Number.isFinite(rawWeightKg) ? Math.max(0, rawWeightKg) : 0;
   const tareKg = Math.max(0, Number.isFinite(profile.tareWeight) ? profile.tareWeight : 0);
@@ -996,14 +1321,40 @@ export function quantizeToHardware(
   let displayNote: string;
   let explicitLoadTypeLabel: string;
   let effectiveHardwareWeightKg: number = actualKg;
+  let cableResult: CableResistanceResult | undefined;
 
   if (isCable) {
-    const effectiveAtHandle = Math.round((actualKg / (profile.pulleyRatio || 1)) * 10) / 10;
-    effectiveHardwareWeightKg = effectiveAtHandle;
-    explicitLoadTypeLabel = profile.isPerHand
-      ? `Cable (สลักพินต่อฝั่ง · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`
-      : `Cable (สลักพิน · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`;
-    displayNote = `เสียบสลักพิน ${roundDisplay(snappedDisplay)} ${unitLabel}${profile.isPerHand ? " ต่อฝั่ง" : ""} (รอกทด ${profile.pulleyRatio}:1)`;
+    if (profile.cableConfig) {
+      cableResult = calculateCableEffectiveResistance(actualKg, profile.cableConfig);
+      effectiveHardwareWeightKg = cableResult.effectiveCombinedResistanceKg;
+      const isPerSideLabel = cableResult.labelScope === "per_side";
+      const isDualCables = cableResult.contributingCableSides > 1;
+
+      if (cableResult.stackLabelMeaning === "effective_resistance_per_handle") {
+        explicitLoadTypeLabel = isDualCables
+          ? `Cable (${cableResult.contributingCableSides} สายดึงรวม · ป้ายระบุแรงต้านจริงต่อข้าง · รอก ${cableResult.pulleyRatio}:1)`
+          : `Cable (ป้ายระบุแรงต้านจริงต่อด้ามจับ · รอก ${cableResult.pulleyRatio}:1)`;
+        displayNote = isDualCables && isPerSideLabel
+          ? `เสียบสลักพินข้างละ ${roundDisplay(snappedDisplay)} ${unitLabel} (${cableResult.contributingCableSides} ข้างรวมแรงต้าน ${roundDisplay(toDisplay(cableResult.effectiveCombinedResistanceKg))} ${unitLabel} · ผู้ผลิตระบุแรงต้านต่อข้าง)`
+          : `เสียบสลักพิน ${roundDisplay(snappedDisplay)} ${unitLabel} (แรงต้านจริง ${roundDisplay(toDisplay(cableResult.effectiveCombinedResistanceKg))} ${unitLabel})`;
+      } else {
+        explicitLoadTypeLabel = isDualCables
+          ? `Cable (${cableResult.contributingCableSides} สายดึงรวม · สลักพินมวลแผ่น · รอกทด ${cableResult.pulleyRatio}:1)`
+          : profile.isPerHand
+          ? `Cable (สลักพินต่อฝั่ง · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`
+          : `Cable (สลักพิน · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`;
+        displayNote = isDualCables && isPerSideLabel
+          ? `เสียบสลักพินข้างละ ${roundDisplay(snappedDisplay)} ${unitLabel} (${cableResult.contributingCableSides} ข้างรวมแรงต้าน ${roundDisplay(toDisplay(cableResult.effectiveCombinedResistanceKg))} ${unitLabel} · รอกทด ${cableResult.pulleyRatio}:1)`
+          : `เสียบสลักพิน ${roundDisplay(snappedDisplay)} ${unitLabel}${profile.isPerHand ? " ต่อฝั่ง" : ""} (รอกทด ${profile.pulleyRatio}:1)`;
+      }
+    } else {
+      const effectiveAtHandle = Math.round((actualKg / (profile.pulleyRatio || 1)) * 10) / 10;
+      effectiveHardwareWeightKg = effectiveAtHandle;
+      explicitLoadTypeLabel = profile.isPerHand
+        ? `Cable (สลักพินต่อฝั่ง · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`
+        : `Cable (สลักพิน · รอกทด ${profile.pulleyRatio}:1 · ค่าประมาณ)`;
+      displayNote = `เสียบสลักพิน ${roundDisplay(snappedDisplay)} ${unitLabel}${profile.isPerHand ? " ต่อฝั่ง" : ""} (รอกทด ${profile.pulleyRatio}:1)`;
+    }
   } else if (profile.isPerHand) {
     explicitLoadTypeLabel = "Dumbbell (น้ำหนักต่อข้าง/ต่อมือ)";
     displayNote = `ดัมเบล/โหลด ${roundDisplay(snappedDisplay)} ${unitLabel} ต่อข้าง`;
@@ -1027,6 +1378,7 @@ export function quantizeToHardware(
     hardwareExceedsTarget: exceeds,
     displayNote: displayNote + warning(actualKg),
     explicitLoadTypeLabel,
+    cableResult,
   };
 }
 
@@ -1050,7 +1402,8 @@ export function calculatePrescriptionWeight(
   startingResistanceOverrideKg?: number,
   exerciseId?: string,
   targetUnit?: WeightUnit,
-  forcedTier?: ExperienceTier | "Beginner" | "Intermediate" | "Advanced" | "Elite"
+  forcedTier?: ExperienceTier | "Beginner" | "Intermediate" | "Advanced" | "Elite",
+  cableConfigOverride?: Partial<CableResistanceConfig>
 ): BiomechanicalResult {
   const bw = userProfile.weightKg;
   const isFemale = userProfile.gender === "female";
@@ -1146,11 +1499,22 @@ export function calculatePrescriptionWeight(
   if (!isFreeWeightLoad && isRowChestOrPulldown && mechProfile.baseRatio.male !== 0.40) {
     const baseRatio = isFemale ? mechProfile.baseRatio.female : mechProfile.baseRatio.male;
     const f_physio = bw * baseRatio * e_exp * r_rep * mechProfile.stabilityFactor * g_goal * m_musc * safety_factor;
-    const selectedPulleyRatio = Number.isFinite(pulleyRatioOverride) && pulleyRatioOverride! > 0
+    
+    let rawWeightKg: number;
+    let selectedPulleyRatio = Number.isFinite(pulleyRatioOverride) && pulleyRatioOverride! > 0
       ? Math.min(4, Math.max(1, pulleyRatioOverride!))
       : mechProfile.pulleyRatio;
-    // Physical pin load = physiological force * pulley mechanical advantage ratio
-    const rawWeightKg = f_physio * selectedPulleyRatio;
+    let cableConfig: CableResistanceConfig | undefined;
+
+    if (load === "cable") {
+      cableConfig = resolveCableResistanceConfig(exerciseName, machineTag, cableConfigOverride, pulleyRatioOverride);
+      selectedPulleyRatio = cableConfig.pulleyRatio;
+      const cableTarget = calculateCableStackSettingFromTargetForce(f_physio, cableConfig);
+      rawWeightKg = cableTarget.targetLabelledWeightKg;
+    } else {
+      // Physical pin load = physiological force * pulley mechanical advantage ratio
+      rawWeightKg = f_physio * selectedPulleyRatio;
+    }
 
     const isIsolation = cat === "LatRaise" || cat === "Flye" || cat === "Bicep" || cat === "Tricep" || cat === "RearDelt";
     const quantProfile: MechanicalProfile = {
@@ -1163,6 +1527,7 @@ export function calculatePrescriptionWeight(
       bilateralDeficit: false,
       minHardwareStep: 2.5,
       tareWeight: 0,
+      cableConfig,
     };
     const quantized = quantizeToHardware(rawWeightKg, quantProfile, isIsolation, load === "cable", unit, resSource, resolvedConfig);
 
@@ -1175,7 +1540,9 @@ export function calculatePrescriptionWeight(
       : (load === "plate-loaded" || mechProfile.isPlateLoaded)
       ? (mechProfile.isPerHand ? "เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)" : "เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)")
       : load === "cable"
-      ? (mechProfile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน")
+      ? (cableConfig?.labelScope === "per_side" && cableConfig?.contributingCableSides > 1
+          ? "น้ำหนักพินต่อข้าง (2 สายดึงรวม)"
+          : (mechProfile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน"))
       : "น้ำหนักเครื่อง";
 
     return {
@@ -1200,6 +1567,8 @@ export function calculatePrescriptionWeight(
       hardwareExceedsTarget: quantized.hardwareExceedsTarget,
       targetWeightKg: Math.round(rawWeightKg * 10) / 10,
       displayNote: quantized.displayNote,
+      cableConfig,
+      cableResult: quantized.cableResult,
     };
   }
 
@@ -1216,19 +1585,35 @@ export function calculatePrescriptionWeight(
     profile.tareWeight = startingResistanceOverrideKg;
   }
 
-  if (profile.isPerHand) {
-    force = (force / 2) * (profile.bilateralDeficit ? 0.88 : 1.0);
-  }
-
-  const radAngle = (profile.angleThetaDeg * Math.PI) / 180;
-  const denominator = Math.cos(radAngle) + profile.frictionCoeff;
+  let cableConfig: CableResistanceConfig | undefined;
+  let rawWeightKg: number;
   const fallbackPulleyRatio = Number.isFinite(profile.pulleyRatio) && profile.pulleyRatio > 0
     ? Math.min(4, Math.max(1, profile.pulleyRatio))
     : 1;
-  const selectedPulleyRatio = Number.isFinite(pulleyRatioOverride) && pulleyRatioOverride! > 0
+  let selectedPulleyRatio = Number.isFinite(pulleyRatioOverride) && pulleyRatioOverride! > 0
     ? Math.min(4, Math.max(1, pulleyRatioOverride!))
     : fallbackPulleyRatio;
-  let rawWeightKg = force * profile.leverageRatio * profile.camModifier * (selectedPulleyRatio / denominator);
+
+  const radAngle = (profile.angleThetaDeg * Math.PI) / 180;
+  const denominator = Math.cos(radAngle) + profile.frictionCoeff;
+
+  if (load === "cable") {
+    cableConfig = resolveCableResistanceConfig(exerciseName, machineTag, cableConfigOverride, pulleyRatioOverride);
+    selectedPulleyRatio = cableConfig.pulleyRatio;
+    profile.pulleyRatio = selectedPulleyRatio;
+    profile.cableConfig = cableConfig;
+
+    if (profile.isPerHand && cableConfig.contributingCableSides === 1) {
+      force = (force / 2) * (profile.bilateralDeficit ? 0.88 : 1.0);
+    }
+    const cableTarget = calculateCableStackSettingFromTargetForce(force, cableConfig);
+    rawWeightKg = (cableTarget.targetLabelledWeightKg * profile.leverageRatio * profile.camModifier) / denominator;
+  } else {
+    if (profile.isPerHand) {
+      force = (force / 2) * (profile.bilateralDeficit ? 0.88 : 1.0);
+    }
+    rawWeightKg = force * profile.leverageRatio * profile.camModifier * (selectedPulleyRatio / denominator);
+  }
 
   // Biomechanical Safety Clamp: Cable Row / Seated Row max baseline
   if (cat === "SeatedCableRow" || lowerName.includes("cable row") || lowerName.includes("seated row")) {
@@ -1240,7 +1625,7 @@ export function calculatePrescriptionWeight(
 
   const isIsolation = cat === "LatRaise" || cat === "Flye" || cat === "Bicep" || cat === "Tricep" || cat === "RearDelt" || cat === "LegExt" || cat === "LegCurl" || cat === "SeatedCalf";
 
-  const quantizeProfile = { ...profile, pulleyRatio: selectedPulleyRatio };
+  const quantizeProfile = { ...profile, pulleyRatio: selectedPulleyRatio, cableConfig };
   const quantized = quantizeToHardware(rawWeightKg, quantizeProfile, isIsolation, load === "cable", unit, resSource, resolvedConfig);
 
   const resolvedHardwareLoadLabel = load === "barbell"
@@ -1252,7 +1637,9 @@ export function calculatePrescriptionWeight(
     : (load === "plate-loaded" || profile.isPlateLoaded)
     ? (profile.isPerHand ? "เพลตรวมสองข้าง (ไม่รวมแรงต้านเครื่อง)" : "เพลตที่ใส่เพิ่ม (ไม่รวมแรงต้านเครื่อง)")
     : load === "cable"
-    ? (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน")
+    ? (cableConfig?.labelScope === "per_side" && cableConfig?.contributingCableSides > 1
+        ? "น้ำหนักพินต่อข้าง (2 สายดึงรวม)"
+        : (profile.isPerHand ? "น้ำหนักพินต่อฝั่ง" : "น้ำหนักพิน"))
     : load === "selectorized"
     ? "น้ำหนักสลักพิน"
     : "น้ำหนักอุปกรณ์";
@@ -1279,6 +1666,8 @@ export function calculatePrescriptionWeight(
     minHardwareStep: profile.minHardwareStep,
     hardwareExceedsTarget: quantized.hardwareExceedsTarget,
     displayNote: quantized.displayNote,
+    cableConfig,
+    cableResult: quantized.cableResult,
   };
 }
 

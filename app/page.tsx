@@ -129,6 +129,11 @@ import {
   evaluateMuscleMass,
   getIntelligentWarmup,
   type WarmupRecommendation,
+  type CableResistanceConfig,
+  type CableResistanceResult,
+  calculateCableEffectiveResistance,
+  getCableMachineDefault,
+  resolveCableResistanceConfig,
 } from "./lib/assessment";
 
 type MuscleGroup = "Chest" | "Back" | "Legs" | "Shoulders" | "Arms" | "Abs & Calves";
@@ -214,6 +219,7 @@ const LEGACY_STATS_KEY = "trainingStatsV2";
 const MACHINE_TAGS_KEY = "haitMachineTagsV1";
 const MACHINE_STARTING_RESISTANCES_KEY = "haitMachineStartingResistancesV1";
 const PULLEY_RATIOS_KEY = "haitPulleyRatiosV1";
+const CABLE_MACHINE_CONFIGS_KEY = "haitCableMachineConfigsV1";
 const FAVORITE_MACHINES_KEY = "haitFavoriteMachinesV1";
 const PRESET_SETS_KEY = "haitPresetSetsV1";
 const WEEK_STREAK_KEY = "haitWeekStreak";
@@ -2969,6 +2975,7 @@ export default function Page() {
     return migrated;
   });
   const [pulleyRatios, setPulleyRatios] = useState<Record<string, "1" | "2" | "3">>(() => readJson<Record<string, "1" | "2" | "3">>(PULLEY_RATIOS_KEY, {}));
+  const [cableMachineConfigs, setCableMachineConfigs] = useState<Record<string, CableResistanceConfig>>(() => readJson<Record<string, CableResistanceConfig>>(CABLE_MACHINE_CONFIGS_KEY, {}));
   const [favoriteMachines, setFavoriteMachines] = useState<Record<string, string>>(() => readJson<Record<string, string>>(FAVORITE_MACHINES_KEY, {}));
   const [inputs, setInputs] = useState<Record<string, SetInput[]>>(() => readJson<Record<string, SetInput[]>>(SET_INPUTS_KEY, {}));
   const [restTimer, setRestTimer] = useState<RestTimerState>(() => {
@@ -3976,6 +3983,7 @@ export default function Page() {
   useEffect(() => writeLocalJson(MACHINE_TAGS_KEY, machineTags), [machineTags]);
   useEffect(() => writeLocalJson(MACHINE_STARTING_RESISTANCES_KEY, machineStartingResistances), [machineStartingResistances]);
   useEffect(() => writeLocalJson(PULLEY_RATIOS_KEY, pulleyRatios), [pulleyRatios]);
+  useEffect(() => writeLocalJson(CABLE_MACHINE_CONFIGS_KEY, cableMachineConfigs), [cableMachineConfigs]);
   useEffect(() => writeLocalJson(PRESET_SETS_KEY, presetSetsMap), [presetSetsMap]);
   useEffect(() => {
     if (bodyweightKg !== null) writeLocalJson(CURRENT_BODYWEIGHT_KEY, bodyweightKg);
@@ -4038,6 +4046,24 @@ export default function Page() {
     setPulleyRatios((old) => {
       const next = { ...old, [exerciseId]: ratio };
       writeLocalJson(PULLEY_RATIOS_KEY, next);
+      return next;
+    });
+  }
+
+  function updateCableMachineConfig(key: string, updates: Partial<CableResistanceConfig>) {
+    setCableMachineConfigs((old) => {
+      const existing = old[key] || getCableMachineDefault(key, key);
+      const next = { ...old, [key]: { ...existing, ...updates } };
+      writeLocalJson(CABLE_MACHINE_CONFIGS_KEY, next);
+      return next;
+    });
+  }
+
+  function resetCableMachineConfig(key: string) {
+    setCableMachineConfigs((old) => {
+      const next = { ...old };
+      delete next[key];
+      writeLocalJson(CABLE_MACHINE_CONFIGS_KEY, next);
       return next;
     });
   }
@@ -6700,6 +6726,8 @@ export default function Page() {
     const muscleInfo = evaluateMuscleMass(currentGender, userProfile?.weightKg ?? 70, muscleMass, muscleMode);
     const safeModifier = Number.isFinite(muscleInfo.modifier) && muscleInfo.modifier > 0 ? muscleInfo.modifier : 1.0;
     const effectivePulleyRatio = effectiveLoad === "cable" ? Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)) : undefined;
+    const cableOverrideKey = currentMachine ? getEffectiveExerciseKey(exercise.name, currentMachine) : baseExercise.id;
+    const cableConfigOverride = effectiveLoad === "cable" ? (cableMachineConfigs[cableOverrideKey] || (currentMachine ? cableMachineConfigs[currentMachine] : undefined) || cableMachineConfigs[baseExercise.id]) : undefined;
 
     const prescriptionResult = userProfile ? calculatePrescriptionWeight(
       exercise.name,
@@ -6713,7 +6741,8 @@ export default function Page() {
       startingResistanceKg,
       exercise.id,
       effectiveUnit,
-      forcedTier
+      forcedTier,
+      cableConfigOverride
     ) : null;
 
     const displayedPrescriptionWeight = prescriptionResult
@@ -6862,7 +6891,7 @@ export default function Page() {
                                   : isChest
                                   ? ["Standard Machine Press", "Incline Machine Press", "Decline Machine Press", "Iso-Lateral Flat", "Iso-Lateral Incline", "Converging Cable"]
                                   : isPulldown
-                                  ? ["Lat Pulldown (Pin-Loaded)", "Iso-Lateral Front Pulldown", "Dual Cable Pulldown"]
+                                  ? ["Lat Pulldown (Pin-Loaded)", "Iso-Lateral Front Pulldown", "Dual Pulley Cable Pulldown", "Dual Cable Pulldown"]
                                   : ["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"];
 
                                 return (
@@ -7038,6 +7067,17 @@ export default function Page() {
                                         }
                                         if (effectiveLoad === "dumbbell") {
                                           return <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate px-1">ต่อข้าง</span>;
+                                        }
+                                        if (effectiveLoad === "cable" && prescriptionResult.cableConfig) {
+                                          const cfg = prescriptionResult.cableConfig;
+                                          if (cfg.contributingCableSides > 1 && cfg.labelScope === "per_side") {
+                                            const effCombined = totalW * cfg.contributingCableSides;
+                                            return (
+                                              <span className="block text-[9px] font-mono text-yellow-400/90 text-center mt-0.5 truncate px-1" title="รวมแรงต้าน 2 สายที่บาร์">
+                                                พินข้างละ · รวม {Math.round(effCombined * 10) / 10} {effectiveUnit}f
+                                              </span>
+                                            );
+                                          }
                                         }
                                         return null;
                                       })()}
@@ -7230,21 +7270,99 @@ export default function Page() {
                                 );
                               })()}
 
-                              {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "cable") && (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[11px] font-bold text-zinc-400 shrink-0">อัตราทดรอก:</span>
-                                  <select
-                                    aria-label="อัตราทดรอก"
-                                    value={pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)}
-                                    onChange={(e) => updatePulleyRatio(baseExercise.id, e.target.value as "1" | "2" | "3")}
-                                    className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
-                                  >
-                                    <option value="1">1:1 (Direct)</option>
-                                    <option value="2">2:1 (Standard functional)</option>
-                                    <option value="3">3:1</option>
-                                  </select>
-                                </div>
-                              )}
+                              {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "cable") && (() => {
+                                const currentCableCfg = prescriptionResult?.cableConfig || resolveCableResistanceConfig(
+                                  exercise.name,
+                                  currentMachine,
+                                  cableConfigOverride,
+                                  Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name))
+                                );
+                                const sampleCalc = calculateCableEffectiveResistance(20, currentCableCfg);
+
+                                return (
+                                  <div className="space-y-2 pt-2 border-t border-zinc-800">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[11px] font-bold text-zinc-300">⚙️ การปรับตั้งแรงต้านเคเบิล</span>
+                                      {cableMachineConfigs[cableOverrideKey] && (
+                                        <button
+                                          type="button"
+                                          onClick={() => resetCableMachineConfig(cableOverrideKey)}
+                                          className="text-[10px] text-zinc-400 hover:text-yellow-400 transition"
+                                        >
+                                          คืนค่าเดิม
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    {/* Pulley Ratio */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">อัตราทดรอก:</span>
+                                      <select
+                                        aria-label="อัตราทดรอก"
+                                        value={String(currentCableCfg.pulleyRatio)}
+                                        onChange={(e) => {
+                                          const val = e.target.value as "1" | "2" | "3";
+                                          updatePulleyRatio(baseExercise.id, val);
+                                          updateCableMachineConfig(cableOverrideKey, { pulleyRatio: Number(val) });
+                                        }}
+                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
+                                      >
+                                        <option value="1">1:1 (Direct Stack)</option>
+                                        <option value="2">2:1 (Standard functional)</option>
+                                        <option value="3">3:1 (High advantage)</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Stack Label Meaning */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">ความหมายป้าย:</span>
+                                      <select
+                                        aria-label="ความหมายป้ายพิน"
+                                        value={currentCableCfg.stackLabelMeaning}
+                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { stackLabelMeaning: e.target.value as any })}
+                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
+                                      >
+                                        <option value="effective_resistance_per_handle">แรงต้านจริงต่อด้ามจับ (Effective Resistance)</option>
+                                        <option value="physical_stack_mass">มวลแผ่นเหล็กจริง (Physical Stack Mass)</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Contributing Cable Sides */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">สายต่อเข้าบาร์:</span>
+                                      <select
+                                        aria-label="จำนวนสายเคเบิลต่ออุปกรณ์"
+                                        value={String(currentCableCfg.contributingCableSides)}
+                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { contributingCableSides: Number(e.target.value) })}
+                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
+                                      >
+                                        <option value="1">1 สาย (ด้ามจับเดี่ยว / Unilateral)</option>
+                                        <option value="2">2 สายรวมที่บาร์เดียว (Dual Pulley Pulldown/Row)</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Label Scope */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">ขอบเขตป้าย:</span>
+                                      <select
+                                        aria-label="ขอบเขตป้ายน้ำหนัก"
+                                        value={currentCableCfg.labelScope}
+                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { labelScope: e.target.value as any })}
+                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
+                                      >
+                                        <option value="per_side">ป้ายต่อน้ำหนักข้างละ (Per Stack / Side)</option>
+                                        <option value="combined">ป้ายระบุน้ำหนักรวมสองข้าง (Combined)</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Live Verification Preview */}
+                                    <div className="rounded-lg bg-zinc-950 p-2 border border-zinc-800/80 text-[10px] text-zinc-400 font-mono">
+                                      <span className="text-yellow-400 font-bold block mb-0.5">จำลองการทำงาน:</span>
+                                      {sampleCalc.displaySummary}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
 
                               {currentMachine && (
                                 <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
@@ -7266,6 +7384,7 @@ export default function Page() {
                                       updateMachineTag(baseExercise.id, "");
                                       updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name));
                                       updateMachineStartingResistance(machineResistanceKey, "");
+                                      resetCableMachineConfig(cableOverrideKey);
                                     }}
                                     className="text-[10px] text-zinc-500 hover:text-zinc-300"
                                   >
