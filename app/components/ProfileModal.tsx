@@ -1,6 +1,6 @@
 "use client";
 import React from "react";
-import { X, User, Trophy, Flame, Download, Settings, Info, Scale, ShieldCheck } from "lucide-react";
+import { X, User, Trophy, Flame, Download, Settings, Info, Scale, ShieldCheck, FileUp } from "lucide-react";
 import { getOnboardingResult } from "./OnboardingWizard";
 import { getCurrentBodyweight } from "./BodyweightManager";
 import { getUserProfile, saveUserProfile, type Gender, type UserProfile } from "../lib/assessment";
@@ -17,6 +17,7 @@ type Props = {
   preferredUnit?: WeightUnit;
   onUnitChange?: (unit: WeightUnit) => void;
   onExportLogs: () => void;
+  onImportLogs?: () => void;
   onOpenAssessment?: () => void;
   currentGender?: Gender;
   onGenderChange?: (gender: Gender) => void;
@@ -35,6 +36,7 @@ export function ProfileModal({
   preferredUnit = "kg",
   onUnitChange,
   onExportLogs,
+  onImportLogs,
   onOpenAssessment,
   currentGender,
   onGenderChange,
@@ -264,6 +266,18 @@ export function ProfileModal({
               </span>
               <span className="text-xs text-zinc-500">Export</span>
             </button>
+            {onImportLogs && (
+              <button
+                type="button"
+                onClick={onImportLogs}
+                className="flex w-full items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 p-3 text-sm font-bold text-zinc-200 transition hover:bg-zinc-800"
+              >
+                <span className="flex items-center gap-2">
+                  <FileUp size={16} className="text-yellow-400" /> นำเข้าประวัติการฝึก (CSV / JSON)
+                </span>
+                <span className="text-xs text-zinc-500">Import</span>
+              </button>
+            )}
           </div>
 
           {/* Language and text-size preferences */}

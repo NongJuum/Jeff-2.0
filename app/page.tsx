@@ -39,6 +39,7 @@ import {
   Trash2,
   Trophy,
   User,
+  FileUp,
   X,
 } from "lucide-react";
 import { OnboardingWizard, hasCompletedOnboarding, getAppLanguage, getFontScale, APP_LANGUAGE_KEY, FONT_SCALE_KEY, type AppLanguage, type FontScale } from "./components/OnboardingWizard";
@@ -86,6 +87,7 @@ import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
 import { MuscleTapBuilder } from "./components/MuscleTapBuilder";
 import { ProfileModal } from "./components/ProfileModal";
+import { ImportModal } from "./components/ImportModal";
 import { ProgressPhotos } from "./components/ProgressPhotos";
 import { runMigration, hasMigrated, getMigrationResult, type MigrationResult } from "./lib/migration";
 import { WeeklyTrendChart, type WeeklyScore } from "./components/WeeklyTrendChart";
@@ -3770,6 +3772,7 @@ export default function Page() {
 
   // Profile & Settings Modal (U1)
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   // Focus Mode & Progressive Session Flow State (Lifting vs Cardio)
   const [sessionStage, setSessionStage] = useState<"lifting" | "cardio">(initialUiState.sessionStage ?? "lifting");
@@ -4916,6 +4919,40 @@ export default function Page() {
     window.localStorage.removeItem(LATEST_LOGS_KEY);
   }
 
+  function handleImportLogs(importedLogs: LogSet[], mode: "merge" | "replace") {
+    if (!importedLogs || importedLogs.length === 0) return;
+
+    setLogs((old) => {
+      let updated: LogSet[];
+      if (mode === "replace") {
+        updated = importedLogs;
+      } else {
+        const existingKeys = new Set(
+          old.map((l) => `${l.date.slice(0, 10)}_${l.exerciseName}_${l.machine || ""}_${l.setNumber}`)
+        );
+        const newUnique = importedLogs.filter(
+          (l) => !existingKeys.has(`${l.date.slice(0, 10)}_${l.exerciseName}_${l.machine || ""}_${l.setNumber}`)
+        );
+        updated = [...old, ...newUnique];
+      }
+
+      updated.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      writeLocalJson(LATEST_LOGS_KEY, updated);
+
+      setRecordsMap((oldRecords) => {
+        let recs = mode === "replace" ? {} : { ...oldRecords };
+        for (const s of updated) {
+          recs = updateRecordsWithSet(recs, s);
+        }
+        writeLocalJson(PERMANENT_RECORDS_KEY, recs);
+        writeLocalJson(LEGACY_STATS_KEY, recs);
+        return recs;
+      });
+
+      return updated;
+    });
+  }
+
   function createNewCustomPlan() {
     const plan = createStarterCustomPlan();
     setCustomPlans((old) => [...old, plan]);
@@ -6052,25 +6089,34 @@ export default function Page() {
                     14 วัน
                   </button>
                 </div>
-                {logs.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={exportLogsToCsv}
-                      className="flex items-center gap-1.5 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs font-bold text-yellow-300 transition hover:bg-yellow-500/20"
-                      aria-label="Export history to CSV"
-                    >
-                      <Download size={15} /> Export CSV
-                    </button>
-                    <button
-                      onClick={clearHistory}
-                      className="rounded-2xl border border-red-500/40 bg-red-500/10 p-2 text-red-300 transition hover:bg-red-500/20"
-                      aria-label="Clear history"
-                      title="Clear history logs"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="flex items-center gap-1.5 rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-200 transition hover:bg-zinc-800"
+                    aria-label="Import history from CSV or JSON"
+                  >
+                    <FileUp size={15} className="text-yellow-400" /> นำเข้า (Import)
+                  </button>
+                  {logs.length > 0 && (
+                    <>
+                      <button
+                        onClick={exportLogsToCsv}
+                        className="flex items-center gap-1.5 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs font-bold text-yellow-300 transition hover:bg-yellow-500/20"
+                        aria-label="Export history to CSV"
+                      >
+                        <Download size={15} /> Export CSV
+                      </button>
+                      <button
+                        onClick={clearHistory}
+                        className="rounded-2xl border border-red-500/40 bg-red-500/10 p-2 text-red-300 transition hover:bg-red-500/20"
+                        aria-label="Clear history"
+                        title="Clear history logs"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -6906,76 +6952,226 @@ export default function Page() {
                     {isExpanded && (
                       <div className="px-3.5 pb-4 sm:px-4 sm:pb-5 border-t border-zinc-900/80 pt-3 space-y-3">
                         {/* Level D2: Compact Inline Equipment & Actionable Prescription Strip */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-2xl bg-zinc-950/90 border border-zinc-800/80 p-2.5">
-                          {/* Machine Selector Dropdown with inline Unit Switcher */}
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <Dumbbell className="text-yellow-400 shrink-0" size={14} />
-                            <div className="relative flex-1 min-w-0">
-                              {(() => {
-                                const exNameLower = exercise.name.toLowerCase();
-                                const isRow = exNameLower.includes("row");
-                                const isChest = exNameLower.includes("press") || exNameLower.includes("bench") || exNameLower.includes("chest");
-                                const isPulldown = exNameLower.includes("pulldown") || exNameLower.includes("pull down") || exNameLower.includes("lat pull");
+                        <div className="flex flex-col gap-2 rounded-2xl bg-zinc-950/90 border border-zinc-800/80 p-2.5">
+                          {/* Top Row: Machine Selector Dropdown with inline Unit Switcher & Target Prescription */}
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Dumbbell className="text-yellow-400 shrink-0" size={14} />
+                              <div className="relative flex-1 min-w-0">
+                                {(() => {
+                                  const exNameLower = exercise.name.toLowerCase();
+                                  const isRow = exNameLower.includes("row");
+                                  const isChest = exNameLower.includes("press") || exNameLower.includes("bench") || exNameLower.includes("chest");
+                                  const isPulldown = exNameLower.includes("pulldown") || exNameLower.includes("pull down") || exNameLower.includes("lat pull");
 
-                                const contextualMachineOptions = isRow
-                                  ? ["Standard Selectorized", "Chest-Supported Machine", "Iso-Lateral High Row", "Iso-Lateral Low Row", "Seated Cable (Free)", "T-Bar Supported"]
-                                  : isChest
-                                  ? ["Standard Machine Press", "Incline Machine Press", "Decline Machine Press", "Iso-Lateral Flat", "Iso-Lateral Incline", "Converging Cable"]
-                                  : isPulldown
-                                  ? ["Lat Pulldown (Pin-Loaded)", "Iso-Lateral Front Pulldown", "Dual Pulley Cable Pulldown", "Dual Cable Pulldown"]
-                                  : ["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"];
+                                  const contextualMachineOptions = isRow
+                                    ? ["Standard Selectorized", "Chest-Supported Machine", "Iso-Lateral High Row", "Iso-Lateral Low Row", "Seated Cable (Free)", "T-Bar Supported"]
+                                    : isChest
+                                    ? ["Standard Machine Press", "Incline Machine Press", "Decline Machine Press", "Iso-Lateral Flat", "Iso-Lateral Incline", "Converging Cable"]
+                                    : isPulldown
+                                    ? ["Lat Pulldown (Pin-Loaded)", "Iso-Lateral Front Pulldown", "Dual Pulley Cable Pulldown", "Dual Cable Pulldown"]
+                                    : ["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"];
 
-                                return (
-                                  <select
-                                    value={currentMachine || ""}
-                                    onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
-                                    className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1 pl-2 pr-7 text-xs font-semibold text-zinc-100 outline-none focus:border-yellow-400 transition"
-                                  >
-                                    <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[exercise.load || getLoadType(exercise)]})</option>
-                                    {contextualMachineOptions.map((tag) => (
-                                      <option key={tag} value={tag}>
-                                        {tag} {lastUsedMachine === tag ? "● ล่าสุด" : ""} {favoriteMachines[exercise.name] === tag ? "⭐" : ""}
-                                      </option>
-                                    ))}
-                                    {currentMachine && !contextualMachineOptions.includes(currentMachine) && (
-                                      <option value={currentMachine}>{currentMachine} (กำหนดเอง) {favoriteMachines[exercise.name] === currentMachine ? "⭐" : ""}</option>
-                                    )}
-                                  </select>
-                                );
-                              })()}
-                              <ChevronDown className="pointer-events-none absolute right-2 top-2 text-zinc-400" size={12} />
-                            </div>
+                                  return (
+                                    <select
+                                      value={currentMachine || ""}
+                                      onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
+                                      className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1 pl-2 pr-7 text-xs font-semibold text-zinc-100 outline-none focus:border-yellow-400 transition"
+                                    >
+                                      <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[exercise.load || getLoadType(exercise)]})</option>
+                                      {contextualMachineOptions.map((tag) => (
+                                        <option key={tag} value={tag}>
+                                          {tag} {lastUsedMachine === tag ? "● ล่าสุด" : ""} {favoriteMachines[exercise.name] === tag ? "⭐" : ""}
+                                        </option>
+                                      ))}
+                                      {currentMachine && !contextualMachineOptions.includes(currentMachine) && (
+                                        <option value={currentMachine}>{currentMachine} (กำหนดเอง) {favoriteMachines[exercise.name] === currentMachine ? "⭐" : ""}</option>
+                                      )}
+                                    </select>
+                                  );
+                                })()}
+                                <ChevronDown className="pointer-events-none absolute right-2 top-2 text-zinc-400" size={12} />
+                              </div>
 
-                            <button
-                              type="button"
-                              onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
-                              className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] font-black text-yellow-300 hover:border-yellow-400 transition shrink-0"
-                              title="สลับหน่วยน้ำหนัก kg / lbs"
-                            >
-                              {effectiveUnit}
-                            </button>
-                          </div>
-
-                          {/* Concise Actionable Target Prescription */}
-                          {strengthTierInfo && (
-                            <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 type="button"
-                                onClick={() => {
-                                  const order: ("Beginner" | "Intermediate" | "Advanced" | "Elite")[] = ["Beginner", "Intermediate", "Advanced", "Elite"];
-                                  const nextIdx = (order.indexOf(strengthTierInfo.tier) + 1) % order.length;
-                                  setManualTierMap((prev) => ({ ...prev, [baseExercise.id]: order[nextIdx] }));
-                                }}
-                                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-black uppercase transition active:scale-95 ${strengthTierInfo.badgeClass}`}
-                                title="แตะเพื่อสลับระดับเป้าหมายคำนวณ"
+                                onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
+                                className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] font-black text-yellow-300 hover:border-yellow-400 transition shrink-0"
+                                title="สลับหน่วยน้ำหนัก kg / lbs"
                               >
-                                <span>{strengthTierInfo.label}</span>
-                                <span className="text-[9px] text-zinc-400">✎</span>
+                                {effectiveUnit}
                               </button>
+                            </div>
 
-                              <span className="text-xs font-bold text-yellow-300">
-                                🎯 แนะนำ: {displayedPrescriptionWeight} {effectiveUnit} × {exercise.reps.split(" ")[0] || 8}
-                              </span>
+                            {/* Concise Actionable Target Prescription */}
+                            {strengthTierInfo && (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const order: ("Beginner" | "Intermediate" | "Advanced" | "Elite")[] = ["Beginner", "Intermediate", "Advanced", "Elite"];
+                                    const nextIdx = (order.indexOf(strengthTierInfo.tier) + 1) % order.length;
+                                    setManualTierMap((prev) => ({ ...prev, [baseExercise.id]: order[nextIdx] }));
+                                  }}
+                                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-black uppercase transition active:scale-95 ${strengthTierInfo.badgeClass}`}
+                                  title="แตะเพื่อสลับระดับเป้าหมายคำนวณ"
+                                >
+                                  <span>{strengthTierInfo.label}</span>
+                                  <span className="text-[9px] text-zinc-400">✎</span>
+                                </button>
+
+                                <span className="text-xs font-bold text-yellow-300">
+                                  🎯 แนะนำ: {displayedPrescriptionWeight} {effectiveUnit} × {exercise.reps.split(" ")[0] || 8}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Explicit Barbell / Machine Equipment Weight Clarification Banner */}
+                          {prescriptionResult && (() => {
+                            const startW = effectiveUnit === "lbs"
+                              ? Math.round(prescriptionResult.startingResistanceKg * 2.20462 * 10) / 10
+                              : prescriptionResult.startingResistanceKg;
+
+                            if (effectiveLoad === "barbell" || prescriptionResult.loadType === "barbell") {
+                              const barWeight = effectiveUnit === "lbs" ? 45 : 20;
+                              const addedPlates = Math.max(0, displayedPrescriptionWeight - barWeight);
+                              const perSide = Math.round((addedPlates / 2) * 10) / 10;
+                              return (
+                                <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 text-[11px] text-amber-200">
+                                  <span className="font-bold text-yellow-400">✓ รวมน้ำหนักคานมาตรฐาน {barWeight} {effectiveUnit} แล้ว</span>
+                                  {perSide > 0 ? (
+                                    <span className="text-zinc-300">(ใส่แผ่นข้างละ {perSide} {effectiveUnit})</span>
+                                  ) : (
+                                    <span className="text-zinc-400">(ใช้เฉพาะคานเปล่า ไม่ต้องใส่แผ่น)</span>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            if (effectiveLoad === "smith" || prescriptionResult.loadType === "smith") {
+                              const addedPlates = Math.max(0, displayedPrescriptionWeight - startW);
+                              const perSide = Math.round((addedPlates / 2) * 10) / 10;
+                              return (
+                                <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 text-[11px] text-amber-200">
+                                  <span className="font-bold text-yellow-400">✓ รวมแรงต้านบาร์สมิท {startW} {effectiveUnit} แล้ว</span>
+                                  {perSide > 0 ? (
+                                    <span className="text-zinc-300">(ใส่เพลตข้างละ {perSide} {effectiveUnit} · รวมเพลตสองข้าง {Math.round(addedPlates * 10) / 10} {effectiveUnit})</span>
+                                  ) : (
+                                    <span className="text-zinc-400">(ใช้บาร์สมิทเปล่า ไม่ต้องใส่แผ่น)</span>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            if (effectiveLoad === "plate-loaded" || effectiveLoad === "specialty" || prescriptionResult.loadType === "plate-loaded") {
+                              const perSidePlate = prescriptionResult.isPerHand
+                                ? displayedPrescriptionWeight
+                                : Math.round((displayedPrescriptionWeight / 2) * 10) / 10;
+                              return (
+                                <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 text-[11px] text-amber-200">
+                                  <span className="font-bold text-yellow-400">✓ น้ำหนักเพลตที่ใส่เพิ่ม</span>
+                                  <span className="text-amber-300 font-semibold">(ไม่รวมแรงต้านเครื่อง/แคร่เริ่มต้น {startW} {effectiveUnit})</span>
+                                  <span className="text-zinc-300">· ใส่เพลตข้างละ {perSidePlate} {effectiveUnit}</span>
+                                </div>
+                              );
+                            }
+
+                            if (effectiveLoad === "dumbbell" || prescriptionResult.loadType === "dumbbell") {
+                              return (
+                                <div className="flex items-center gap-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-300">
+                                  <span className="font-bold text-yellow-400">✓ น้ำหนักดัมเบลต่อข้าง/ต่อมือ</span>
+                                </div>
+                              );
+                            }
+
+                            if (effectiveLoad === "cable" || prescriptionResult.loadType === "cable") {
+                              const ratio = prescriptionResult.pulleyRatio ?? (pulleyRatios[baseExercise.id] ?? 2);
+                              const isPerSide = prescriptionResult.cableConfig?.labelScope === "per_side";
+                              return (
+                                <div className="flex items-center gap-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-300">
+                                  <span className="font-bold text-yellow-400">✓ สลักพินน้ำหนักเคเบิล{isPerSide ? " (ต่อข้าง)" : ""} · รอกทด {ratio}:1</span>
+                                </div>
+                              );
+                            }
+
+                            if (effectiveLoad === "selectorized" || prescriptionResult.loadType === "selectorized") {
+                              return (
+                                <div className="flex items-center gap-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-300">
+                                  <span className="font-bold text-yellow-400">✓ เสียบสลักพินน้ำหนักเครื่องตามจริง</span>
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          })()}
+
+                          {/* Machine / Smith Starting Resistance Input Field */}
+                          {((effectiveLoad === "plate-loaded" || effectiveLoad === "specialty" || effectiveLoad === "smith")) && (() => {
+                            const defaultEstimateKg = getDefaultMechanicalProfile(effectiveLoad, `${exercise.name} ${currentMachine || ""}`).tareWeight;
+                            const defaultEstimateDisplay = effectiveUnit === "lbs"
+                              ? Math.round(defaultEstimateKg * 2.20462 * 10) / 10
+                              : defaultEstimateKg;
+                            const userVal = machineStartingResistances[machineResistanceKey];
+                            return (
+                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2 text-xs">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-yellow-400 font-bold shrink-0">⚖️</span>
+                                  <label htmlFor={`machine-start-resistance-${baseExercise.id}`} className="font-bold text-zinc-200 truncate">
+                                    {effectiveLoad === "smith"
+                                      ? (appLanguage === "th" ? `น้ำหนักบาร์สมิทเริ่มต้น (${effectiveUnit}):` : `Smith Bar Weight (${effectiveUnit}):`)
+                                      : machineResistanceIsPerSide
+                                      ? (appLanguage === "th" ? `แรงต้านเริ่มต้นต่อข้าง (${effectiveUnit}):` : `Starting Resistance / side (${effectiveUnit}):`)
+                                      : (appLanguage === "th" ? `แรงต้านเริ่มต้นของเครื่อง/แคร่ (${effectiveUnit}):` : `Machine / Sled Starting Resistance (${effectiveUnit}):`)}
+                                  </label>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    id={`machine-start-resistance-${baseExercise.id}`}
+                                    type="number"
+                                    min="0"
+                                    max="1000"
+                                    step="0.5"
+                                    inputMode="decimal"
+                                    value={userVal ?? ""}
+                                    onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)}
+                                    placeholder={`มาตรฐาน: ${defaultEstimateDisplay}`}
+                                    className="w-28 sm:w-32 rounded-lg border border-zinc-700 bg-zinc-950 px-2 py-1 text-xs font-mono font-bold text-zinc-100 outline-none focus:border-yellow-400 text-center"
+                                  />
+                                  {userVal !== undefined && userVal !== "" ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => updateMachineStartingResistance(machineResistanceKey, "")}
+                                      className="text-[10px] text-yellow-400 hover:underline font-bold shrink-0"
+                                      title="รีเซ็ตเป็นค่ามาตรฐานของระบบ"
+                                    >
+                                      รีเซ็ต ({defaultEstimateDisplay})
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] text-zinc-500 font-medium shrink-0">
+                                      {appLanguage === "th" ? `(มาตรฐาน: ${defaultEstimateDisplay} ${effectiveUnit})` : `(std: ${defaultEstimateDisplay})`}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Quick Cable Pulley Ratio Selector */}
+                          {effectiveLoad === "cable" && (
+                            <div className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-1.5 text-xs">
+                              <span className="text-zinc-400 font-bold shrink-0">⚙️ อัตราทดรอกเคเบิล:</span>
+                              <select
+                                aria-label="อัตราทดรอก"
+                                value={pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)}
+                                onChange={(e) => updatePulleyRatio(baseExercise.id, e.target.value as "1" | "2" | "3")}
+                                className="rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2.5 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
+                              >
+                                <option value="1">1:1 (Direct / เสียบเท่าไรได้เท่านั้น)</option>
+                                <option value="2">2:1 (Standard Functional Trainer / รอกคู่)</option>
+                                <option value="3">3:1</option>
+                              </select>
                             </div>
                           )}
                         </div>
@@ -7088,15 +7284,38 @@ export default function Page() {
                                         const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
                                         if (!prescriptionResult) return null;
 
+                                        const startW = effectiveUnit === "lbs"
+                                          ? Math.round(prescriptionResult.startingResistanceKg * 2.20462 * 10) / 10
+                                          : prescriptionResult.startingResistanceKg;
+
                                         if (prescriptionResult.loadType === "plate-loaded" || effectiveLoad === "plate-loaded" || effectiveLoad === "specialty") {
-                                          const perSideW = Math.round((totalW / 2) * 10) / 10;
+                                          const perSideW = prescriptionResult.isPerHand
+                                            ? totalW
+                                            : Math.round((totalW / 2) * 10) / 10;
                                           return (
-                                            <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate px-1">
-                                              ข้างละ {perSideW} {effectiveUnit}
+                                            <span className="block text-[9px] font-mono text-amber-300/80 text-center mt-0.5 truncate px-1" title={`เพลตข้างละ ${perSideW} ${effectiveUnit} (ไม่รวมแรงต้านเครื่อง ${startW} ${effectiveUnit})`}>
+                                              เพลตข้างละ {perSideW} (ไม่รวมเครื่อง {startW})
                                             </span>
                                           );
                                         }
-                                        if (effectiveLoad === "dumbbell") {
+                                        if (effectiveLoad === "barbell" || prescriptionResult.loadType === "barbell") {
+                                          const barW = effectiveUnit === "lbs" ? 45 : 20;
+                                          const platePerSide = Math.max(0, Math.round(((totalW - barW) / 2) * 10) / 10);
+                                          return (
+                                            <span className="block text-[9px] font-mono text-amber-300/80 text-center mt-0.5 truncate px-1" title={`แผ่นข้างละ ${platePerSide} ${effectiveUnit} (รวมคานมาตรฐาน ${barW} ${effectiveUnit})`}>
+                                              {platePerSide > 0 ? `แผ่นข้างละ ${platePerSide} (รวมคาน ${barW})` : `คานเปล่า ${barW} ${effectiveUnit}`}
+                                            </span>
+                                          );
+                                        }
+                                        if (effectiveLoad === "smith" || prescriptionResult.loadType === "smith") {
+                                          const platePerSide = Math.max(0, Math.round(((totalW - startW) / 2) * 10) / 10);
+                                          return (
+                                            <span className="block text-[9px] font-mono text-amber-300/80 text-center mt-0.5 truncate px-1" title={`เพลตข้างละ ${platePerSide} ${effectiveUnit} (รวมบาร์สมิท ${startW} ${effectiveUnit})`}>
+                                              {platePerSide > 0 ? `เพลตข้างละ ${platePerSide} (รวมบาร์ ${startW})` : `บาร์เปล่า ${startW} ${effectiveUnit}`}
+                                            </span>
+                                          );
+                                        }
+                                        if (effectiveLoad === "dumbbell" || prescriptionResult.loadType === "dumbbell") {
                                           return <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate px-1">ต่อข้าง</span>;
                                         }
                                         if (effectiveLoad === "cable" && prescriptionResult.cableConfig) {
@@ -7946,6 +8165,7 @@ export default function Page() {
         preferredUnit={globalWeightUnit}
         onUnitChange={handleSetGlobalUnit}
         onExportLogs={exportLogsToCsv}
+        onImportLogs={() => setShowImportModal(true)}
         onOpenAssessment={() => setShowAssessmentModal(true)}
         currentGender={userProfile?.gender || "male"}
         onGenderChange={handleSetGender}
@@ -7953,6 +8173,14 @@ export default function Page() {
         fontScale={fontScale}
         onLanguageChange={setAppLanguage}
         onFontScaleChange={setFontScale}
+      />
+
+      {/* Workout Logs Import Modal */}
+      <ImportModal
+        open={showImportModal}
+        onClose={() => setShowImportModal(false)}
+        onImportLogs={handleImportLogs}
+        existingLogsCount={logs.length}
       />
 
       {/* Trainer Assessment Modal (Stage 2) */}
