@@ -149,7 +149,7 @@ export function ProfileModal({
               </div>
             </div>
 
-            <div className="mt-3 grid grid-cols-3 gap-2 border-t border-zinc-800/80 pt-3 text-center">
+            <div className={`mt-3 grid ${profile?.muscleMassKg ? "grid-cols-4" : "grid-cols-3"} gap-2 border-t border-zinc-800/80 pt-3 text-center`}>
               <div>
                 <p className="text-[10px] font-bold uppercase text-zinc-500">เป้าหมาย</p>
                 <p className="text-xs font-black text-yellow-300 mt-0.5">{goalLabels[goal as keyof typeof goalLabels]?.split(" ")[1] || goal}</p>
@@ -168,6 +168,16 @@ export function ProfileModal({
                     : "—"}
                 </p>
               </div>
+              {profile?.muscleMassKg && (
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-emerald-400">มวลกล้ามเนื้อ</p>
+                  <p className="text-xs font-black text-emerald-300 mt-0.5">
+                    {preferredUnit === "kg"
+                      ? `${profile.muscleMassKg} kg`
+                      : `${Math.round((profile.muscleMassKg / 0.453592) * 10) / 10} lbs`}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="mt-3 border-t border-zinc-800/80 pt-3 flex gap-2">

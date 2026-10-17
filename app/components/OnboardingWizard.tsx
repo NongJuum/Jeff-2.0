@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Globe } from "lucide-react";
-import { saveUserProfile, type Gender, type UserProfile } from "../lib/assessment";
+import { saveUserProfile, evaluateMuscleMass, type Gender, type UserProfile, type MuscleMassMode } from "../lib/assessment";
 import {
   type WeightUnit,
   getPersistentWeightUnit,
@@ -125,6 +125,8 @@ export function OnboardingWizard({
   const [age, setAge] = useState("");
   const [heightCm, setHeightCm] = useState("");
   const [weightKg, setWeightKg] = useState("");
+  const [muscleMass, setMuscleMass] = useState("");
+  const [muscleMassMode, setMuscleMassMode] = useState<MuscleMassMode>("smm");
   const [expMonths, setExpMonths] = useState<number | null>(null);
   const [goal, setGoal] = useState<Goal | null>(null);
   const [days, setDays] = useState<Days | null>(null);
@@ -146,6 +148,10 @@ export function OnboardingWizard({
     age: "อายุ (ปี)",
     height: "ส่วนสูง (ซม.)",
     weight: "น้ำหนักตัว",
+    muscleMass: "มวลกล้ามเนื้อ (InBody / Dexa) - ไม่บังคับ",
+    muscleMassDesc: "ใช้คำนวณแรงตามหลักสรีรศาสตร์และปรับน้ำหนัก Warmup AI",
+    smm: "SMM (กล้ามเนื้อลาย)",
+    totalMuscle: "Total (กล้ามรวม)",
     experience: "ประสบการณ์ฝึกเวท",
     injuries: "อาการบาดเจ็บหรือจุดที่ควรระวัง (ไม่บังคับ)",
     goal: "เป้าหมายหลัก",
@@ -175,6 +181,10 @@ export function OnboardingWizard({
     age: "Age (years)",
     height: "Height (cm)",
     weight: "Body weight",
+    muscleMass: "Muscle mass (InBody / Dexa) - optional",
+    muscleMassDesc: "Used for biomechanical force assessment & AI warmups",
+    smm: "SMM (Skeletal)",
+    totalMuscle: "Total Muscle",
     experience: "Weight-training experience",
     injuries: "Injuries or areas to be careful with (optional)",
     goal: "Primary goal",
@@ -198,13 +208,22 @@ export function OnboardingWizard({
     ? Boolean(gender && Number(age) >= 16 && Number(age) <= 100 && Number(heightCm) >= 100 && Number(heightCm) <= 250 && Number(weightKg) >= 25 && Number(weightKg) <= 350 && expMonths !== null)
     : step === 1 ? Boolean(goal && days) : true;
 
+  const numWeightKg = unit === "lbs" ? Number(weightKg) * 0.453592 : Number(weightKg);
+  const numMuscleKg = muscleMass ? (unit === "lbs" ? Number(muscleMass) * 0.453592 : Number(muscleMass)) : undefined;
+  const muscleInfo = (gender && numWeightKg > 0 && numMuscleKg && numMuscleKg > 0)
+    ? evaluateMuscleMass(gender, numWeightKg, numMuscleKg, muscleMassMode)
+    : null;
+
   const handleComplete = () => {
     if (!gender || !level || !goal || !days) return;
+    const parsedMuscleKg = numMuscleKg && numMuscleKg > 0 ? Math.round(numMuscleKg * 10) / 10 : undefined;
     const profile: UserProfile = {
       gender,
       age: Number(age),
       heightCm: Number(heightCm),
       weightKg: unit === "lbs" ? Math.round(Number(weightKg) * 0.453592 * 10) / 10 : Number(weightKg),
+      muscleMassKg: parsedMuscleKg,
+      muscleMassMode: parsedMuscleKg ? muscleMassMode : undefined,
       expMonths: expMonths!,
       daysPerWeek: days,
       goal,
@@ -278,6 +297,59 @@ export function OnboardingWizard({
                 <input className={inputClass} inputMode="decimal" type="number" min={25} max={350} value={weightKg} onChange={e => setWeightKg(e.target.value)} placeholder="70" />
               </label>
             </div>
+            {/* Muscle Mass Input Card (InBody / Dexa) */}
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3.5 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <label className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
+                    💪 {copy.muscleMass}
+                  </label>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">{copy.muscleMassDesc}</p>
+                </div>
+                <div className="flex gap-1 rounded-xl bg-zinc-950 p-1 text-[11px] shrink-0 border border-zinc-800/80">
+                  <button
+                    type="button"
+                    onClick={() => setMuscleMassMode("smm")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                      muscleMassMode === "smm" ? "bg-emerald-400 text-zinc-950 font-black shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {copy.smm}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMuscleMassMode("total")}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition ${
+                      muscleMassMode === "total" ? "bg-emerald-400 text-zinc-950 font-black shadow-sm" : "text-zinc-400 hover:text-zinc-200"
+                    }`}
+                  >
+                    {copy.totalMuscle}
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  className={inputClass}
+                  inputMode="decimal"
+                  type="number"
+                  min={5}
+                  max={200}
+                  step="0.1"
+                  value={muscleMass}
+                  onChange={(e) => setMuscleMass(e.target.value)}
+                  placeholder={unit === "kg" ? "เช่น 28.5 (kg)" : "e.g. 62.8 (lbs)"}
+                />
+                <span className="text-xs font-bold text-zinc-400 shrink-0 px-3 py-3 bg-zinc-900 border border-zinc-700 rounded-xl mt-1">
+                  {formatUnitLabel(unit)}
+                </span>
+              </div>
+              {muscleInfo && (
+                <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 text-xs font-bold text-emerald-300">
+                  <span>📊</span>
+                  <span>{muscleInfo.percentage}% ของน้ำหนักตัว · {muscleInfo.label}</span>
+                </div>
+              )}
+            </div>
             <div>
               <label className="mb-2 block text-xs font-bold text-zinc-400">{copy.experience} *</label>
               <div className="grid gap-2">
@@ -300,6 +372,9 @@ export function OnboardingWizard({
                     onClick={() => {
                       if (weightKg) {
                         setWeightKg(convertInputWeight(weightKg, unit, v));
+                      }
+                      if (muscleMass) {
+                        setMuscleMass(convertInputWeight(muscleMass, unit, v));
                       }
                       setUnit(v);
                       setPersistentWeightUnit(v);
