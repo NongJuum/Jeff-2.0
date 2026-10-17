@@ -87,7 +87,7 @@ import { PlanBuilder } from "./components/PlanBuilder";
 import { MuscleTapPicker } from "./components/MuscleTapPicker";
 import { MuscleTapBuilder } from "./components/MuscleTapBuilder";
 import { ProfileModal } from "./components/ProfileModal";
-import { ImportModal } from "./components/ImportModal";
+import { ImportModal, type BackupMetadata } from "./components/ImportModal";
 import { ProgressPhotos } from "./components/ProgressPhotos";
 import { runMigration, hasMigrated, getMigrationResult, type MigrationResult } from "./lib/migration";
 import { WeeklyTrendChart, type WeeklyScore } from "./components/WeeklyTrendChart";
@@ -4906,6 +4906,31 @@ export default function Page() {
     URL.revokeObjectURL(url);
   }
 
+  function exportBackupToJson() {
+    const backupData = {
+      app: "HA IT Workout Tracker Pro",
+      version: 2,
+      exportDate: new Date().toISOString(),
+      logs,
+      records: recordsMap,
+      userProfile,
+      machineStartingResistances,
+      pulleyRatios,
+      cableMachineConfigs,
+      favoriteMachines,
+    };
+    const jsonStr = JSON.stringify(backupData, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `hait_workout_backup_${new Date().toISOString().slice(0, 10)}.json`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   function clearHistory() {
     if (
       typeof window !== "undefined" &&
@@ -4919,7 +4944,7 @@ export default function Page() {
     window.localStorage.removeItem(LATEST_LOGS_KEY);
   }
 
-  function handleImportLogs(importedLogs: LogSet[], mode: "merge" | "replace") {
+  function handleImportLogs(importedLogs: LogSet[], mode: "merge" | "replace", backupBundle?: BackupMetadata) {
     if (!importedLogs || importedLogs.length === 0) return;
 
     setLogs((old) => {
@@ -4940,7 +4965,9 @@ export default function Page() {
       writeLocalJson(LATEST_LOGS_KEY, updated);
 
       setRecordsMap((oldRecords) => {
-        let recs = mode === "replace" ? {} : { ...oldRecords };
+        let recs = mode === "replace"
+          ? (backupBundle?.records ? { ...backupBundle.records } : {})
+          : { ...oldRecords, ...(backupBundle?.records || {}) };
         for (const s of updated) {
           recs = updateRecordsWithSet(recs, s);
         }
@@ -4948,6 +4975,56 @@ export default function Page() {
         writeLocalJson(LEGACY_STATS_KEY, recs);
         return recs;
       });
+
+      // Restore machine starting resistances if present in backup
+      if (backupBundle?.machineStartingResistances) {
+        setMachineStartingResistances((prev) => {
+          const merged = mode === "replace"
+            ? { ...backupBundle.machineStartingResistances }
+            : { ...prev, ...backupBundle.machineStartingResistances };
+          writeLocalJson(MACHINE_STARTING_RESISTANCES_KEY, merged);
+          return merged;
+        });
+      }
+
+      // Restore pulley ratios if present in backup
+      if (backupBundle?.pulleyRatios) {
+        setPulleyRatios((prev) => {
+          const merged = mode === "replace"
+            ? { ...backupBundle.pulleyRatios }
+            : { ...prev, ...backupBundle.pulleyRatios };
+          writeLocalJson(PULLEY_RATIOS_KEY, merged);
+          return merged;
+        });
+      }
+
+      // Restore cable configs if present in backup
+      if (backupBundle?.cableMachineConfigs) {
+        setCableMachineConfigs((prev) => {
+          const merged = mode === "replace"
+            ? { ...backupBundle.cableMachineConfigs }
+            : { ...prev, ...backupBundle.cableMachineConfigs };
+          writeLocalJson(CABLE_MACHINE_CONFIGS_KEY, merged);
+          return merged;
+        });
+      }
+
+      // Restore favorite machines if present in backup
+      if (backupBundle?.favoriteMachines) {
+        setFavoriteMachines((prev) => {
+          const merged = mode === "replace"
+            ? { ...backupBundle.favoriteMachines }
+            : { ...prev, ...backupBundle.favoriteMachines };
+          writeLocalJson(FAVORITE_MACHINES_KEY, merged);
+          return merged;
+        });
+      }
+
+      // Restore userProfile if missing or replace mode
+      if (backupBundle?.userProfile && (!userProfile || mode === "replace")) {
+        setUserProfile(backupBundle.userProfile);
+        saveUserProfile(backupBundle.userProfile);
+      }
 
       return updated;
     });
@@ -6103,8 +6180,17 @@ export default function Page() {
                         onClick={exportLogsToCsv}
                         className="flex items-center gap-1.5 rounded-2xl border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs font-bold text-yellow-300 transition hover:bg-yellow-500/20"
                         aria-label="Export history to CSV"
+                        title="ส่งออกเป็นไฟล์ CSV"
                       >
                         <Download size={15} /> Export CSV
+                      </button>
+                      <button
+                        onClick={exportBackupToJson}
+                        className="flex items-center gap-1.5 rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs font-bold text-amber-300 transition hover:bg-amber-500/20"
+                        aria-label="Export backup to JSON"
+                        title="สำรองข้อมูลทั้งหมดเป็นไฟล์ JSON"
+                      >
+                        <Download size={15} /> Backup JSON
                       </button>
                       <button
                         onClick={clearHistory}
@@ -6953,9 +7039,9 @@ export default function Page() {
                       <div className="px-3.5 pb-4 sm:px-4 sm:pb-5 border-t border-zinc-900/80 pt-3 space-y-3">
                         {/* Level D2: Compact Inline Equipment & Actionable Prescription Strip */}
                         <div className="flex flex-col gap-2 rounded-2xl bg-zinc-950/90 border border-zinc-800/80 p-2.5">
-                          {/* Top Row: Machine Selector Dropdown with inline Unit Switcher & Target Prescription */}
+                          {/* Top Row: Machine Selector Dropdown with inline Star, Unit Switcher & Target Prescription */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               <Dumbbell className="text-yellow-400 shrink-0" size={14} />
                               <div className="relative flex-1 min-w-0">
                                 {(() => {
@@ -6993,6 +7079,23 @@ export default function Page() {
                                 <ChevronDown className="pointer-events-none absolute right-2 top-2 text-zinc-400" size={12} />
                               </div>
 
+                              {/* Favorite Machine Star ⭐ */}
+                              {currentMachine && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleFavoriteMachine(exercise.name, currentMachine)}
+                                  className={`rounded-lg border p-1 text-xs transition shrink-0 ${
+                                    isFavoriteMachine
+                                      ? "border-amber-400/50 bg-amber-400/20 text-amber-300"
+                                      : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-yellow-400"
+                                  }`}
+                                  title={isFavoriteMachine ? "ลบเครื่องโปรด" : "ตั้งเป็นเครื่องประจำ (Favorite ⭐)"}
+                                >
+                                  <Star size={13} className={isFavoriteMachine ? "fill-amber-400 text-amber-400" : ""} />
+                                </button>
+                              )}
+
+                              {/* Unit Switcher */}
                               <button
                                 type="button"
                                 onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
@@ -7003,7 +7106,7 @@ export default function Page() {
                               </button>
                             </div>
 
-                            {/* Concise Actionable Target Prescription */}
+                            {/* Actionable Target Prescription */}
                             {strengthTierInfo && (
                               <div className="flex items-center gap-1.5 shrink-0">
                                 <button
@@ -7027,84 +7130,20 @@ export default function Page() {
                             )}
                           </div>
 
-                          {/* Explicit Barbell / Machine Equipment Weight Clarification Banner */}
-                          {prescriptionResult && (() => {
-                            const startW = effectiveUnit === "lbs"
-                              ? Math.round(prescriptionResult.startingResistanceKg * 2.20462 * 10) / 10
-                              : prescriptionResult.startingResistanceKg;
-
-                            if (effectiveLoad === "barbell" || prescriptionResult.loadType === "barbell") {
-                              const barWeight = effectiveUnit === "lbs" ? 45 : 20;
-                              const addedPlates = Math.max(0, displayedPrescriptionWeight - barWeight);
-                              const perSide = Math.round((addedPlates / 2) * 10) / 10;
-                              return (
-                                <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 text-[11px] text-amber-200">
-                                  <span className="font-bold text-yellow-400">✓ รวมน้ำหนักคานมาตรฐาน {barWeight} {effectiveUnit} แล้ว</span>
-                                  {perSide > 0 ? (
-                                    <span className="text-zinc-300">(ใส่แผ่นข้างละ {perSide} {effectiveUnit})</span>
-                                  ) : (
-                                    <span className="text-zinc-400">(ใช้เฉพาะคานเปล่า ไม่ต้องใส่แผ่น)</span>
-                                  )}
+                          {/* Authoritative Equipment Mechanics & Load Type Clarification Banner */}
+                          {prescriptionResult && (
+                            <div className="flex flex-col gap-1 rounded-xl bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 text-[11px] text-amber-200">
+                              <div className="flex items-center gap-1.5 font-bold text-yellow-400">
+                                <span>⚙️</span>
+                                <span>{prescriptionResult.explicitLoadTypeLabel}</span>
+                              </div>
+                              {prescriptionResult.displayNote && (
+                                <div className="text-zinc-300 text-[10.5px] leading-snug pl-4">
+                                  {prescriptionResult.displayNote}
                                 </div>
-                              );
-                            }
-
-                            if (effectiveLoad === "smith" || prescriptionResult.loadType === "smith") {
-                              const addedPlates = Math.max(0, displayedPrescriptionWeight - startW);
-                              const perSide = Math.round((addedPlates / 2) * 10) / 10;
-                              return (
-                                <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 text-[11px] text-amber-200">
-                                  <span className="font-bold text-yellow-400">✓ รวมแรงต้านบาร์สมิท {startW} {effectiveUnit} แล้ว</span>
-                                  {perSide > 0 ? (
-                                    <span className="text-zinc-300">(ใส่เพลตข้างละ {perSide} {effectiveUnit} · รวมเพลตสองข้าง {Math.round(addedPlates * 10) / 10} {effectiveUnit})</span>
-                                  ) : (
-                                    <span className="text-zinc-400">(ใช้บาร์สมิทเปล่า ไม่ต้องใส่แผ่น)</span>
-                                  )}
-                                </div>
-                              );
-                            }
-
-                            if (effectiveLoad === "plate-loaded" || effectiveLoad === "specialty" || prescriptionResult.loadType === "plate-loaded") {
-                              const perSidePlate = prescriptionResult.isPerHand
-                                ? displayedPrescriptionWeight
-                                : Math.round((displayedPrescriptionWeight / 2) * 10) / 10;
-                              return (
-                                <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 px-2.5 py-1.5 text-[11px] text-amber-200">
-                                  <span className="font-bold text-yellow-400">✓ น้ำหนักเพลตที่ใส่เพิ่ม</span>
-                                  <span className="text-amber-300 font-semibold">(ไม่รวมแรงต้านเครื่อง/แคร่เริ่มต้น {startW} {effectiveUnit})</span>
-                                  <span className="text-zinc-300">· ใส่เพลตข้างละ {perSidePlate} {effectiveUnit}</span>
-                                </div>
-                              );
-                            }
-
-                            if (effectiveLoad === "dumbbell" || prescriptionResult.loadType === "dumbbell") {
-                              return (
-                                <div className="flex items-center gap-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-300">
-                                  <span className="font-bold text-yellow-400">✓ น้ำหนักดัมเบลต่อข้าง/ต่อมือ</span>
-                                </div>
-                              );
-                            }
-
-                            if (effectiveLoad === "cable" || prescriptionResult.loadType === "cable") {
-                              const ratio = prescriptionResult.pulleyRatio ?? (pulleyRatios[baseExercise.id] ?? 2);
-                              const isPerSide = prescriptionResult.cableConfig?.labelScope === "per_side";
-                              return (
-                                <div className="flex items-center gap-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-300">
-                                  <span className="font-bold text-yellow-400">✓ สลักพินน้ำหนักเคเบิล{isPerSide ? " (ต่อข้าง)" : ""} · รอกทด {ratio}:1</span>
-                                </div>
-                              );
-                            }
-
-                            if (effectiveLoad === "selectorized" || prescriptionResult.loadType === "selectorized") {
-                              return (
-                                <div className="flex items-center gap-1.5 rounded-xl bg-zinc-900/80 border border-zinc-800 px-2.5 py-1 text-[11px] text-zinc-300">
-                                  <span className="font-bold text-yellow-400">✓ เสียบสลักพินน้ำหนักเครื่องตามจริง</span>
-                                </div>
-                              );
-                            }
-
-                            return null;
-                          })()}
+                              )}
+                            </div>
+                          )}
 
                           {/* Machine / Smith Starting Resistance Input Field */}
                           {((effectiveLoad === "plate-loaded" || effectiveLoad === "specialty" || effectiveLoad === "smith")) && (() => {
@@ -7158,22 +7197,111 @@ export default function Page() {
                             );
                           })()}
 
-                          {/* Quick Cable Pulley Ratio Selector */}
-                          {effectiveLoad === "cable" && (
-                            <div className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-1.5 text-xs">
-                              <span className="text-zinc-400 font-bold shrink-0">⚙️ อัตราทดรอกเคเบิล:</span>
-                              <select
-                                aria-label="อัตราทดรอก"
-                                value={pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)}
-                                onChange={(e) => updatePulleyRatio(baseExercise.id, e.target.value as "1" | "2" | "3")}
-                                className="rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2.5 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
-                              >
-                                <option value="1">1:1 (Direct / เสียบเท่าไรได้เท่านั้น)</option>
-                                <option value="2">2:1 (Standard Functional Trainer / รอกคู่)</option>
-                                <option value="3">3:1</option>
-                              </select>
-                            </div>
-                          )}
+                          {/* Full Cable Mechanics & Pulley Ratio Configuration */}
+                          {effectiveLoad === "cable" && (() => {
+                            const currentCableCfg = prescriptionResult?.cableConfig || resolveCableResistanceConfig(
+                              exercise.name,
+                              currentMachine,
+                              cableConfigOverride,
+                              Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name))
+                            );
+                            const sampleCalc = calculateCableEffectiveResistance(20, currentCableCfg);
+
+                            return (
+                              <div className="flex flex-col gap-2 rounded-xl border border-zinc-800 bg-zinc-900/80 p-2.5 text-xs">
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-1.5 font-bold text-zinc-300">
+                                    <span className="text-yellow-400">⚙️</span>
+                                    <span>อัตราทดรอก (Pulley Ratio):</span>
+                                  </div>
+                                  <select
+                                    aria-label="อัตราทดรอก"
+                                    value={String(currentCableCfg.pulleyRatio)}
+                                    onChange={(e) => {
+                                      const val = e.target.value as "1" | "2" | "3";
+                                      updatePulleyRatio(baseExercise.id, val);
+                                      updateCableMachineConfig(cableOverrideKey, { pulleyRatio: Number(val) });
+                                    }}
+                                    className="rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2.5 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
+                                  >
+                                    <option value="1">1:1 (Direct / เสียบเท่าไรได้เท่านั้น)</option>
+                                    <option value="2">2:1 (Standard Functional Trainer / รอกคู่)</option>
+                                    <option value="3">3:1 (High Advantage)</option>
+                                  </select>
+                                </div>
+
+                                {/* Collapsible Advanced Cable Mechanics */}
+                                <details className="group border-t border-zinc-800/80 pt-2">
+                                  <summary className="cursor-pointer text-[11px] font-bold text-zinc-400 hover:text-yellow-400 transition flex items-center justify-between select-none">
+                                    <span>การตั้งค่ากลไกเคเบิลขั้นสูง (Stack Label, จำนวนสาย, ขอบเขตป้าย)</span>
+                                    <ChevronDown size={12} className="text-zinc-500 group-open:rotate-180 transition-transform" />
+                                  </summary>
+
+                                  <div className="space-y-2 pt-2">
+                                    {/* Stack Label Meaning */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">ความหมายป้าย:</span>
+                                      <select
+                                        aria-label="ความหมายป้ายพิน"
+                                        value={currentCableCfg.stackLabelMeaning}
+                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { stackLabelMeaning: e.target.value as any })}
+                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
+                                      >
+                                        <option value="effective_resistance_per_handle">แรงต้านจริงต่อด้ามจับ (Effective Resistance)</option>
+                                        <option value="physical_stack_mass">มวลแผ่นเหล็กจริง (Physical Stack Mass)</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Contributing Cable Sides */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">สายต่อเข้าบาร์:</span>
+                                      <select
+                                        aria-label="จำนวนสายเคเบิลต่ออุปกรณ์"
+                                        value={String(currentCableCfg.contributingCableSides)}
+                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { contributingCableSides: Number(e.target.value) })}
+                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
+                                      >
+                                        <option value="1">1 สาย (ด้ามจับเดี่ยว / Unilateral)</option>
+                                        <option value="2">2 สายรวมที่บาร์เดียว (Dual Pulley Pulldown/Row)</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Label Scope */}
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">ขอบเขตป้าย:</span>
+                                      <select
+                                        aria-label="ขอบเขตป้ายน้ำหนัก"
+                                        value={currentCableCfg.labelScope}
+                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { labelScope: e.target.value as any })}
+                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
+                                      >
+                                        <option value="per_side">ป้ายต่อน้ำหนักข้างละ (Per Stack / Side)</option>
+                                        <option value="combined">ป้ายระบุน้ำหนักรวมสองข้าง (Combined)</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Live Verification Preview */}
+                                    <div className="rounded-lg bg-zinc-950 p-2 border border-zinc-800/80 text-[10px] text-zinc-400 font-mono">
+                                      <span className="text-yellow-400 font-bold block mb-0.5">จำลองการทำงาน:</span>
+                                      {sampleCalc.displaySummary}
+                                    </div>
+
+                                    {cableMachineConfigs[cableOverrideKey] && (
+                                      <div className="flex justify-end pt-1">
+                                        <button
+                                          type="button"
+                                          onClick={() => resetCableMachineConfig(cableOverrideKey)}
+                                          className="text-[10px] text-yellow-400 hover:underline font-bold"
+                                        >
+                                          คืนค่ากลไกเคเบิลเป็นค่าเริ่มต้น
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </details>
+                              </div>
+                            );
+                          })()}
                         </div>
 
                         {/* Level D3: Primary Zone — Working Sets Table (High Contrast & Roomy Tap Targets) */}
@@ -7478,171 +7606,26 @@ export default function Page() {
                             {/* 2. Target Muscle Preview Card (3D Silhouette & Chips) */}
                             <ExerciseMusclePreviewCard exercise={exercise} />
 
-                            {/* 3. Machine Mechanics & Adjustments */}
-                            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5 space-y-2">
-                              <p className="text-xs font-bold text-zinc-300 uppercase tracking-wider">กลไกเครื่อง & การตั้งค่า</p>
-
-                              {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "plate-loaded" || (currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "specialty") && (() => {
-                                const defaultEstimateKg = getDefaultMechanicalProfile(effectiveLoad, `${exercise.name} ${currentMachine || ""}`).tareWeight;
-                                const defaultEstimateDisplay = effectiveUnit === "lbs"
-                                  ? Math.round(defaultEstimateKg * 2.20462 * 10) / 10
-                                  : defaultEstimateKg;
-                                const userVal = machineStartingResistances[machineResistanceKey];
-                                return (
-                                  <div className="flex flex-col gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>
-                                        ⚖️ {machineResistanceIsPerSide ? `แรงต้านเริ่มต้นต่อข้าง (${effectiveUnit})` : `แรงต้านเริ่มต้นรวม (${effectiveUnit})`}
-                                      </label>
-                                      {userVal !== undefined && userVal !== "" && (
-                                        <button
-                                          type="button"
-                                          onClick={() => updateMachineStartingResistance(machineResistanceKey, "")}
-                                          className="text-[10px] text-yellow-400 font-bold underline"
-                                        >
-                                          ใช้ค่าประมาณ ({defaultEstimateDisplay})
-                                        </button>
-                                      )}
-                                    </div>
-                                    <input
-                                      id={`machine-start-resistance-${baseExercise.id}`}
-                                      type="number"
-                                      min="0"
-                                      max="1000"
-                                      step="0.5"
-                                      inputMode="decimal"
-                                      value={userVal ?? ""}
-                                      onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)}
-                                      placeholder={`ค่าประมาณ: ${defaultEstimateDisplay} ${effectiveUnit}`}
-                                      className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-zinc-100 outline-none focus:border-yellow-400"
-                                    />
-                                  </div>
-                                );
-                              })()}
-
-                              {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "cable") && (() => {
-                                const currentCableCfg = prescriptionResult?.cableConfig || resolveCableResistanceConfig(
-                                  exercise.name,
-                                  currentMachine,
-                                  cableConfigOverride,
-                                  Number(pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name))
-                                );
-                                const sampleCalc = calculateCableEffectiveResistance(20, currentCableCfg);
-
-                                return (
-                                  <div className="space-y-2 pt-2 border-t border-zinc-800">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-[11px] font-bold text-zinc-300">⚙️ การปรับตั้งแรงต้านเคเบิล</span>
-                                      {cableMachineConfigs[cableOverrideKey] && (
-                                        <button
-                                          type="button"
-                                          onClick={() => resetCableMachineConfig(cableOverrideKey)}
-                                          className="text-[10px] text-zinc-400 hover:text-yellow-400 transition"
-                                        >
-                                          คืนค่าเดิม
-                                        </button>
-                                      )}
-                                    </div>
-
-                                    {/* Pulley Ratio */}
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">อัตราทดรอก:</span>
-                                      <select
-                                        aria-label="อัตราทดรอก"
-                                        value={String(currentCableCfg.pulleyRatio)}
-                                        onChange={(e) => {
-                                          const val = e.target.value as "1" | "2" | "3";
-                                          updatePulleyRatio(baseExercise.id, val);
-                                          updateCableMachineConfig(cableOverrideKey, { pulleyRatio: Number(val) });
-                                        }}
-                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
-                                      >
-                                        <option value="1">1:1 (Direct Stack)</option>
-                                        <option value="2">2:1 (Standard functional)</option>
-                                        <option value="3">3:1 (High advantage)</option>
-                                      </select>
-                                    </div>
-
-                                    {/* Stack Label Meaning */}
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">ความหมายป้าย:</span>
-                                      <select
-                                        aria-label="ความหมายป้ายพิน"
-                                        value={currentCableCfg.stackLabelMeaning}
-                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { stackLabelMeaning: e.target.value as any })}
-                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
-                                      >
-                                        <option value="effective_resistance_per_handle">แรงต้านจริงต่อด้ามจับ (Effective Resistance)</option>
-                                        <option value="physical_stack_mass">มวลแผ่นเหล็กจริง (Physical Stack Mass)</option>
-                                      </select>
-                                    </div>
-
-                                    {/* Contributing Cable Sides */}
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">สายต่อเข้าบาร์:</span>
-                                      <select
-                                        aria-label="จำนวนสายเคเบิลต่ออุปกรณ์"
-                                        value={String(currentCableCfg.contributingCableSides)}
-                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { contributingCableSides: Number(e.target.value) })}
-                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
-                                      >
-                                        <option value="1">1 สาย (ด้ามจับเดี่ยว / Unilateral)</option>
-                                        <option value="2">2 สายรวมที่บาร์เดียว (Dual Pulley Pulldown/Row)</option>
-                                      </select>
-                                    </div>
-
-                                    {/* Label Scope */}
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[11px] font-bold text-zinc-400 shrink-0">ขอบเขตป้าย:</span>
-                                      <select
-                                        aria-label="ขอบเขตป้ายน้ำหนัก"
-                                        value={currentCableCfg.labelScope}
-                                        onChange={(e) => updateCableMachineConfig(cableOverrideKey, { labelScope: e.target.value as any })}
-                                        className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
-                                      >
-                                        <option value="per_side">ป้ายต่อน้ำหนักข้างละ (Per Stack / Side)</option>
-                                        <option value="combined">ป้ายระบุน้ำหนักรวมสองข้าง (Combined)</option>
-                                      </select>
-                                    </div>
-
-                                    {/* Live Verification Preview */}
-                                    <div className="rounded-lg bg-zinc-950 p-2 border border-zinc-800/80 text-[10px] text-zinc-400 font-mono">
-                                      <span className="text-yellow-400 font-bold block mb-0.5">จำลองการทำงาน:</span>
-                                      {sampleCalc.displaySummary}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-
-                              {currentMachine && (
-                                <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
-                                  <button
-                                    type="button"
-                                    onClick={() => toggleFavoriteMachine(exercise.name, currentMachine)}
-                                    className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition border ${
-                                      isFavoriteMachine
-                                        ? "border-amber-400/40 bg-amber-400/20 text-amber-300"
-                                        : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200"
-                                    }`}
-                                  >
-                                    <Star size={11} className={isFavoriteMachine ? "fill-amber-400 text-amber-400" : ""} />
-                                    <span>{isFavoriteMachine ? "เครื่องโปรด ⭐" : "ตั้งเป็นเครื่องประจำ"}</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      updateMachineTag(baseExercise.id, "");
-                                      updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name));
-                                      updateMachineStartingResistance(machineResistanceKey, "");
-                                      resetCableMachineConfig(cableOverrideKey);
-                                    }}
-                                    className="text-[10px] text-zinc-500 hover:text-zinc-300"
-                                  >
-                                    รีเซ็ตค่าเครื่อง
-                                  </button>
-                                </div>
-                              )}
-                            </div>
+                            {/* 3. Machine Quick Actions */}
+                            {currentMachine && (
+                              <div className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5">
+                                <span className="text-xs text-zinc-400">
+                                  เครื่องปัจจุบัน: <strong className="text-zinc-200">{currentMachine}</strong>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    updateMachineTag(baseExercise.id, "");
+                                    updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name));
+                                    updateMachineStartingResistance(machineResistanceKey, "");
+                                    resetCableMachineConfig(cableOverrideKey);
+                                  }}
+                                  className="text-xs text-yellow-400 hover:underline font-bold"
+                                >
+                                  รีเซ็ตกลับเป็นเครื่องมาตรฐาน
+                                </button>
+                              </div>
+                            )}
 
                             {/* 4. PR Records & Relative Strength Grid */}
                             <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5">
@@ -8165,6 +8148,7 @@ export default function Page() {
         preferredUnit={globalWeightUnit}
         onUnitChange={handleSetGlobalUnit}
         onExportLogs={exportLogsToCsv}
+        onExportBackupJson={exportBackupToJson}
         onImportLogs={() => setShowImportModal(true)}
         onOpenAssessment={() => setShowAssessmentModal(true)}
         currentGender={userProfile?.gender || "male"}
@@ -8416,6 +8400,175 @@ export default function Page() {
           onClose={() => setShowWeeklyReviewModal(false)}
           language={appLanguage}
         />
+      )}
+
+      {/* Edit PR & Recent Sets History Modal */}
+      {editingPrExercise && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-md rounded-3xl bg-zinc-950 p-5 sm:p-6 border border-zinc-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
+              <h2 className="text-base sm:text-lg font-black text-white flex items-center gap-2">
+                <span>แก้ไขสถิติ PR - {getExerciseDisplayName(editingPrExercise.name, appLanguage)}</span>
+                {editingPrExercise.machine && (
+                  <span className="text-xs text-yellow-400 font-bold bg-yellow-400/10 px-2 py-0.5 rounded-md border border-yellow-500/20">
+                    {editingPrExercise.machine}
+                  </span>
+                )}
+              </h2>
+              <button
+                type="button"
+                onClick={() => setEditingPrExercise(null)}
+                className="rounded-xl bg-zinc-900 border border-zinc-800 p-1.5 text-zinc-400 hover:text-white transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-bold text-zinc-400">น้ำหนักสูงสุด (Weight & Unit)</label>
+                <div className="inline-flex rounded-lg bg-zinc-900 p-0.5 border border-zinc-800 text-xs font-bold">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editPrUnit === "kg") return;
+                      if (editPrWeight) setEditPrWeight(convertInputWeight(editPrWeight, "lbs", "kg"));
+                      setEditPrUnit("kg");
+                    }}
+                    className={`px-2.5 py-1 rounded transition ${editPrUnit === "kg" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
+                  >
+                    kg
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (editPrUnit === "lbs") return;
+                      if (editPrWeight) setEditPrWeight(convertInputWeight(editPrWeight, "kg", "lbs"));
+                      setEditPrUnit("lbs");
+                    }}
+                    className={`px-2.5 py-1 rounded transition ${editPrUnit === "lbs" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
+                  >
+                    lb
+                  </button>
+                </div>
+              </div>
+              <div className="relative flex items-center">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  placeholder={editPrUnit === "kg" ? "เช่น 100" : "เช่น 225"}
+                  value={editPrWeight}
+                  onChange={(e) => setEditPrWeight(e.target.value)}
+                  className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 pr-12 text-zinc-100 font-mono font-bold outline-none focus:border-yellow-400 text-base"
+                />
+                <span className="pointer-events-none absolute right-3 text-xs font-black uppercase text-yellow-400">
+                  {formatUnitLabel(editPrUnit)}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-zinc-400 block mb-1.5">จำนวนครั้ง (Reps)</label>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="Reps"
+                value={editPrReps}
+                onChange={(e) => setEditPrReps(e.target.value)}
+                className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-zinc-100 font-mono font-bold outline-none focus:border-yellow-400 text-base"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setEditingPrExercise(null)}
+                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-xs font-bold border border-zinc-800 transition"
+              >
+                ยกเลิก (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const weightNum = Number(editPrWeight);
+                  const repsNum = Number(editPrReps);
+                  if (!weightNum || !repsNum) return;
+                  const weightLbs = editPrUnit === "kg" ? convertWeight(weightNum, "kg", "lbs") : weightNum;
+                  const key = getEffectiveExerciseKey(editingPrExercise.name, editingPrExercise.machine);
+                  setRecordsMap((prev) => {
+                    const rec = { ...(prev[key] ?? {}) };
+                    rec.maxWeight = {
+                      exerciseId: "",
+                      exerciseName: editingPrExercise.name,
+                      weightLbs,
+                      reps: repsNum,
+                      setNumber: 0,
+                      date: new Date().toISOString(),
+                      machine: editingPrExercise.machine,
+                      unit: editPrUnit,
+                      rawValue: weightNum,
+                    };
+                    const updated = { ...prev, [key]: { ...rec } };
+                    writeLocalJson(PERMANENT_RECORDS_KEY, updated);
+                    return updated;
+                  });
+                  setEditingPrExercise(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black text-xs uppercase tracking-wider transition shadow-md shadow-yellow-500/20"
+              >
+                บันทึกสถิติ (Save PR)
+              </button>
+            </div>
+
+            <div className="pt-3 border-t border-zinc-800/80">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2">
+                ประวัติเซตล่าสุดของท่านี้ (Recent Sets)
+              </h3>
+              <ul className="max-h-48 overflow-y-auto space-y-1.5 divide-y divide-zinc-800/50">
+                {logs
+                  .filter((l) => getEffectiveExerciseKey(l.exerciseName, l.machine) === getEffectiveExerciseKey(editingPrExercise.name, editingPrExercise.machine))
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .slice(0, 5)
+                  .map((log, idx) => {
+                    const disp = resolveRecordDisplay(log, editPrUnit);
+                    return (
+                      <li key={idx} className="flex justify-between items-center text-xs pt-1.5 first:pt-0">
+                        <span className="font-mono text-zinc-300">
+                          {new Date(log.date).toLocaleDateString("th-TH")} · {log.reps} × <strong className="text-yellow-300">{disp.primaryText}</strong> {disp.secondaryText && <span className="text-zinc-500 text-[10px]">({disp.secondaryText})</span>}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLogs((old) => {
+                              const updated = old.filter((_, i) => i !== old.indexOf(log));
+                              writeLocalJson(LATEST_LOGS_KEY, updated);
+                              return updated;
+                            });
+                            const key = getEffectiveExerciseKey(log.exerciseName, log.machine);
+                            setRecordsMap((prev) => {
+                              const newMap = { ...prev };
+                              const rec = newMap[key];
+                              if (rec && rec.maxWeight && rec.maxWeight.date === log.date) {
+                                delete rec.maxWeight;
+                              }
+                              writeLocalJson(PERMANENT_RECORDS_KEY, newMap);
+                              return newMap;
+                            });
+                          }}
+                          className="text-[11px] text-red-400 hover:text-red-300 hover:underline px-2 py-0.5 rounded transition"
+                        >
+                          ลบเซต
+                        </button>
+                      </li>
+                    );
+                  })}
+                {logs.filter((l) => getEffectiveExerciseKey(l.exerciseName, l.machine) === getEffectiveExerciseKey(editingPrExercise.name, editingPrExercise.machine)).length === 0 && (
+                  <li className="text-[11px] text-zinc-500 py-2 text-center">ยังไม่มีประวัติเซตที่บันทึกไว้สำหรับเครื่องนี้</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
       )}
 
       <nav className="safe-bottom fixed bottom-0 left-0 right-0 z-30 border-t border-zinc-800 bg-zinc-950/95 px-2 py-2 backdrop-blur">

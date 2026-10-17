@@ -810,12 +810,15 @@ export function getDefaultMechanicalProfile(load: string, exerciseName: string, 
 
   // ─── Bilateral cable stack (pulldown / row) ───────────────────────────────
   if (
-    lowerName.includes("lat pull down") ||
-    lowerName.includes("lat pull") ||
-    lowerName.includes("cable row") ||
-    lowerName.includes("cable crunch") ||
-    lowerName.includes("straight arm pulldown") ||
-    lowerName.includes("cable lat prayers")
+    (load === "cable" || load === "selectorized") &&
+    (
+      lowerName.includes("lat pull down") ||
+      lowerName.includes("lat pull") ||
+      lowerName.includes("cable row") ||
+      lowerName.includes("cable crunch") ||
+      lowerName.includes("straight arm pulldown") ||
+      lowerName.includes("cable lat prayers")
+    )
   ) {
     return {
       leverageRatio: 1.0,
@@ -1580,8 +1583,8 @@ export function calculatePrescriptionWeight(
 
   const profile = getDefaultMechanicalProfile(load, exerciseName, pulleyRatioOverride);
   // Optional user-provided machine resistance overrides the app's category/model estimate.
-  // Only apply it to plate-loaded equipment; selectorized stack values are already the selected load.
-  if (profile.isPlateLoaded && startingResistanceOverrideKg !== undefined && Number.isFinite(startingResistanceOverrideKg) && startingResistanceOverrideKg >= 0) {
+  // Apply it to plate-loaded equipment and smith machines; selectorized stack values are already the selected load.
+  if ((profile.isPlateLoaded || load === "smith") && startingResistanceOverrideKg !== undefined && Number.isFinite(startingResistanceOverrideKg) && startingResistanceOverrideKg >= 0) {
     profile.tareWeight = startingResistanceOverrideKg;
   }
 

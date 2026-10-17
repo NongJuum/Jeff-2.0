@@ -17,6 +17,7 @@ type Props = {
   preferredUnit?: WeightUnit;
   onUnitChange?: (unit: WeightUnit) => void;
   onExportLogs: () => void;
+  onExportBackupJson?: () => void;
   onImportLogs?: () => void;
   onOpenAssessment?: () => void;
   currentGender?: Gender;
@@ -36,6 +37,7 @@ export function ProfileModal({
   preferredUnit = "kg",
   onUnitChange,
   onExportLogs,
+  onExportBackupJson,
   onImportLogs,
   onOpenAssessment,
   currentGender,
@@ -264,8 +266,20 @@ export function ProfileModal({
               <span className="flex items-center gap-2">
                 <Download size={16} className="text-yellow-400" /> ส่งออกประวัติการฝึก (CSV)
               </span>
-              <span className="text-xs text-zinc-500">Export</span>
+              <span className="text-xs text-zinc-500">Export CSV</span>
             </button>
+            {onExportBackupJson && (
+              <button
+                type="button"
+                onClick={onExportBackupJson}
+                className="flex w-full items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 p-3 text-sm font-bold text-zinc-200 transition hover:bg-zinc-800"
+              >
+                <span className="flex items-center gap-2">
+                  <Download size={16} className="text-amber-400" /> สำรองข้อมูลทั้งหมด (Full JSON Backup)
+                </span>
+                <span className="text-xs text-zinc-500">Backup JSON</span>
+              </button>
+            )}
             {onImportLogs && (
               <button
                 type="button"
@@ -273,7 +287,7 @@ export function ProfileModal({
                 className="flex w-full items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 p-3 text-sm font-bold text-zinc-200 transition hover:bg-zinc-800"
               >
                 <span className="flex items-center gap-2">
-                  <FileUp size={16} className="text-yellow-400" /> นำเข้าประวัติการฝึก (CSV / JSON)
+                  <FileUp size={16} className="text-yellow-400" /> นำเข้าข้อมูลการฝึก (CSV / JSON)
                 </span>
                 <span className="text-xs text-zinc-500">Import</span>
               </button>

@@ -4,10 +4,20 @@ import { X, Upload, FileText, CheckCircle2, AlertTriangle, ArrowRight, RefreshCw
 import type { LogSet } from "../page";
 import { type WeightUnit } from "../lib/units";
 
+export interface BackupMetadata {
+  records?: Record<string, any>;
+  recordsMap?: Record<string, any>;
+  userProfile?: any;
+  machineStartingResistances?: Record<string, string>;
+  pulleyRatios?: Record<string, "1" | "2" | "3">;
+  cableMachineConfigs?: Record<string, any>;
+  favoriteMachines?: Record<string, string>;
+}
+
 interface ImportModalProps {
   open: boolean;
   onClose: () => void;
-  onImportLogs: (logs: LogSet[], mode: "merge" | "replace") => void;
+  onImportLogs: (logs: LogSet[], mode: "merge" | "replace", backupData?: BackupMetadata) => void;
   existingLogsCount: number;
 }
 
@@ -56,14 +66,14 @@ export function parseWorkoutCsv(content: string): LogSet[] {
     return -1;
   };
 
-  const dateIdx = getColIndex("date", "timestamp", "datetime", "time", "createdat");
-  const exIdx = getColIndex("exercise", "exercisename", "name", "movement");
-  const machineIdx = getColIndex("machine", "equipment", "variant", "machinetag");
-  const setIdx = getColIndex("set", "setnumber", "setnum", "setno");
-  const weightIdx = getColIndex("weight", "load", "rawweight", "displayweight");
-  const unitIdx = getColIndex("unit", "weightunit");
+  const dateIdx = getColIndex("date", "timestamp", "datetime", "time", "createdat", "วันที่", "เวลา", "วัน");
+  const exIdx = getColIndex("exercise", "exercisename", "name", "movement", "ท่า", "ท่าฝึก", "ชื่อท่า", "รายการ");
+  const machineIdx = getColIndex("machine", "equipment", "variant", "machinetag", "เครื่อง", "อุปกรณ์", "ประเภทเครื่อง");
+  const setIdx = getColIndex("set", "setnumber", "setnum", "setno", "เซต", "เซ็ต", "รอบ");
+  const weightIdx = getColIndex("weight", "load", "rawweight", "displayweight", "น้ำหนัก", "โหลด");
+  const unitIdx = getColIndex("unit", "weightunit", "หน่วย");
   const normWeightIdx = getColIndex("normalizedweightlbs", "weightlbs", "lbs", "normlbs");
-  const repsIdx = getColIndex("reps", "rep", "repetitions", "count");
+  const repsIdx = getColIndex("reps", "rep", "repetitions", "count", "จำนวนครั้ง", "ครั้ง", "เรป");
 
   if (exIdx === -1 && repsIdx === -1) {
     return [];
@@ -130,11 +140,71 @@ export function parseWorkoutCsv(content: string): LogSet[] {
   return result;
 }
 
-export function parseWorkoutJson(content: string): LogSet[] {
+export function parseWorkoutJsonWithMetadata(content: string): { logs: LogSet[]; backupData?: BackupMetadata } {
   try {
-    const parsed = JSON.parse(content);
-    const rawArray = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.logs) ? parsed.logs : null);
-    if (!rawArray) return [];
+    let parsed = JSON.parse(content);
+    if (typeof parsed === "string") {
+      try { parsed = JSON.parse(parsed); } catch {}
+    }
+
+    let rawArray: any = null;
+    let backupData: BackupMetadata | undefined;
+
+    if (Array.isArray(parsed)) {
+      rawArray = parsed;
+    } else if (parsed && typeof parsed === "object") {
+      if (Array.isArray(parsed.logs)) {
+        rawArray = parsed.logs;
+      } else if (Array.isArray(parsed.trainingLatestV2)) {
+        rawArray = parsed.trainingLatestV2;
+      } else if (typeof parsed.trainingLatestV2 === "string") {
+        try { rawArray = JSON.parse(parsed.trainingLatestV2); } catch {}
+      } else if (Array.isArray(parsed.latestLogs)) {
+        rawArray = parsed.latestLogs;
+      } else if (typeof parsed.latestLogs === "string") {
+        try { rawArray = JSON.parse(parsed.latestLogs); } catch {}
+      } else if (Array.isArray(parsed.history)) {
+        rawArray = parsed.history;
+      } else if (Array.isArray(parsed.workoutHistory)) {
+        rawArray = parsed.workoutHistory;
+      } else if (parsed.data && Array.isArray(parsed.data.logs)) {
+        rawArray = parsed.data.logs;
+      } else if (parsed.data && Array.isArray(parsed.data.trainingLatestV2)) {
+        rawArray = parsed.data.trainingLatestV2;
+      }
+
+      // Helper to parse stringified JSON if needed
+      const parseVal = (val: any) => {
+        if (typeof val === "string") {
+          try { return JSON.parse(val); } catch { return undefined; }
+        }
+        return val;
+      };
+
+      // Check for additional backup metadata
+      const recs = parseVal(parsed.records || parsed.recordsMap || parsed.permanentRecords || parsed.haitPermanentRecordsV1);
+      const mRes = parseVal(parsed.machineStartingResistances || parsed.haitMachineStartingResistancesV1);
+      const pRatios = parseVal(parsed.pulleyRatios || parsed.haitPulleyRatiosV1);
+      const cConfigs = parseVal(parsed.cableMachineConfigs || parsed.haitCableConfigsV1);
+      const fMachines = parseVal(parsed.favoriteMachines || parsed.haitFavoriteMachinesV1);
+      const uProf = parseVal(parsed.userProfile || parsed.haitUserProfileV1);
+
+      if (recs || mRes || pRatios || cConfigs || fMachines || uProf) {
+        backupData = {
+          records: recs && typeof recs === "object" ? recs : undefined,
+          recordsMap: recs && typeof recs === "object" ? recs : undefined,
+          machineStartingResistances: mRes && typeof mRes === "object" ? mRes : undefined,
+          pulleyRatios: pRatios && typeof pRatios === "object" ? pRatios : undefined,
+          cableMachineConfigs: cConfigs && typeof cConfigs === "object" ? cConfigs : undefined,
+          favoriteMachines: fMachines && typeof fMachines === "object" ? fMachines : undefined,
+          userProfile: uProf && typeof uProf === "object" ? uProf : undefined,
+        };
+      }
+    }
+
+    if (!rawArray || !Array.isArray(rawArray)) {
+      return { logs: [], backupData };
+    }
 
     const result: LogSet[] = [];
     for (const item of rawArray) {
@@ -174,16 +244,21 @@ export function parseWorkoutJson(content: string): LogSet[] {
       });
     }
 
-    return result;
+    return { logs: result, backupData };
   } catch {
-    return [];
+    return { logs: [] };
   }
+}
+
+export function parseWorkoutJson(content: string): LogSet[] {
+  return parseWorkoutJsonWithMetadata(content).logs;
 }
 
 export function ImportModal({ open, onClose, onImportLogs, existingLogsCount }: ImportModalProps) {
   const [fileContent, setFileContent] = useState<string>("");
   const [fileName, setFileName] = useState<string>("");
   const [parsedLogs, setParsedLogs] = useState<LogSet[]>([]);
+  const [backupMetadata, setBackupMetadata] = useState<BackupMetadata | undefined>(undefined);
   const [importMode, setImportMode] = useState<"merge" | "replace">("merge");
   const [errorMsg, setErrorMsg] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"file" | "paste">("file");
@@ -199,12 +274,16 @@ export function ImportModal({ open, onClose, onImportLogs, existingLogsCount }: 
     const trimmed = text.trim();
     if (!trimmed) {
       setParsedLogs([]);
+      setBackupMetadata(undefined);
       return;
     }
 
     let logs: LogSet[] = [];
+    let meta: BackupMetadata | undefined;
     if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-      logs = parseWorkoutJson(trimmed);
+      const res = parseWorkoutJsonWithMetadata(trimmed);
+      logs = res.logs;
+      meta = res.backupData;
     } else {
       logs = parseWorkoutCsv(trimmed);
     }
@@ -213,6 +292,7 @@ export function ImportModal({ open, onClose, onImportLogs, existingLogsCount }: 
       setErrorMsg("ไม่พบข้อมูลเซตการฝึกที่ถูกต้อง กรุณาตรวจสอบรูปแบบไฟล์ CSV หรือ JSON");
     }
     setParsedLogs(logs);
+    setBackupMetadata(meta);
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -240,7 +320,7 @@ export function ImportModal({ open, onClose, onImportLogs, existingLogsCount }: 
 
   function handleExecuteImport() {
     if (parsedLogs.length === 0) return;
-    onImportLogs(parsedLogs, importMode);
+    onImportLogs(parsedLogs, importMode, backupMetadata);
     onClose();
   }
 
@@ -359,6 +439,23 @@ export function ImportModal({ open, onClose, onImportLogs, existingLogsCount }: 
                   <span className="font-bold text-white text-xs truncate block">{earliestDate} - {latestDate}</span>
                 </div>
               </div>
+
+              {/* Detected Backup Metadata Alert */}
+              {backupMetadata && (
+                <div className="flex items-start gap-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 p-2.5 text-xs text-amber-200">
+                  <CheckCircle2 size={16} className="text-yellow-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-yellow-300">ตรวจพบข้อมูลสำรองเพิ่มเติมในไฟล์:</p>
+                    <ul className="mt-1 list-disc list-inside text-zinc-300 text-[11px] space-y-0.5">
+                      {backupMetadata.records && <li>สถิติสูงสุด PR: {Object.keys(backupMetadata.records).length} ท่า</li>}
+                      {backupMetadata.machineStartingResistances && <li>แรงต้านเริ่มต้นของเครื่อง: {Object.keys(backupMetadata.machineStartingResistances).length} เครื่อง</li>}
+                      {backupMetadata.pulleyRatios && <li>อัตราทดรอกเคเบิล: {Object.keys(backupMetadata.pulleyRatios).length} ท่า</li>}
+                      {backupMetadata.userProfile && <li>ข้อมูลโปรไฟล์ผู้ใช้</li>}
+                    </ul>
+                    <p className="mt-1 text-[10px] text-zinc-400">ระบบจะกู้คืนการตั้งค่าเหล่านี้ให้อัตโนมัติเมื่อกดนำเข้า</p>
+                  </div>
+                </div>
+              )}
 
               {/* Sample 3 rows preview */}
               <div className="space-y-1">

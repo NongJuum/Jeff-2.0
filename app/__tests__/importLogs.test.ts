@@ -95,4 +95,117 @@ describe("Workout Data Import Parsers", () => {
     expect(logs[0].rawValue).toBe(180);
     expect(logs[0].weightLbs).toBeCloseTo(396.83, 1);
   });
+
+  it("parses Thai CSV headers correctly (วันที่, ท่าฝึก, เครื่อง, เซต, น้ำหนัก, หน่วย, จำนวนครั้ง)", () => {
+    const thaiCsv = `วันที่,ท่าฝึก,เครื่อง,เซต,น้ำหนัก,หน่วย,จำนวนครั้ง
+2026-10-16 09:00:00,Lat Pulldown,Plate-Loaded Wide,1,50,kg,10
+2026-10-16 09:02:00,Lat Pulldown,Plate-Loaded Wide,2,55,kg,8`;
+
+    const logs = parseWorkoutCsv(thaiCsv);
+    expect(logs).toHaveLength(2);
+    expect(logs[0].exerciseName).toBe("Lat Pulldown");
+    expect(logs[0].machine).toBe("Plate-Loaded Wide");
+    expect(logs[0].setNumber).toBe(1);
+    expect(logs[0].rawValue).toBe(50);
+    expect(logs[0].unit).toBe("kg");
+    expect(logs[0].reps).toBe(10);
+  });
+
+  it("parses full JSON backup bundle with metadata for cache clear recovery", async () => {
+    const { parseWorkoutJsonWithMetadata } = await import("../components/ImportModal");
+    const fullBackup = JSON.stringify({
+      version: 2,
+      exportDate: "2026-10-17T09:00:00.000Z",
+      app: "HA IT Workout Tracker",
+      logs: [
+        {
+          exerciseName: "Bench Press",
+          setNumber: 1,
+          weightLbs: 220.46,
+          reps: 8,
+          unit: "kg",
+          rawValue: 100,
+          date: "2026-10-17T08:30:00.000Z",
+        },
+      ],
+      records: {
+        ex_bench_press: {
+          weightLbs: 220.46,
+          reps: 8,
+          date: "2026-10-17T08:30:00.000Z",
+          setNumber: 1,
+        },
+      },
+      machineStartingResistances: {
+        "smith_bench::Smith Machine 1": 15,
+      },
+      pulleyRatios: {
+        "cable_fly::Cable Cross": "2:1",
+      },
+      cableMachineConfigs: {
+        "lat_pulldown::Dual Lat": {
+          ratio: "2:1",
+          labelMeaning: "single_cable_tension",
+          contributingSides: 2,
+          labelScope: "per_side",
+        },
+      },
+      favoriteMachines: {
+        chest_press: "Prime Incline",
+      },
+      userProfile: {
+        unit: "kg",
+        experience: "advanced",
+      },
+    });
+
+    const parsed = parseWorkoutJsonWithMetadata(fullBackup);
+    expect(parsed.logs).toHaveLength(1);
+    expect(parsed.logs[0].exerciseName).toBe("Bench Press");
+    expect(parsed.backupData).toBeDefined();
+    expect(parsed.backupData?.recordsMap).toHaveProperty("ex_bench_press");
+    expect(parsed.backupData?.machineStartingResistances).toEqual({
+      "smith_bench::Smith Machine 1": 15,
+    });
+    expect(parsed.backupData?.pulleyRatios).toEqual({
+      "cable_fly::Cable Cross": "2:1",
+    });
+    expect(parsed.backupData?.cableMachineConfigs).toBeDefined();
+    expect(parsed.backupData?.favoriteMachines).toEqual({
+      chest_press: "Prime Incline",
+    });
+    expect(parsed.backupData?.userProfile?.unit).toBe("kg");
+  });
+
+  it("parses raw localStorage dump JSON before cache clear", async () => {
+    const { parseWorkoutJsonWithMetadata } = await import("../components/ImportModal");
+    const rawStorageDump = JSON.stringify({
+      trainingLatestV2: JSON.stringify([
+        {
+          exerciseName: "Squat",
+          setNumber: 1,
+          weightLbs: 315,
+          reps: 5,
+          unit: "lbs",
+          rawValue: 315,
+          date: "2026-10-16",
+        },
+      ]),
+      haitPermanentRecordsV1: JSON.stringify({
+        ex_squat: { weightLbs: 315, reps: 5, date: "2026-10-16" },
+      }),
+      machineStartingResistances: JSON.stringify({
+        "leg_press::Hack Squat": 45,
+      }),
+    });
+
+    const parsed = parseWorkoutJsonWithMetadata(rawStorageDump);
+    expect(parsed.logs).toHaveLength(1);
+    expect(parsed.logs[0].exerciseName).toBe("Squat");
+    expect(parsed.backupData?.recordsMap).toHaveProperty("ex_squat");
+    expect(parsed.backupData?.machineStartingResistances).toEqual({
+      "leg_press::Hack Squat": 45,
+    });
+  });
 });
+
