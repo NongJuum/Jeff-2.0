@@ -1312,9 +1312,10 @@ function uniqueRegions(items: MuscleRegion[]) {
   return Array.from(new Set(items));
 }
 
-function getExercisePreviewRegions(exercise: Pick<PlanExercise, "group" | "movement" | "muscles">) {
-  const normalized = uniqueRegions(exercise.muscles.flatMap((muscle) => MUSCLE_ALIAS_MAP[muscle] ?? []));
-  const movement = exercise.movement.toLowerCase();
+function getExercisePreviewRegions(exercise: Partial<PlanExercise> | Pick<PlanExercise, "group" | "movement" | "muscles">) {
+  const muscles = Array.isArray(exercise?.muscles) ? exercise.muscles : [];
+  const normalized = uniqueRegions(muscles.flatMap((muscle) => MUSCLE_ALIAS_MAP[muscle] ?? []));
+  const movement = (exercise?.movement || "").toLowerCase();
 
   const isIsolation =
     exercise.group === "Arms" ||
@@ -1449,7 +1450,20 @@ function buildProgramMuscleSummary(programOrPlan: any): MuscleSummary {
       if (week.days) {
         for (const day of week.days) {
           if (day.exercises) {
-            exercises.push(...day.exercises);
+            for (const ex of day.exercises) {
+              const found = findExercise(ex.name);
+              exercises.push({
+                id: ex.name,
+                name: ex.name,
+                sets: ex.sets || 3,
+                reps: ex.reps || "8-12",
+                warmup: false,
+                muscles: found.muscles,
+                movement: found.movement,
+                group: found.group,
+                load: found.load,
+              });
+            }
           }
         }
       }
@@ -1457,7 +1471,20 @@ function buildProgramMuscleSummary(programOrPlan: any): MuscleSummary {
   } else if (programOrPlan?.days) {
     for (const day of programOrPlan.days) {
       if (day.exercises) {
-        exercises.push(...day.exercises);
+        for (const ex of day.exercises) {
+          const found = findExercise(ex.name);
+          exercises.push({
+            id: ex.id || ex.name,
+            name: ex.name,
+            sets: ex.sets || 3,
+            reps: ex.reps || "8-12",
+            warmup: false,
+            muscles: ex.muscles || found.muscles,
+            movement: ex.movement || found.movement,
+            group: ex.group || found.group,
+            load: ex.load || found.load,
+          });
+        }
       }
     }
   }
