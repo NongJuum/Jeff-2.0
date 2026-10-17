@@ -1,4 +1,4 @@
-const CACHE_NAME = "hait-workout-v3";
+const CACHE_NAME = "hait-workout-v4";
 const ASSETS_TO_CACHE = [
   "/",
   "/manifest.webmanifest",
@@ -33,21 +33,45 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      const fetchPromise = fetch(event.request)
+  const request = event.request;
+
+  // 1. For HTML / navigation requests: ALWAYS network-first so new build chunk hashes are fetched
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseToCache);
+              cache.put(request, responseToCache);
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match(request).then((cached) => cached || caches.match("/"));
+        })
+    );
+    return;
+  }
+
+  // 2. For static assets (images, icons, chunks): cache first, network fallback
+  event.respondWith(
+    caches.match(request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      return fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
             });
           }
           return networkResponse;
         })
         .catch(() => cachedResponse);
-
-      return cachedResponse || fetchPromise;
     })
   );
 });
