@@ -1,77 +1,22 @@
-const CACHE_NAME = "hait-workout-v4";
-const ASSETS_TO_CACHE = [
-  "/",
-  "/manifest.webmanifest",
-  "/favicon.ico",
-  "/icon-192.png",
-  "/icon-512.png",
-  "/hait-logo.png",
-];
+// Service Worker Kill Switch & Self-Unregister
+// This forces any existing service worker to unregister and clear all stale caches,
+// allowing the browser to load all pages and scripts directly from the network.
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS_TO_CACHE))
-  );
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((key) => {
-          if (key !== CACHE_NAME) {
-            return caches.delete(key);
-          }
-        })
-      )
-    )
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+      .then(() => self.registration.unregister())
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
-
-  const request = event.request;
-
-  // 1. For HTML / navigation requests: ALWAYS network-first so new build chunk hashes are fetched
-  if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => {
-          return caches.match(request).then((cached) => cached || caches.match("/"));
-        })
-    );
-    return;
-  }
-
-  // 2. For static assets (images, icons, chunks): cache first, network fallback
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(() => cachedResponse);
-    })
-  );
+// Pass-through: Do not intercept fetch events so the browser uses native network
+self.addEventListener("fetch", () => {
+  return;
 });
