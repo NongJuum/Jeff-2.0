@@ -1434,6 +1434,38 @@ function buildPlannedMuscleSummary(exercises: PlanExercise[]): MuscleSummary {
   return summarizeRegionScores(scoreMap, "Planned from this day");
 }
 
+function buildProgramMuscleSummary(programOrPlan: any): MuscleSummary {
+  const scoreMap = {} as Record<MuscleRegion, number>;
+  const exercises: PlanExercise[] = [];
+
+  if (programOrPlan?.weeks) {
+    for (const week of programOrPlan.weeks) {
+      if (week.days) {
+        for (const day of week.days) {
+          if (day.exercises) {
+            exercises.push(...day.exercises);
+          }
+        }
+      }
+    }
+  } else if (programOrPlan?.days) {
+    for (const day of programOrPlan.days) {
+      if (day.exercises) {
+        exercises.push(...day.exercises);
+      }
+    }
+  }
+
+  for (const exercise of exercises) {
+    const { primary, secondary } = getExercisePreviewRegions(exercise);
+    const setWeight = Math.max(1, (exercise.sets || 3) * 0.8);
+    for (const region of primary) scoreMap[region] = (scoreMap[region] ?? 0) + setWeight;
+    for (const region of secondary) scoreMap[region] = (scoreMap[region] ?? 0) + setWeight * 0.55;
+  }
+
+  return summarizeRegionScores(scoreMap, "Program muscle distribution");
+}
+
 const REGION_TO_ANATOMY_MAP: Record<MuscleRegion, { front?: string[]; back?: string[] }> = {
   upperChest: { front: ["upper_chest"] },
   chest: { front: ["chest"] },
@@ -3844,6 +3876,21 @@ export default function Page() {
     return buildPlannedMuscleSummary(dashboardDay?.exercises ?? []);
   }, [dashboardDay]);
 
+  const [dashboardAnatomyTab, setDashboardAnatomyTab] = useState<"today" | "program">("today");
+
+  const programMuscleSummary = useMemo(() => {
+    if (activeJeffProgram) {
+      const prog = findProgramById(activeJeffProgram.programId);
+      if (prog) {
+        return buildProgramMuscleSummary(prog);
+      }
+    }
+    if (activePlan && Array.isArray(activePlan)) {
+      return buildProgramMuscleSummary({ days: activePlan });
+    }
+    return dashboardMuscleSummary;
+  }, [activeJeffProgram, activePlan, dashboardMuscleSummary]);
+
   const isTodayScheduledRest = useMemo(() => {
     if (activeJeffProgram) {
       return isJeffProgramComplete(activeJeffProgram) || !jeffCalendarStatus?.isTrainingDay;
@@ -5756,6 +5803,134 @@ export default function Page() {
             ) : null
             )}
 
+            {/* Program Muscle Anatomy Overview Card */}
+            <div className="rounded-3xl border border-zinc-800/80 bg-zinc-950 p-4 sm:p-5 shadow-2xl relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-yellow-400 text-base">🧬</span>
+                    <h3 className="text-base sm:text-lg font-black text-white">
+                      {dashboardAnatomyTab === "today"
+                        ? (appLanguage === "th" ? "กล้ามเนื้อที่บริหารวันนี้ (Today's Muscles)" : "Today's Target Muscles")
+                        : (appLanguage === "th" ? `ภาพรวมกล้ามเนื้อทั้งโปรแกรม (${activeJeffProgram ? findProgramById(activeJeffProgram.programId)?.shortName || "Active Program" : "Full Program"})` : "Program Muscle Overview")}
+                    </h3>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {dashboardAnatomyTab === "today"
+                      ? (appLanguage === "th" ? "แสดงกลุ่มกล้ามเนื้อหลักและรองสำหรับเซสชันวันนี้" : "Highlighting targeted muscles for today's workout")
+                      : (appLanguage === "th" ? "แสดงความครอบคลุมของกล้ามเนื้อทุกมัดตลอดทั้งสัปดาห์ของโปรแกรมที่เลือก" : "Overview of muscle coverage across the entire weekly program")}
+                  </p>
+                </div>
+
+                {/* Segmented View Switcher */}
+                <div className="inline-flex rounded-xl bg-zinc-900 p-1 border border-zinc-800 text-xs font-bold shrink-0 self-start sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => setDashboardAnatomyTab("today")}
+                    className={`px-3 py-1.5 rounded-lg transition ${
+                      dashboardAnatomyTab === "today"
+                        ? "bg-yellow-400 text-black font-black shadow-md shadow-yellow-500/20"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {appLanguage === "th" ? "วันนี้" : "Today"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDashboardAnatomyTab("program")}
+                    className={`px-3 py-1.5 rounded-lg transition ${
+                      dashboardAnatomyTab === "program"
+                        ? "bg-yellow-400 text-black font-black shadow-md shadow-yellow-500/20"
+                        : "text-zinc-400 hover:text-white"
+                    }`}
+                  >
+                    {appLanguage === "th" ? "ทั้งโปรแกรม" : "Full Program"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Dual Anatomy Figures & Muscle Badges */}
+              {(() => {
+                const activeSummary = dashboardAnatomyTab === "today" ? dashboardMuscleSummary : programMuscleSummary;
+                const primaryChips = formatMuscleChips(activeSummary.primary, appLanguage);
+                const secondaryChips = formatMuscleChips(activeSummary.secondary, appLanguage).filter(
+                  (c) => !primaryChips.includes(c)
+                );
+
+                return (
+                  <div className="flex flex-col sm:flex-row items-center gap-5">
+                    {/* Anatomical Figures Side by Side */}
+                    <div className="flex items-center justify-center gap-3 rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-3 shrink-0 shadow-inner">
+                      <div className="text-center">
+                        <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 mb-1">Anterior (หน้า)</p>
+                        <RealisticAnatomyFigure
+                          side="front"
+                          primary={activeSummary.primary}
+                          secondary={activeSummary.secondary}
+                          compact
+                        />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 mb-1">Posterior (หลัง)</p>
+                        <RealisticAnatomyFigure
+                          side="back"
+                          primary={activeSummary.primary}
+                          secondary={activeSummary.secondary}
+                          compact
+                        />
+                      </div>
+                    </div>
+
+                    {/* Muscle Groups Breakdown */}
+                    <div className="flex-1 space-y-3 w-full">
+                      {primaryChips.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-yellow-400" />
+                            <span>{appLanguage === "th" ? "กล้ามเนื้อหลัก (Primary Targets)" : "Primary Muscle Groups"}</span>
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {primaryChips.map((m) => (
+                              <span
+                                key={`p-chip-${m}`}
+                                className="inline-flex items-center gap-1 rounded-lg border border-yellow-500/40 bg-yellow-500/15 px-2.5 py-1 text-xs font-bold text-yellow-300"
+                              >
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {secondaryChips.length > 0 && (
+                        <div>
+                          <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-indigo-400" />
+                            <span>{appLanguage === "th" ? "กล้ามเนื้อรอง (Secondary / Synergists)" : "Secondary Muscle Groups"}</span>
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {secondaryChips.map((m) => (
+                              <span
+                                key={`s-chip-${m}`}
+                                className="inline-flex items-center gap-1 rounded-lg border border-zinc-700/80 bg-zinc-900 px-2.5 py-1 text-xs font-medium text-zinc-300"
+                              >
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pt-1 flex items-center gap-3 text-[11px] text-zinc-500 font-mono">
+                        <span>● สีเหลือง = เป้าหมายหลัก</span>
+                        <span>● สีม่วง/คราม = กล้ามเนื้อซัพพอร์ต</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
             {/* Quick Status Summary Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-3">
@@ -6587,39 +6762,42 @@ export default function Page() {
                 const completedSetsCount = currentSetInputs.filter((s) => s.done).length;
 
                 return (
-                  <article key={baseExercise.id} className="rounded-3xl bg-[#121214] border border-zinc-800/60 shadow-xl overflow-hidden w-full max-w-full transition-all">
-                    {/* Accordion Exercise Header Bar (Clickable to Expand/Collapse) */}
+                  <article key={baseExercise.id} className="rounded-3xl bg-[#111113] border border-zinc-800/80 shadow-2xl overflow-hidden w-full max-w-full transition-all">
+                    {/* Level D1: Clean, uncluttered Exercise Header */}
                     <div
                       onClick={() => toggleExerciseAccordion(baseExercise.id)}
-                      className="cursor-pointer p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-[#161619] transition select-none"
+                      className="cursor-pointer p-3.5 sm:p-4 flex items-center justify-between gap-3 hover:bg-[#161619] transition select-none"
                     >
-                      {/* Left: Exercise Number + Name + Completed Sets Badge */}
+                      {/* Left: Exercise Identity & Clean Metadata */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[11px] font-mono font-bold text-zinc-500">#{index + 1}</span>
-                          <h3 className="text-base sm:text-lg font-black uppercase tracking-tight text-white font-mono break-words leading-snug">
+                          <span className="text-xs font-mono font-bold text-yellow-400">#{index + 1}</span>
+                          <h3 className="text-base sm:text-lg font-black text-white font-mono break-words leading-tight">
                             {getExerciseDisplayName(exercise.name, appLanguage)}
                           </h3>
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold font-mono ${
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-mono font-bold ${
                             completedSetsCount === effectiveSets
                               ? "bg-yellow-400 text-black font-black shadow-[0_0_8px_rgba(250,204,21,0.4)]"
                               : completedSetsCount > 0
                               ? "bg-yellow-400/20 text-yellow-300 border border-yellow-500/30"
-                              : "bg-zinc-800/80 text-zinc-400"
+                              : "bg-zinc-800 text-zinc-300"
                           }`}>
-                            <span>{effectiveSets} Sets</span>
-                            <span>·</span>
-                            <span>{completedSetsCount}/{effectiveSets}</span>
+                            {completedSetsCount}/{effectiveSets} Sets
                           </span>
-                          <span className="text-[11px] text-zinc-500 hidden sm:inline">
-                            {LOAD_LABELS[effectiveLoad]}
+                          <span className="text-xs text-zinc-400">
+                            {exercise.group} · {exercise.movement}
                           </span>
+                          {mode === "preset" && substituteMap[baseExercise.id] && (
+                            <span className="rounded-md bg-blue-500/10 border border-blue-500/30 px-1.5 py-0.2 text-[10px] font-bold text-blue-300">
+                              Subbed
+                            </span>
+                          )}
                         </div>
                       </div>
 
-                      {/* Right: Actions (Substitute / YouTube / Delete) + Chevron Indicator */}
+                      {/* Right: Quick actions (Swap, Video Demo, Collapse) */}
                       <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
@@ -6628,21 +6806,21 @@ export default function Page() {
                             setSubstituteSearch("");
                             setSubstituteFilter("movement");
                           }}
-                          className="flex items-center gap-1 rounded-xl bg-zinc-900 border border-zinc-800 px-2.5 py-2 text-xs font-bold text-yellow-400 hover:border-yellow-400 transition active:scale-95"
-                          title="เปลี่ยนท่าสำรอง หรือสลับเครื่องเล่น"
+                          className="flex items-center gap-1 rounded-xl bg-zinc-900 border border-zinc-800 px-2.5 py-1.5 text-xs font-bold text-yellow-400 hover:border-yellow-400 transition active:scale-95"
+                          title="สลับท่าสำรอง หรือเปลี่ยนเครื่องเล่น"
                         >
-                          <RotateCcw size={14} />
-                          <span className="hidden sm:inline">สลับท่า/เครื่อง</span>
+                          <RotateCcw size={13} />
+                          <span className="hidden sm:inline">สลับท่า</span>
                         </button>
                         <a
                           href={youtubeSearch(`${exercise.name} proper form`)}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-xl bg-zinc-900 border border-zinc-800 p-2 text-zinc-300 hover:text-white transition"
+                          className="rounded-xl bg-zinc-900 border border-zinc-800 p-2 text-zinc-400 hover:text-white transition"
                           aria-label="Watch demo"
                           title="ดูคลิปสอนฟอร์ม"
                         >
-                          <PlayCircle size={18} />
+                          <PlayCircle size={16} />
                         </a>
                         {mode === "custom" && (
                           <button
@@ -6650,7 +6828,7 @@ export default function Page() {
                             className="rounded-xl border border-red-500/30 bg-red-500/10 p-2 text-red-300 transition hover:bg-red-500/20"
                             aria-label="Remove exercise"
                           >
-                            <Trash2 size={16} />
+                            <Trash2 size={15} />
                           </button>
                         )}
                         <button
@@ -6659,905 +6837,567 @@ export default function Page() {
                           className="rounded-xl bg-zinc-900 border border-zinc-800 p-2 text-zinc-400 hover:text-yellow-400 transition"
                           aria-label={isExpanded ? "Collapse exercise" : "Expand exercise"}
                         >
-                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                         </button>
                       </div>
                     </div>
 
-                    {/* Accordion Expanded Body */}
+                    {/* Expanded Exercise Body */}
                     {isExpanded && (
-                      <div className="px-4 pb-4 sm:px-5 sm:pb-5 border-t border-zinc-900/80 pt-3">
-                        <div className="mb-3">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="rounded-full bg-yellow-400/10 px-2.5 py-0.5 text-xs font-bold text-yellow-300">{exercise.group}</span>
-                            <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">{exercise.movement}</span>
-                            <span className="rounded-full bg-zinc-800 px-2.5 py-0.5 text-xs font-bold text-zinc-400">
-                              {LOAD_LABELS[effectiveLoad]}
-                            </span>
-                            {mode === "preset" && substituteMap[baseExercise.id] && (
-                              <span className="rounded-full bg-blue-400/10 px-2.5 py-0.5 text-xs font-bold text-blue-300">Subbed</span>
-                            )}
-                            {exercise.warmup ? (
-                              <span className="rounded-full bg-orange-400/10 px-2.5 py-0.5 text-xs font-bold text-orange-300">
-                                <Flame className="mr-1 inline" size={11} /> Warmup
-                              </span>
-                            ) : null}
+                      <div className="px-3.5 pb-4 sm:px-4 sm:pb-5 border-t border-zinc-900/80 pt-3 space-y-3">
+                        {/* Level D2: Compact Inline Equipment & Actionable Prescription Strip */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-2xl bg-zinc-950/90 border border-zinc-800/80 p-2.5">
+                          {/* Machine Selector Dropdown with inline Unit Switcher */}
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <Dumbbell className="text-yellow-400 shrink-0" size={14} />
+                            <div className="relative flex-1 min-w-0">
+                              {(() => {
+                                const exNameLower = exercise.name.toLowerCase();
+                                const isRow = exNameLower.includes("row");
+                                const isChest = exNameLower.includes("press") || exNameLower.includes("bench") || exNameLower.includes("chest");
+                                const isPulldown = exNameLower.includes("pulldown") || exNameLower.includes("pull down") || exNameLower.includes("lat pull");
+
+                                const contextualMachineOptions = isRow
+                                  ? ["Standard Selectorized", "Chest-Supported Machine", "Iso-Lateral High Row", "Iso-Lateral Low Row", "Seated Cable (Free)", "T-Bar Supported"]
+                                  : isChest
+                                  ? ["Standard Machine Press", "Incline Machine Press", "Decline Machine Press", "Iso-Lateral Flat", "Iso-Lateral Incline", "Converging Cable"]
+                                  : isPulldown
+                                  ? ["Lat Pulldown (Pin-Loaded)", "Iso-Lateral Front Pulldown", "Dual Cable Pulldown"]
+                                  : ["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"];
+
+                                return (
+                                  <select
+                                    value={currentMachine || ""}
+                                    onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
+                                    className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1 pl-2 pr-7 text-xs font-semibold text-zinc-100 outline-none focus:border-yellow-400 transition"
+                                  >
+                                    <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[exercise.load || getLoadType(exercise)]})</option>
+                                    {contextualMachineOptions.map((tag) => (
+                                      <option key={tag} value={tag}>
+                                        {tag} {lastUsedMachine === tag ? "● ล่าสุด" : ""} {favoriteMachines[exercise.name] === tag ? "⭐" : ""}
+                                      </option>
+                                    ))}
+                                    {currentMachine && !contextualMachineOptions.includes(currentMachine) && (
+                                      <option value={currentMachine}>{currentMachine} (กำหนดเอง) {favoriteMachines[exercise.name] === currentMachine ? "⭐" : ""}</option>
+                                    )}
+                                  </select>
+                                );
+                              })()}
+                              <ChevronDown className="pointer-events-none absolute right-2 top-2 text-zinc-400" size={12} />
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
+                              className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-[11px] font-black text-yellow-300 hover:border-yellow-400 transition shrink-0"
+                              title="สลับหน่วยน้ำหนัก kg / lbs"
+                            >
+                              {effectiveUnit}
+                            </button>
                           </div>
 
+                          {/* Concise Actionable Target Prescription */}
                           {strengthTierInfo && (
-                            <div className="mt-2.5 flex flex-col gap-2 rounded-xl bg-zinc-950/80 border border-zinc-800 p-2.5">
-                              <div className="flex items-center justify-between flex-wrap gap-2">
-                                {/* Interactive Click-to-Cycle Tier Badge */}
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const order: ("Beginner" | "Intermediate" | "Advanced" | "Elite")[] = ["Beginner", "Intermediate", "Advanced", "Elite"];
-                                    const nextIdx = (order.indexOf(strengthTierInfo.tier) + 1) % order.length;
-                                    setManualTierMap((prev) => ({ ...prev, [baseExercise.id]: order[nextIdx] }));
-                                  }}
-                                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-black uppercase transition active:scale-95 ${strengthTierInfo.badgeClass}`}
-                                  title="แตะเพื่อสลับระดับเป้าหมายที่ต้องการคำนวณ"
-                                >
-                                  <span>{strengthTierInfo.label}</span>
-                                  <span className="text-[10px] text-zinc-500 font-normal">✎</span>
-                                </button>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const order: ("Beginner" | "Intermediate" | "Advanced" | "Elite")[] = ["Beginner", "Intermediate", "Advanced", "Elite"];
+                                  const nextIdx = (order.indexOf(strengthTierInfo.tier) + 1) % order.length;
+                                  setManualTierMap((prev) => ({ ...prev, [baseExercise.id]: order[nextIdx] }));
+                                }}
+                                className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-black uppercase transition active:scale-95 ${strengthTierInfo.badgeClass}`}
+                                title="แตะเพื่อสลับระดับเป้าหมายคำนวณ"
+                              >
+                                <span>{strengthTierInfo.label}</span>
+                                <span className="text-[9px] text-zinc-400">✎</span>
+                              </button>
 
-                                {/* Clear Actionable Goal Message Synchronized with Prescription */}
-                                <div className="flex items-center gap-1.5 text-xs">
-                                  <span className="font-bold text-yellow-300">
-                                    {(() => {
-                                      if (!shouldAutoPrescribeAddedLoad(effectiveLoad, exercise.name)) {
-                                        return "ใช้เฉพาะน้ำหนักตัวก่อน; ระบบยังไม่แนะนำให้เพิ่มน้ำหนักภายนอกอัตโนมัติ";
-                                      }
-                                      if (strengthTierInfo.tier === "Elite" && e1RMLbs > 0) {
-                                        return "🏆 ระดับสูงสุด (Elite): มุ่งเน้นการรักษาฟอร์มและการพัฒนาต่อเนื่อง";
-                                      }
-                                      const targetLabel = (e1RMLbs > 0) ? `สู่ระดับ ${strengthTierInfo.nextTierLabel}` : `แนะนำเริ่มต้น (${strengthTierInfo.tier})`;
-                                      const sideDetail = prescriptionResult?.isPerHand
-                                        ? (effectiveLoad === "plate-loaded"
-                                            ? (prescriptionResult.platesPerSideKg !== undefined
-                                                ? ` (เพลตข้างละ ${effectiveUnit === "lbs" ? Math.round(prescriptionResult.platesPerSideKg * 2.20462 * 10) / 10 : prescriptionResult.platesPerSideKg} ${effectiveUnit})`
-                                                : "")
-                                            : " (ต่อข้าง)")
-                                        : "";
-                                      return `🎯 ${targetLabel}: ยก ${displayedPrescriptionWeight} ${effectiveUnit}${sideDetail} × ${exercise.reps.split(" ")[0] || 8} ครั้ง`;
-                                    })()}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* Explicit Equipment Mechanics & Load Type Strip */}
-                              {prescriptionResult && (
-                                <div className="flex items-start gap-1.5 rounded-lg bg-zinc-900/90 border border-zinc-800/80 px-2.5 py-1.5 text-[11px] leading-relaxed text-zinc-300">
-                                  <span className="font-bold text-yellow-400 shrink-0">⚙️ {prescriptionResult.explicitLoadTypeLabel}</span>
-                                  <span className="text-zinc-500">·</span>
-                                  <span className="text-zinc-400">{prescriptionResult.displayNote}</span>
-                                </div>
-                              )}
+                              <span className="text-xs font-bold text-yellow-300">
+                                🎯 แนะนำ: {displayedPrescriptionWeight} {effectiveUnit} × {exercise.reps.split(" ")[0] || 8}
+                              </span>
                             </div>
                           )}
                         </div>
 
-                    {/* [Order 2] Integrated 3D Muscle & Target Strip (Inline Layout) */}
-                    <ExerciseMusclePreviewCard exercise={exercise} />
-
-                    {/* [Order 3] Compact Machine Dropdown Selector */}
-                    <div className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950 p-2.5 space-y-2 w-full">
-                      <div className="flex items-center gap-2 min-w-0 w-full">
-                        <Dumbbell className="text-yellow-400 shrink-0" size={14} />
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">เครื่อง:</span>
-
-                        <div className="relative flex-1 min-w-0">
-                          {(() => {
-                            const exNameLower = exercise.name.toLowerCase();
-                            const isRow = exNameLower.includes("row");
-                            const isChest = exNameLower.includes("press") || exNameLower.includes("bench") || exNameLower.includes("chest");
-                            const isPulldown = exNameLower.includes("pulldown") || exNameLower.includes("pull down") || exNameLower.includes("lat pull");
-
-                            const contextualMachineOptions = isRow
-                              ? ["Standard Selectorized", "Chest-Supported Machine", "Iso-Lateral High Row", "Iso-Lateral Low Row", "Seated Cable (Free)", "T-Bar Supported"]
-                              : isChest
-                              ? ["Standard Machine Press", "Incline Machine Press", "Decline Machine Press", "Iso-Lateral Flat", "Iso-Lateral Incline", "Converging Cable"]
-                              : isPulldown
-                              ? ["Lat Pulldown (Pin-Loaded)", "Iso-Lateral Front Pulldown", "Dual Cable Pulldown"]
-                              : ["Pin-Selectorized", "Plate-Loaded", "Cable", "Barbell", "Dumbbell", "Smith Machine"];
-
-                            return (
-                              <select
-                                value={currentMachine || ""}
-                                onChange={(e) => updateMachineTag(baseExercise.id, e.target.value)}
-                                className="w-full appearance-none rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 pl-2.5 pr-8 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
-                              >
-                                <option value="">เครื่องมาตรฐาน ({LOAD_LABELS[exercise.load || getLoadType(exercise)]})</option>
-                                {contextualMachineOptions.map((tag) => (
-                                  <option key={tag} value={tag}>
-                                    {tag} {lastUsedMachine === tag ? "● ล่าสุด" : ""} {favoriteMachines[exercise.name] === tag ? "⭐" : ""}
-                                  </option>
-                                ))}
-                                {currentMachine && !contextualMachineOptions.includes(currentMachine) && (
-                                  <option value={currentMachine}>{currentMachine} (กำหนดเอง) {favoriteMachines[exercise.name] === currentMachine ? "⭐" : ""}</option>
-                                )}
-                              </select>
-                            );
-                          })()}
-                          <ChevronDown className="pointer-events-none absolute right-2.5 top-2.5 text-zinc-400" size={14} />
-                        </div>
-                      </div>
-
-                      {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "plate-loaded" || (currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "specialty") && (() => {
-                        const defaultEstimateKg = getDefaultMechanicalProfile(effectiveLoad, `${exercise.name} ${currentMachine || ""}`).tareWeight;
-                        const defaultEstimateDisplay = effectiveUnit === "lbs"
-                          ? Math.round(defaultEstimateKg * 2.20462 * 10) / 10
-                          : defaultEstimateKg;
-                        const userVal = machineStartingResistances[machineResistanceKey];
-                        return (
-                          <div className="flex flex-col gap-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2">
-                            <div className="flex items-center justify-between gap-2">
-                              <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>
-                                ⚖️ {machineResistanceIsPerSide ? `แรงต้านเริ่มต้นต่อข้าง (${effectiveUnit}) ถ้าทราบ` : `แรงต้านเริ่มต้นรวมของเครื่อง (${effectiveUnit}) ถ้าทราบ`}
-                              </label>
-                              {userVal !== undefined && userVal !== "" && (
-                                <button
-                                  type="button"
-                                  onClick={() => updateMachineStartingResistance(machineResistanceKey, "")}
-                                  className="text-[10px] text-amber-400 hover:text-amber-300 font-bold underline"
-                                  title="กลับไปใช้ค่าประมาณเริ่มต้นของระบบ"
-                                >
-                                  ใช้ค่าประมาณ ({defaultEstimateDisplay} {effectiveUnit})
-                                </button>
-                              )}
+                        {/* Level D3: Primary Zone — Working Sets Table (High Contrast & Roomy Tap Targets) */}
+                        <div className="rounded-2xl bg-black/40 p-2.5 sm:p-3 border border-zinc-800/60">
+                          {/* Sets Header */}
+                          <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">Working sets</span>
+                              <span className="text-[11px] text-zinc-500 font-mono">
+                                ({completedSetsCount}/{effectiveSets} completed)
+                              </span>
                             </div>
-                            <input
-                              id={`machine-start-resistance-${baseExercise.id}`}
-                              aria-label={`แรงต้านเริ่มต้นของเครื่อง (${effectiveUnit})`}
-                              type="number"
-                              min="0"
-                              max="1000"
-                              step="0.5"
-                              inputMode="decimal"
-                              value={userVal ?? ""}
-                              onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)}
-                              placeholder={`ค่าประมาณ: ${defaultEstimateDisplay} ${effectiveUnit}`}
-                              className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-100 outline-none focus:border-yellow-400"
-                            />
-                            <p className="text-[10px] leading-relaxed text-zinc-500">
-                              {userVal ? `✓ บันทึกค่ากำหนดเองแล้ว (${userVal} ${effectiveUnit})` : `ค่าเริ่มต้น: ประมาณ ${defaultEstimateDisplay} ${effectiveUnit} (กรอกค่าจริงได้ถ้าทราบ หรือเว้นว่างไว้)`}
-                            </p>
+
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => removeManualSet(baseExercise.id, effectiveSets)}
+                                className="flex items-center gap-1 rounded-xl bg-zinc-900 border border-zinc-800 px-2.5 py-1 text-xs font-bold text-zinc-400 disabled:opacity-30 transition hover:bg-zinc-800 active:scale-95"
+                                disabled={currentSetInputs.length <= 1}
+                                aria-label="Remove set"
+                                type="button"
+                              >
+                                − Set
+                              </button>
+                              <button
+                                onClick={() => addManualSet(baseExercise.id, effectiveSets)}
+                                className="flex items-center gap-1 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-yellow-400/50 px-2.5 py-1 text-xs font-bold text-yellow-300 active:scale-95 transition"
+                                aria-label="Add set"
+                                type="button"
+                              >
+                                + Set
+                              </button>
+                            </div>
                           </div>
-                        );
-                      })()}
 
-                      {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "cable") && (
-                        <div className="flex items-center gap-2 min-w-0 w-full">
-                          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400 shrink-0">อัตราทดรอก:</span>
-                          <select
-                            aria-label="อัตราทดรอก"
-                            value={pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)}
-                            onChange={(e) => updatePulleyRatio(baseExercise.id, e.target.value as "1" | "2" | "3")}
-                            className="flex-1 rounded-lg border border-zinc-800 bg-zinc-900 py-1.5 px-2.5 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400 transition"
-                          >
-                            <option value="1">1:1 (Direct)</option>
-                            <option value="2">2:1 (Standard functional trainer)</option>
-                            <option value="3">3:1</option>
-                          </select>
-                          <span className="text-[10px] text-zinc-500">ค่าเริ่มต้นตามประเภทท่า</span>
-                        </div>
-                      )}
+                          {/* Table Column Headings */}
+                          <div className="mb-2 grid grid-cols-[32px_1fr_1fr_44px] gap-2 items-center text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-500 px-1 text-center">
+                            <span>SET</span>
+                            <span>WEIGHT ({effectiveUnit})</span>
+                            <span>REPS</span>
+                            <span>DONE</span>
+                          </div>
 
-                      {/* Auxiliary Controls (Star ⭐, Unit ⚙️, Reset) in clean compact sub-bar */}
-                      {currentMachine && (
-                        <div className="flex items-center justify-end gap-1.5 pt-1 border-t border-zinc-900">
-                          <button
-                            type="button"
-                            onClick={() => toggleFavoriteMachine(exercise.name, currentMachine)}
-                            className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition border ${
-                              isFavoriteMachine
-                                ? "border-amber-400/40 bg-amber-400/20 text-amber-300"
-                                : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200"
-                            }`}
-                            title={isFavoriteMachine ? "ลบเครื่องโปรด" : "ตั้งเป็นเครื่องประจำ"}
-                          >
-                            <Star size={11} className={isFavoriteMachine ? "fill-amber-400 text-amber-400" : ""} />
-                            <span>{isFavoriteMachine ? "เครื่องโปรด ⭐" : "ตั้งเป็นเครื่องประจำ"}</span>
-                          </button>
+                          {/* Sets Rows */}
+                          <div className="space-y-2">
+                            {currentSetInputs.map((set, setIndex) => {
+                              const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1];
+                              const fallbackRepVal = latestSet ? Number(latestSet.reps) : 10;
+                              const fallbackWeightVal = latestSet
+                                ? latestSet.unit === effectiveUnit
+                                  ? (latestSet.rawValue ?? latestSet.weightLbs)
+                                  : convertAndSnapWeight(latestSet.weightLbs, "lbs", effectiveUnit, isIso)
+                                : 0;
 
-                          <button
-                            type="button"
-                            onClick={() => handleToggleExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine, effectiveSets)}
-                            className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-black text-yellow-300 hover:border-yellow-400 transition"
-                            title="สลับหน่วยน้ำหนัก"
-                          >
-                            ⚙️ หน่วย: {effectiveUnit}
-                          </button>
+                              const aiWeightSuggestion = displayedPrescriptionWeight;
+                              const effectivePlaceholderWeight = fallbackWeightVal > 0
+                                ? fallbackWeightVal
+                                : aiWeightSuggestion;
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              updateMachineTag(baseExercise.id, "");
-                              updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name));
-                              updateMachineStartingResistance(machineResistanceKey, "");
-                            }}
-                            className="text-[10px] text-zinc-500 hover:text-zinc-300 px-1 py-0.5"
-                            title="รีเซ็ตเครื่องเป็นค่าเริ่มต้น"
-                          >
-                            รีเซ็ต
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* [Order 4] SMART WARMUP STRIP */}
-                    {warmupInfo && (
-                      <div className="mb-3 rounded-xl border border-zinc-800 bg-zinc-950 p-2.5 w-full">
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-bold flex items-center gap-1.5 text-zinc-300">
-                            {warmupInfo.type === "full" && <span className="text-yellow-400">⚡</span>}
-                            {warmupInfo.type === "acclimation" && <span className="text-yellow-400">🔥</span>}
-                            {warmupInfo.type === "skip" && <span className="text-zinc-500">✓</span>}
-                            <span>
-                              {warmupInfo.type === "skip"
-                                ? warmupInfo.headline
-                                : warmupInfo.type === "acclimation"
-                                ? warmupInfo.headline
-                                : `ลำดับ Warmup แนะนำ (${effectiveLoad === "dumbbell" ? "ดัมเบล" : effectiveLoad === "cable" ? "เคเบิล" : "เครื่องเล่น"} 1-2 เซต)`}
-                            </span>
-                          </span>
-                        </div>
-
-                        {warmupInfo.steps.length > 0 && (
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1.5 w-full">
-                            {warmupInfo.steps.map((st, sIdx) => {
-                              const isIso = effectiveLoad === "plate-loaded" && (exercise.name.toLowerCase().includes("iso-lateral") || exercise.name.toLowerCase().includes("iso ")) && !exercise.name.toLowerCase().includes("t-bar");
-                              const perSideText = isIso ? ` (ข้างละ ${Math.round((st.weight / 2) * 10) / 10})` : "";
                               return (
                                 <div
-                                  key={sIdx}
-                                  className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold border border-yellow-500/40 bg-yellow-950/30 text-yellow-300"
+                                  key={setIndex}
+                                  className={`rounded-2xl p-2 sm:p-2.5 transition border ${
+                                    set.done
+                                      ? "bg-zinc-950/70 border-yellow-500/30"
+                                      : "bg-[#141416] border-zinc-800/80 hover:bg-[#18181c]"
+                                  }`}
                                 >
-                                  <span>{st.label}:</span>
-                                  <span className="font-black text-white">{st.weight} {effectiveUnit}{perSideText}</span>
-                                  <span className="text-zinc-400">× {st.reps}</span>
+                                  {/* Previous benchmark note if exists */}
+                                  {latestSet && (
+                                    <div className="text-[10px] text-zinc-500 font-mono px-1 mb-1 flex items-center justify-between">
+                                      <span>ครั้งก่อน: <strong className="text-yellow-400/90">{latestSet.rawValue ?? latestSet.weightLbs} {formatUnitLabel(latestSet.unit || "lbs")} × {latestSet.reps}</strong></span>
+                                      {set.done && <span className="text-yellow-400 text-[10px] font-bold">✓ Logged</span>}
+                                    </div>
+                                  )}
+
+                                  <div className="grid grid-cols-[32px_1fr_1fr_44px] gap-2 items-center">
+                                    {/* Set Index */}
+                                    <div className="text-center font-mono font-black text-xs text-zinc-400">
+                                      {String(setIndex + 1).padStart(2, '0')}
+                                    </div>
+
+                                    {/* Weight Input Box with Tactile Steppers */}
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
+                                        <button
+                                          type="button"
+                                          onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
+                                          className="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
+                                        >−</button>
+                                        <input
+                                          id={`weight-input-${baseExercise.id}-${setIndex}`}
+                                          inputMode="decimal"
+                                          value={set.weightLbs}
+                                          onChange={(e) => updateSet(baseExercise.id, setIndex, "weightLbs", e.target.value, effectiveSets)}
+                                          onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs", currentMachine)}
+                                          className="w-full text-center font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
+                                          placeholder={String(effectivePlaceholderWeight || 0)}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
+                                          className="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
+                                        >+</button>
+                                      </div>
+
+                                      {/* Sub-label for Plate/Equipment Specifics */}
+                                      {(() => {
+                                        const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
+                                        if (!prescriptionResult) return null;
+
+                                        if (prescriptionResult.loadType === "plate-loaded" || effectiveLoad === "plate-loaded" || effectiveLoad === "specialty") {
+                                          const perSideW = Math.round((totalW / 2) * 10) / 10;
+                                          return (
+                                            <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate px-1">
+                                              ข้างละ {perSideW} {effectiveUnit}
+                                            </span>
+                                          );
+                                        }
+                                        if (effectiveLoad === "dumbbell") {
+                                          return <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 truncate px-1">ต่อข้าง</span>;
+                                        }
+                                        return null;
+                                      })()}
+                                    </div>
+
+                                    {/* Reps Input Box with Tactile Steppers */}
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
+                                        <button
+                                          type="button"
+                                          onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
+                                          className="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
+                                        >−</button>
+                                        <input
+                                          id={`rep-input-${baseExercise.id}-${setIndex}`}
+                                          inputMode="numeric"
+                                          value={set.reps}
+                                          onChange={(e) => updateSet(baseExercise.id, setIndex, "reps", e.target.value, effectiveSets)}
+                                          onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps", currentMachine)}
+                                          className="w-full text-center font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
+                                          placeholder={latestSet ? String(latestSet.reps) : "0"}
+                                        />
+                                        <button
+                                          type="button"
+                                          onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
+                                          className="w-8 h-10 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
+                                        >+</button>
+                                      </div>
+                                    </div>
+
+                                    {/* 44x44px Tactile Done Checkmark */}
+                                    <button
+                                      type="button"
+                                      onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
+                                      className={`w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center shrink-0 transition active:scale-90 border ${
+                                        set.done
+                                          ? "bg-yellow-400 border-yellow-300 text-black shadow-[0_0_12px_rgba(250,204,21,0.4)]"
+                                          : "bg-zinc-900/80 border-zinc-800 text-zinc-500 hover:border-yellow-400 hover:text-yellow-400"
+                                      }`}
+                                      aria-label={`Mark set ${setIndex + 1} done`}
+                                    >
+                                      <Check className={set.done ? "stroke-[3]" : "stroke-[1.5] opacity-40"} size={20} />
+                                    </button>
+                                  </div>
                                 </div>
                               );
                             })}
                           </div>
-                        )}
-                      </div>
-                    )}
 
-                    {/* [Order 5] PRIMARY ZONE: Working Sets Table (Zepp Athletic Standard) */}
-                    <div className="mb-3 rounded-2xl bg-black/40 p-2.5 sm:p-3">
-                      <div className="mb-3 flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-bold uppercase text-zinc-400">Working sets</p>
-                          <p className="mt-0.5 text-[11px] text-zinc-500">
-                            Plan {effectiveSets} · Log {currentSetInputs.length}
-                          </p>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => removeManualSet(baseExercise.id, effectiveSets)}
-                            className="flex items-center gap-1 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 disabled:opacity-40 transition hover:bg-zinc-800 active:scale-95 focus-visible:ring-2 focus-visible:ring-yellow-400 select-none"
-                            disabled={currentSetInputs.length <= 1}
-                            aria-label="Remove last set"
-                            type="button"
-                          >
-                            <span className="text-base font-black leading-none">−</span> Set
-                          </button>
-                          <button
-                            onClick={() => addManualSet(baseExercise.id, effectiveSets)}
-                            className="flex items-center gap-1 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black active:scale-95 transition focus-visible:ring-2 focus-visible:ring-yellow-400 select-none"
-                            aria-label="Add additional set"
-                            type="button"
-                          >
-                            <span className="text-base font-black leading-none">+</span> Set
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="mb-2 grid grid-cols-[28px_1fr_1fr_40px] gap-1.5 sm:gap-2 items-center text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 px-1">
-                        <span className="w-7 text-center font-mono font-bold text-xs text-zinc-400">SET</span>
-                        <div className="flex items-center justify-center gap-1">
-                          <span className="hidden sm:inline">WEIGHT</span>
-                          <div className="inline-flex rounded-md bg-zinc-950 p-0.5 border border-zinc-800 text-[9px] font-bold">
+                          {/* Quick Set Clear & Save Action */}
+                          <div className="mt-3 flex items-center justify-end">
                             <button
-                              type="button"
-                              onClick={() => handleSetExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, "kg", currentMachine, effectiveSets)}
-                              className={`px-1.5 py-0.5 rounded transition ${effectiveUnit === "kg" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
-                              aria-label="Set weight unit to kilograms"
-                            >kg</button>
-                            <button
-                              type="button"
-                              onClick={() => handleSetExerciseUnit({ ...exercise, id: baseExercise.id, sets: effectiveSets }, "lbs", currentMachine, effectiveSets)}
-                              className={`px-1.5 py-0.5 rounded transition ${effectiveUnit === "lbs" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
-                              aria-label="Set weight unit to pounds"
-                            >lb</button>
+                              onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
+                              aria-label="Finish working sets and clear inputs"
+                              className="text-xs font-bold text-zinc-400 hover:text-yellow-400 transition flex items-center gap-1 px-2 py-1"
+                            >
+                              <Save size={13} />
+                              <span>บันทึกทุกเซต & ล้างช่อง</span>
+                            </button>
                           </div>
                         </div>
-                        <span className="text-center">REPS</span>
-                        <span className="text-center">DONE</span>
-                      </div>
 
-                      <div className="space-y-2">
-                        {currentSetInputs.map((set, setIndex) => {
-                          const latestSet = lastSetMap[effectiveKey]?.[setIndex + 1];
-                          const fallbackRepVal = latestSet ? Number(latestSet.reps) : 10;
-                          const fallbackWeightVal = latestSet
-                            ? latestSet.unit === effectiveUnit
-                              ? (latestSet.rawValue ?? latestSet.weightLbs)
-                              : convertAndSnapWeight(latestSet.weightLbs, "lbs", effectiveUnit, isIso)
-                            : 0;
-
-                          const aiWeightSuggestion = displayedPrescriptionWeight;
-
-                          const effectivePlaceholderWeight = fallbackWeightVal > 0
-                            ? fallbackWeightVal
-                            : aiWeightSuggestion;
-
-                          return (
-                            <div key={setIndex} className="rounded-2xl bg-[#141416] p-2 hover:bg-[#18181c] transition">
-                              {/* Compact Benchmark Note */}
-                              {latestSet && (
-                                <p className="text-[10px] text-zinc-500 font-mono truncate px-1 mb-0.5">
-                                  ครั้งก่อน: <span className="text-yellow-400/90 font-bold">{latestSet.rawValue ?? latestSet.weightLbs} {formatUnitLabel(latestSet.unit || "lbs")} × {latestSet.reps} reps</span>
-                                </p>
-                              )}
-
-                              <div className="grid grid-cols-[28px_1fr_1fr_40px] gap-1.5 sm:gap-2 items-center">
-                                {/* Set Number */}
-                                <div className="w-7 text-center font-mono font-bold text-xs text-zinc-400">
-                                  {String(setIndex + 1).padStart(2, '0')}
-                                </div>
-
-                                {/* Weight Input Box with visible unit badge */}
-                                <div className="flex flex-col w-full min-w-0">
-                                  <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
-                                    <button
-                                      type="button"
-                                      onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, -1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                      className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
-                                    >−</button>
-                                    <div className="flex-1 flex items-center justify-center min-w-0 px-1">
-                                      <input
-                                        id={`weight-input-${baseExercise.id}-${setIndex}`}
-                                        inputMode="decimal"
-                                        value={set.weightLbs}
-                                        onChange={(e) => updateSet(baseExercise.id, setIndex, "weightLbs", e.target.value, effectiveSets)}
-                                        onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "weightLbs", currentMachine)}
-                                        className="w-full text-right font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
-                                        placeholder={String(effectivePlaceholderWeight || 0)}
-                                      />
-                                      <span className="text-xs font-black uppercase text-yellow-400/90 select-none ml-1 shrink-0">
-                                        {formatUnitLabel(effectiveUnit)}
-                                      </span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => stepWeight({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, 1, currentMachine, effectiveSets, effectivePlaceholderWeight)}
-                                      className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
-                                    >+</button>
-                                  </div>
-                                  {(() => {
-                                    const totalW = parseFloat(set.weightLbs) || effectivePlaceholderWeight || 0;
-                                    if (!prescriptionResult) return null;
-
-                                    if (prescriptionResult.loadType === "plate-loaded" || effectiveLoad === "plate-loaded" || effectiveLoad === "specialty") {
-                                      const startW = effectiveUnit === "lbs"
-                                        ? Math.round(prescriptionResult.startingResistanceKg * 2.20462 * 10) / 10
-                                        : prescriptionResult.startingResistanceKg;
-
-                                      if (prescriptionResult.isPerHand) {
-                                        const perSideW = Math.round((totalW / 2) * 10) / 10;
-                                        return (
-                                          <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                            {totalW > 0
-                                              ? `(เพลตรวมสองข้าง; ข้างละ ${perSideW} ${formatUnitLabel(effectiveUnit)}, ไม่รวมแรงต้านเริ่มต้น ${startW} ${formatUnitLabel(effectiveUnit)}/ข้าง)`
-                                              : `(เพลตรวมสองข้าง ไม่รวมแรงต้านเริ่มต้น ${startW} ${formatUnitLabel(effectiveUnit)}/ข้าง)`}
-                                          </span>
-                                        );
-                                      }
-                                      if (prescriptionResult.configuration === "single-sleeve") {
-                                        return (
-                                          <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                            {totalW > 0
-                                              ? `(เพลตใส่แกนกลาง ${totalW} ${formatUnitLabel(effectiveUnit)}, ไม่รวมแรงต้านเริ่มต้น ${startW} ${formatUnitLabel(effectiveUnit)})`
-                                              : `(เพลตใส่แกนกลาง ไม่รวมแรงต้านเริ่มต้น ${startW} ${formatUnitLabel(effectiveUnit)})`}
-                                          </span>
-                                        );
-                                      }
-                                      const perSideW = Math.round((totalW / 2) * 10) / 10;
-                                      return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          {totalW > 0
-                                            ? `(เพลตรวมสองข้าง ${totalW} ${formatUnitLabel(effectiveUnit)}; ข้างละ ${perSideW} ${formatUnitLabel(effectiveUnit)}, ไม่รวมแรงต้านแคร่ ${startW} ${formatUnitLabel(effectiveUnit)})`
-                                            : `(เพลตรวมสองข้าง ไม่รวมแรงต้านแคร่ ${startW} ${formatUnitLabel(effectiveUnit)})`}
-                                        </span>
-                                      );
-                                    }
-                                    if (effectiveLoad === "dumbbell" || prescriptionResult.loadType === "dumbbell") {
-                                      return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          (ดัมเบลต่อข้าง)
-                                        </span>
-                                      );
-                                    }
-                                    if (effectiveLoad === "barbell" || prescriptionResult.loadType === "barbell") {
-                                      return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          (น้ำหนักรวมคานมาตรฐาน 20 kg)
-                                        </span>
-                                      );
-                                    }
-                                    if (effectiveLoad === "smith" || prescriptionResult.loadType === "smith") {
-                                      const startW = effectiveUnit === "lbs"
-                                        ? Math.round(prescriptionResult.startingResistanceKg * 2.20462 * 10) / 10
-                                        : prescriptionResult.startingResistanceKg;
-                                      return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          (รวมแรงต้านบาร์สมิท ${startW} ${effectiveUnit})
-                                        </span>
-                                      );
-                                    }
-                                    if (effectiveLoad === "cable" || prescriptionResult.loadType === "cable") {
-                                      const ratio = prescriptionResult.pulleyRatio ?? (pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name));
-                                      return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          (สลักพิน{prescriptionResult.isPerHand ? "ต่อฝั่ง" : ""} · รอก {ratio}:1)
-                                        </span>
-                                      );
-                                    }
-                                    if (effectiveLoad === "selectorized" || prescriptionResult.loadType === "selectorized") {
-                                      return (
-                                        <span className="block text-[9px] font-mono text-zinc-400 text-center mt-0.5 whitespace-normal break-words leading-tight px-1">
-                                          (สลักพินน้ำหนักเครื่อง)
-                                        </span>
-                                      );
-                                    }
-                                    return null;
-                                  })()}
-                                </div>
-
-                                {/* Reps Input Box */}
-                                <div className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 px-1 h-10 w-full overflow-hidden focus-within:border-yellow-400 transition">
-                                  <button
-                                    type="button"
-                                    onClick={() => stepReps(baseExercise.id, setIndex, -1, effectiveSets, fallbackRepVal)}
-                                    className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
-                                  >−</button>
-                                  <input
-                                    id={`rep-input-${baseExercise.id}-${setIndex}`}
-                                    inputMode="numeric"
-                                    value={set.reps}
-                                    onChange={(e) => updateSet(baseExercise.id, setIndex, "reps", e.target.value, effectiveSets)}
-                                    onKeyDown={(e) => handleSetInputKeyDown(e, { ...exercise, id: baseExercise.id, sets: effectiveSets }, baseExercise.id, setIndex, "reps", currentMachine)}
-                                    className="w-full text-center font-mono font-black text-base text-white bg-transparent outline-none tabular-nums p-0 min-w-0"
-                                    placeholder={latestSet ? String(latestSet.reps) : "0"}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => stepReps(baseExercise.id, setIndex, 1, effectiveSets, fallbackRepVal)}
-                                    className="w-7 h-9 flex items-center justify-center text-zinc-400 hover:text-yellow-400 active:scale-90 text-sm font-bold shrink-0 select-none"
-                                  >+</button>
-                                </div>
-
-                                {/* Done Checkmark */}
+                        {/* Level D4: Primary Next Action Button */}
+                        <div className="pt-1">
+                          {activeExerciseIndex < day.exercises.length - 1 ? (
+                            <div className="grid grid-cols-[1fr_2fr] gap-2">
+                              {activeExerciseIndex > 0 ? (
                                 <button
                                   type="button"
-                                  onClick={() => saveSingleSet({ ...exercise, id: baseExercise.id, sets: effectiveSets }, setIndex, currentMachine)}
-                                  className={`w-10 h-10 min-w-[40px] rounded-xl flex items-center justify-center shrink-0 transition active:scale-90 border ${
-                                    set.done
-                                      ? "bg-yellow-400 border-yellow-300 text-black shadow-[0_0_12px_rgba(250,204,21,0.4)]"
-                                      : "bg-zinc-900/60 border-zinc-800 text-zinc-500 hover:border-yellow-400 hover:text-yellow-400"
-                                  }`}
+                                  onClick={() => setActiveExerciseIndex(Math.max(0, activeExerciseIndex - 1))}
+                                  className="rounded-2xl bg-zinc-900 border border-zinc-800 px-3 py-3 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 hover:text-white active:scale-95"
+                                  aria-label="Previous exercise"
                                 >
-                                  <Check className={set.done ? "stroke-[3]" : "stroke-[1.5] opacity-40"} size={18} />
+                                  ← ท่าก่อนหน้า
                                 </button>
-                              </div>
+                              ) : (
+                                <div />
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setActiveExerciseIndex(Math.min(day.exercises.length - 1, activeExerciseIndex + 1))}
+                                className="rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black px-4 py-3 text-xs font-black uppercase tracking-wider transition shadow-lg shadow-yellow-500/20 active:scale-[0.98] flex items-center justify-center gap-2"
+                                aria-label="Go to next exercise"
+                              >
+                                <span>ท่าถัดไป: {getExerciseDisplayName(day.exercises[activeExerciseIndex + 1]?.name || "Next", appLanguage)}</span>
+                                <span>→</span>
+                              </button>
                             </div>
-                          );
-                        })}
-                      </div>
-                      <button
-                        onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
-                        aria-label="Finish working sets and clear inputs"
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase tracking-widest h-10 py-2 text-xs shadow-lg shadow-yellow-500/20 active:scale-[0.99] transition focus-visible:ring-2 focus-visible:ring-yellow-400"
-                      >
-                        <Save size={16} /> Finish & clear
-                      </button>
-
-                      {/* RPE Quick Feedback Strip */}
-                      <div className="mt-2.5 grid grid-cols-5 gap-1.5">
-                        {[
-                          { val: 6, label: "สบายมาก", col: "border-zinc-800 text-zinc-400 hover:border-yellow-400" },
-                          { val: 7, label: "พอดี", col: "border-zinc-800 text-zinc-300 hover:border-yellow-400" },
-                          { val: 8, label: "เริ่มล้า", col: "border-yellow-500/30 text-yellow-400 hover:border-yellow-400" },
-                          { val: 9, label: "หนักมาก", col: "border-yellow-500/60 text-yellow-300 hover:border-yellow-400" },
-                          { val: 10, label: "RPE 10 (Max)", col: "border-red-500/50 text-red-400 hover:border-red-400" },
-                        ].map((r) => (
-                          <button
-                            key={r.val}
-                            type="button"
-                            onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
-                            className={`rounded-lg border bg-zinc-950 py-1.5 text-center transition active:scale-95 ${r.col}`}
-                          >
-                            <span className="block font-black text-xs tabular-nums font-mono">{r.val}</span>
-                            <span className="text-[9px] block leading-tight">{r.label}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* [Order 6] Secondary Tools Accordion (Progressive Disclosure) */}
-                    <details className="rounded-xl bg-zinc-950 border border-zinc-800/80 p-3">
-                      <summary className="cursor-pointer py-1 text-xs font-bold text-zinc-400 hover:text-yellow-400 font-bold transition flex items-center justify-between">
-                        <span>🏆 สถิติเดิม PR, Warmup & การตั้งค่าเพิ่มเติม</span>
-                        <ChevronDown size={14} className="text-zinc-500" />
-                      </summary>
-
-                      <div className="mt-3 pt-3 border-t border-zinc-800/80 space-y-3">
-                        {/* Records & Relative Strength Grid */}
-                        <div>
-                          <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase text-zinc-500">
-                            <Trophy size={14} /> Records {currentMachine && <span className="text-yellow-400 font-bold font-semibold normal-case">({currentMachine})</span>}
-                          </p>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-xl bg-zinc-900 px-3 py-2 cursor-pointer hover:border-yellow-400 border border-transparent transition" onClick={() => {
-                              setEditingPrExercise({ name: exercise.name, machine: currentMachine });
-                              const rec = records.maxWeight;
-                              const initialUnit: WeightUnit = rec?.unit ? normalizeWeightUnit(rec.unit) : globalWeightUnit;
-                              setEditPrUnit(initialUnit);
-                              if (rec) {
-                                if (rec.rawValue !== undefined && rec.unit) {
-                                  setEditPrWeight(String(rec.rawValue));
-                                } else {
-                                  // Legacy record in lbs
-                                  const val = initialUnit === "kg"
-                                    ? convertInputWeight(rec.weightLbs, "lbs", "kg")
-                                    : String(Math.round(rec.weightLbs * 10) / 10);
-                                  setEditPrWeight(val);
-                                }
-                              } else {
-                                setEditPrWeight("");
-                              }
-                              setEditPrReps(records.maxWeight?.reps?.toString() ?? "");
-                            }}>
-                              <p className="text-[10px] font-bold uppercase text-zinc-500">Max</p>
-                              <div className="mt-1">
-                                {records.maxWeight ? (() => {
-                                  const disp = resolveRecordDisplay(records.maxWeight, globalWeightUnit);
-                                  return (
-                                    <>
-                                      <p className="text-sm font-black text-yellow-300">
-                                        {disp.primaryText}{" × "}{records.maxWeight.reps}
-                                      </p>
-                                      <span className="text-[10px] text-yellow-400 font-bold">แก้ไข/ประวัติ ✎</span>
-                                      {disp.secondaryText && (
-                                        <p className="text-[10px] text-zinc-500">
-                                          {disp.secondaryText}
-                                        </p>
-                                      )}
-                                    </>
-                                  );
-                                })() : (
-                                  <p className="text-sm font-black text-zinc-500">—</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
-                              <p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p>
-                              <div className="mt-1">
-                                {records.bestReps ? (() => {
-                                  const disp = resolveRecordDisplay(records.bestReps, globalWeightUnit);
-                                  return (
-                                    <>
-                                      <p className="text-sm font-black text-zinc-100">
-                                        {disp.primaryText}{" × "}{records.bestReps.reps}
-                                      </p>
-                                      {disp.secondaryText && (
-                                        <p className="text-[10px] text-zinc-500">
-                                          {disp.secondaryText}
-                                        </p>
-                                      )}
-                                    </>
-                                  );
-                                })() : (
-                                  <p className="text-sm font-black text-zinc-500">—</p>
-                                )}
-                              </div>
-                            </div>
-                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
-                              <p className="text-[10px] font-bold uppercase text-zinc-500">Volume</p>
-                              <p className="mt-1 text-sm font-black text-zinc-100">{records.bestVolume ? `${Math.round(records.bestVolume.weightLbs * records.bestVolume.reps)}` : "—"}</p>
-                            </div>
-                            <div className="rounded-xl bg-zinc-900 px-3 py-2">
-                              <p className="text-[10px] font-bold uppercase text-zinc-500">Warmup</p>
-                              <p className="mt-1 text-sm font-black text-zinc-100">{exercise.warmup && warmups.length > 0 ? `${warmups[0].weight}/${warmups[1].weight}/${warmups[2].weight}` : "Skip"}</p>
-                            </div>
-                            {bodyweightEntry && records.maxWeight && (() => {
-                              const ratio = records.maxWeight.weightLbs / bodyweightEntry.lbs;
-                              const isBench = exercise.name.toLowerCase().includes("bench press");
-                              const isSquat = exercise.name.toLowerCase().includes("squat");
-                              const isDL = exercise.name.toLowerCase().includes("deadlift");
-                              const target = isBench ? 1.5 : isSquat ? 2.0 : isDL ? 2.5 : null;
-
-                              return (
-                                <div className="rounded-xl bg-yellow-500/10 border border-yellow-500/20 px-3 py-2 col-span-2">
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-[10px] font-bold uppercase text-yellow-300">Relative Strength</p>
-                                    {target && (
-                                      <span className="text-[10px] text-zinc-400 font-medium">
-                                        เป้าหมาย: {target}× BW
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="mt-1 flex items-baseline justify-between">
-                                    <p className="text-sm font-black text-yellow-300">
-                                      {ratio.toFixed(2)}× BW
-                                    </p>
-                                    {target && (
-                                      <span className={`text-[10px] font-bold ${ratio >= target ? "text-yellow-300" : "text-amber-400"}`}>
-                                        {ratio >= target ? "✓ บรรลุเป้าหมาย" : `ขาดอีก ${(target - ratio).toFixed(2)}×`}
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
-
-                        {/* Edit target sets & reps */}
-{editingPrExercise && (
-  <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-    <div className="w-full max-w-md rounded-2xl bg-zinc-950 p-6 border border-zinc-800 shadow-2xl">
-      <h2 className="text-lg font-black text-yellow-300 mb-4 flex items-center gap-2">
-        <span>Edit PR - {editingPrExercise.name}</span>
-        {editingPrExercise.machine && <span className="text-xs text-zinc-400 font-semibold">({editingPrExercise.machine})</span>}
-      </h2>
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-xs font-bold text-zinc-400">Weight & Unit</label>
-          <div className="inline-flex rounded-lg bg-zinc-900 p-0.5 border border-zinc-800 text-xs font-bold">
-            <button
-              type="button"
-              onClick={() => {
-                if (editPrUnit === "kg") return;
-                if (editPrWeight) setEditPrWeight(convertInputWeight(editPrWeight, "lbs", "kg"));
-                setEditPrUnit("kg");
-              }}
-              className={`px-2.5 py-1 rounded transition ${editPrUnit === "kg" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
-            >
-              kg
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (editPrUnit === "lbs") return;
-                if (editPrWeight) setEditPrWeight(convertInputWeight(editPrWeight, "kg", "lbs"));
-                setEditPrUnit("lbs");
-              }}
-              className={`px-2.5 py-1 rounded transition ${editPrUnit === "lbs" ? "bg-yellow-400 text-black font-black" : "text-zinc-400 hover:text-white"}`}
-            >
-              lb
-            </button>
-          </div>
-        </div>
-        <div className="relative flex items-center">
-          <input
-            type="number"
-            inputMode="decimal"
-            placeholder={editPrUnit === "kg" ? "e.g. 100" : "e.g. 225"}
-            value={editPrWeight}
-            onChange={e => setEditPrWeight(e.target.value)}
-            className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 pr-12 text-zinc-100 font-mono font-bold outline-none focus:border-yellow-400"
-          />
-          <span className="pointer-events-none absolute right-3 text-xs font-black uppercase text-yellow-400">
-            {formatUnitLabel(editPrUnit)}
-          </span>
-        </div>
-      </div>
-      <div className="mb-4">
-        <label className="text-xs font-bold text-zinc-400 block mb-1.5">Reps</label>
-        <input
-          type="number"
-          inputMode="numeric"
-          placeholder="Reps"
-          value={editPrReps}
-          onChange={e => setEditPrReps(e.target.value)}
-          className="w-full rounded-xl bg-zinc-900 border border-zinc-800 p-2.5 text-zinc-100 font-mono font-bold outline-none focus:border-yellow-400"
-        />
-      </div>
-      <div className="flex justify-end gap-2 mb-4">
-        <button
-          onClick={() => setEditingPrExercise(null)}
-          className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 text-sm font-bold border border-zinc-800 transition"
-        >Cancel</button>
-        <button
-          onClick={() => {
-            const weightNum = Number(editPrWeight);
-            const repsNum = Number(editPrReps);
-            if (!weightNum || !repsNum) return;
-            const weightLbs = editPrUnit === 'kg' ? convertWeight(weightNum, 'kg', 'lbs') : weightNum;
-            const key = getEffectiveExerciseKey(editingPrExercise.name, editingPrExercise.machine);
-            setRecordsMap(prev => {
-              const rec = { ...(prev[key] ?? {}) };
-              rec.maxWeight = {
-                exerciseId: '',
-                exerciseName: editingPrExercise.name,
-                weightLbs,
-                reps: repsNum,
-                setNumber: 0,
-                date: new Date().toISOString(),
-                machine: editingPrExercise.machine,
-                unit: editPrUnit,
-                rawValue: weightNum,
-              };
-              return { ...prev, [key]: { ...rec } };
-            });
-            setEditingPrExercise(null);
-          }}
-          className="px-4 py-2 rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black font-black text-sm transition"
-        >Save</button>
-      </div>
-      <h3 className="text-sm font-bold text-zinc-400 mb-2">Recent Sets</h3>
-      <ul className="max-h-48 overflow-y-auto mb-4 divide-y divide-zinc-800/80">
-        {logs
-          .filter(l => getEffectiveExerciseKey(l.exerciseName, l.machine) === getEffectiveExerciseKey(editingPrExercise.name, editingPrExercise.machine))
-          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-          .slice(0, 5)
-          .map((log, idx) => {
-            const disp = resolveRecordDisplay(log, editPrUnit);
-            return (
-              <li key={idx} className="flex justify-between items-center text-sm py-2">
-                <span className="font-mono text-zinc-300">{log.reps} × <strong className="text-yellow-300">{disp.primaryText}</strong> {disp.secondaryText && <span className="text-zinc-500 text-xs font-normal">({disp.secondaryText})</span>}</span>
-                <button
-                  onClick={() => {
-                    setLogs(old => old.filter((_, i) => i !== logs.indexOf(log)));
-                    const key = getEffectiveExerciseKey(log.exerciseName, log.machine);
-                    setRecordsMap(prev => {
-                      const newMap = { ...prev };
-                      const rec = newMap[key];
-                      if (rec && rec.maxWeight && rec.maxWeight.date === log.date) {
-                        delete rec.maxWeight;
-                      }
-                      return newMap;
-                    });
-                  }}
-                  className="text-xs text-red-400 hover:underline px-2 py-1"
-                >Delete</button>
-              </li>
-            );
-          })}
-      </ul>
-    </div>
-  </dialog>
-)}
-                        {(mode === "custom" || mode === "preset" || mode === "today") && (
-                          <div className="rounded-xl bg-zinc-900/60 border border-zinc-800/80 p-3">
-                            <p className="text-xs font-bold text-zinc-400 mb-2">Edit target sets & reps</p>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-zinc-500">Target Sets</label>
-                                <div className="flex items-stretch rounded-2xl border border-zinc-700 bg-zinc-900 overflow-hidden focus-within:border-yellow-400 transition">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (mode === "custom") {
-                                        updateCustomExercise(baseExercise.id, { sets: Math.max(1, exercise.sets - 1) });
-                                      } else {
-                                        updatePresetExerciseSets(baseExercise.id, effectiveSets - 1);
-                                      }
-                                    }}
-                                    className="flex w-8 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
-                                    aria-label="Decrease sets"
-                                  >
-                                    −
-                                  </button>
-                                  <input
-                                    inputMode="numeric"
-                                    value={effectiveSets}
-                                    onChange={(event) => {
-                                      const val = Math.max(1, Number(event.target.value) || 1);
-                                      if (mode === "custom") {
-                                        updateCustomExercise(baseExercise.id, { sets: val });
-                                      } else {
-                                        updatePresetExerciseSets(baseExercise.id, val);
-                                      }
-                                    }}
-                                    className="w-full min-w-0 bg-transparent px-0.5 py-3 text-center text-sm font-bold outline-none"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (mode === "custom") {
-                                        updateCustomExercise(baseExercise.id, { sets: Math.min(10, exercise.sets + 1) });
-                                      } else {
-                                        updatePresetExerciseSets(baseExercise.id, effectiveSets + 1);
-                                      }
-                                    }}
-                                    className="flex w-8 items-center justify-center text-zinc-400 hover:text-yellow-300 hover:bg-zinc-800 active:scale-90 transition font-black text-base select-none"
-                                    aria-label="Increase sets"
-                                  >
-                                    +
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div>
-                                <label className="mb-1 block text-xs font-bold text-zinc-500">Target Reps</label>
-                                <input
-                                  value={exercise.reps}
-                                  onChange={(event) => {
-                                    if (mode === "custom") {
-                                      updateCustomExercise(baseExercise.id, { reps: event.target.value });
-                                    }
-                                  }}
-                                  readOnly={mode !== "custom"}
-                                  className="w-full rounded-2xl border border-zinc-700 bg-zinc-900 px-3 py-3 outline-none text-sm font-bold"
-                                />
-                              </div>
-
-                              {mode === "custom" && (
+                          ) : (
+                            <div className="grid grid-cols-[1fr_2fr] gap-2">
+                              {activeExerciseIndex > 0 && (
                                 <button
-                                  onClick={() => updateCustomExercise(baseExercise.id, { warmup: !exercise.warmup })}
-                                  className={`mt-5 rounded-2xl px-2 py-3 text-xs font-black ${
-                                    exercise.warmup ? "bg-orange-400 text-zinc-950" : "bg-zinc-800 text-zinc-300"
-                                  }`}
+                                  type="button"
+                                  onClick={() => setActiveExerciseIndex(Math.max(0, activeExerciseIndex - 1))}
+                                  className="rounded-2xl bg-zinc-900 border border-zinc-800 px-3 py-3 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 hover:text-white active:scale-95"
+                                  aria-label="Previous exercise"
                                 >
-                                  Warmup
+                                  ← ท่าก่อนหน้า
                                 </button>
                               )}
+                              <button
+                                type="button"
+                                onClick={() => handleTriggerFinishWorkout(day.title, day.exercises)}
+                                className="rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black px-4 py-3 text-xs font-black uppercase tracking-wider transition shadow-lg shadow-yellow-500/25 active:scale-[0.98] flex items-center justify-center gap-2 col-span-1"
+                                aria-label="Finish workout session"
+                              >
+                                <Check size={16} className="stroke-[3]" />
+                                <span>เสร็จสิ้นเวิร์กเอาต์ (Finish Workout)</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Level D5: Progressive Disclosure Accordion for Secondary Tools */}
+                        <details className="group rounded-2xl bg-zinc-950/80 border border-zinc-800/80 overflow-hidden">
+                          <summary className="cursor-pointer px-4 py-3 text-xs font-bold text-zinc-400 hover:text-yellow-400 transition flex items-center justify-between select-none">
+                            <span className="flex items-center gap-2">
+                              <span>📊 Warmup, สถิติ PR, รายละเอียดกล้ามเนื้อ & เครื่อง</span>
+                            </span>
+                            <ChevronDown size={14} className="text-zinc-500 group-open:rotate-180 transition-transform" />
+                          </summary>
+
+                          <div className="p-3 pt-1 border-t border-zinc-900/80 space-y-3">
+                            {/* 1. Smart Warmup Strip */}
+                            {warmupInfo && (
+                              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5">
+                                <p className="text-xs font-bold text-zinc-300 mb-1 flex items-center gap-1.5">
+                                  <Flame size={13} className="text-yellow-400" />
+                                  <span>{warmupInfo.headline || "ลำดับ Warmup แนะนำ"}</span>
+                                </p>
+                                {warmupInfo.steps.length > 0 && (
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                    {warmupInfo.steps.map((st, sIdx) => (
+                                      <div
+                                        key={sIdx}
+                                        className="flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-bold border border-yellow-500/30 bg-yellow-950/20 text-yellow-300"
+                                      >
+                                        <span>{st.label}:</span>
+                                        <span className="font-black text-white">{st.weight} {effectiveUnit}</span>
+                                        <span className="text-zinc-400">× {st.reps}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* 2. Target Muscle Preview Card (3D Silhouette & Chips) */}
+                            <ExerciseMusclePreviewCard exercise={exercise} />
+
+                            {/* 3. Machine Mechanics & Adjustments */}
+                            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5 space-y-2">
+                              <p className="text-xs font-bold text-zinc-300 uppercase tracking-wider">กลไกเครื่อง & การตั้งค่า</p>
+
+                              {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "plate-loaded" || (currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "specialty") && (() => {
+                                const defaultEstimateKg = getDefaultMechanicalProfile(effectiveLoad, `${exercise.name} ${currentMachine || ""}`).tareWeight;
+                                const defaultEstimateDisplay = effectiveUnit === "lbs"
+                                  ? Math.round(defaultEstimateKg * 2.20462 * 10) / 10
+                                  : defaultEstimateKg;
+                                const userVal = machineStartingResistances[machineResistanceKey];
+                                return (
+                                  <div className="flex flex-col gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <label className="text-[11px] font-bold text-zinc-300" htmlFor={`machine-start-resistance-${baseExercise.id}`}>
+                                        ⚖️ {machineResistanceIsPerSide ? `แรงต้านเริ่มต้นต่อข้าง (${effectiveUnit})` : `แรงต้านเริ่มต้นรวม (${effectiveUnit})`}
+                                      </label>
+                                      {userVal !== undefined && userVal !== "" && (
+                                        <button
+                                          type="button"
+                                          onClick={() => updateMachineStartingResistance(machineResistanceKey, "")}
+                                          className="text-[10px] text-yellow-400 font-bold underline"
+                                        >
+                                          ใช้ค่าประมาณ ({defaultEstimateDisplay})
+                                        </button>
+                                      )}
+                                    </div>
+                                    <input
+                                      id={`machine-start-resistance-${baseExercise.id}`}
+                                      type="number"
+                                      min="0"
+                                      max="1000"
+                                      step="0.5"
+                                      inputMode="decimal"
+                                      value={userVal ?? ""}
+                                      onChange={(e) => updateMachineStartingResistance(machineResistanceKey, e.target.value)}
+                                      placeholder={`ค่าประมาณ: ${defaultEstimateDisplay} ${effectiveUnit}`}
+                                      className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-2.5 py-1.5 text-xs font-semibold text-zinc-100 outline-none focus:border-yellow-400"
+                                    />
+                                  </div>
+                                );
+                              })()}
+
+                              {((currentMachine ? mapMachineVariantToLoad(currentMachine, exercise.load) : (exercise.load || getLoadType(exercise))) === "cable") && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[11px] font-bold text-zinc-400 shrink-0">อัตราทดรอก:</span>
+                                  <select
+                                    aria-label="อัตราทดรอก"
+                                    value={pulleyRatios[baseExercise.id] ?? getDefaultPulleyRatioForExercise(exercise.name)}
+                                    onChange={(e) => updatePulleyRatio(baseExercise.id, e.target.value as "1" | "2" | "3")}
+                                    className="flex-1 rounded-lg border border-zinc-800 bg-zinc-950 py-1 px-2 text-xs font-bold text-zinc-100 outline-none focus:border-yellow-400"
+                                  >
+                                    <option value="1">1:1 (Direct)</option>
+                                    <option value="2">2:1 (Standard functional)</option>
+                                    <option value="3">3:1</option>
+                                  </select>
+                                </div>
+                              )}
+
+                              {currentMachine && (
+                                <div className="flex items-center justify-between pt-1 border-t border-zinc-800">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleFavoriteMachine(exercise.name, currentMachine)}
+                                    className={`flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold transition border ${
+                                      isFavoriteMachine
+                                        ? "border-amber-400/40 bg-amber-400/20 text-amber-300"
+                                        : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200"
+                                    }`}
+                                  >
+                                    <Star size={11} className={isFavoriteMachine ? "fill-amber-400 text-amber-400" : ""} />
+                                    <span>{isFavoriteMachine ? "เครื่องโปรด ⭐" : "ตั้งเป็นเครื่องประจำ"}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      updateMachineTag(baseExercise.id, "");
+                                      updatePulleyRatio(baseExercise.id, getDefaultPulleyRatioForExercise(exercise.name));
+                                      updateMachineStartingResistance(machineResistanceKey, "");
+                                    }}
+                                    className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                                  >
+                                    รีเซ็ตค่าเครื่อง
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 4. PR Records & Relative Strength Grid */}
+                            <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5">
+                              <p className="mb-2 flex items-center justify-between text-xs font-bold uppercase text-zinc-400">
+                                <span className="flex items-center gap-1.5"><Trophy size={13} className="text-yellow-400" /> Records</span>
+                                {records.maxWeight && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingPrExercise({ name: exercise.name, machine: currentMachine });
+                                      const rec = records.maxWeight;
+                                      const initialUnit: WeightUnit = rec?.unit ? normalizeWeightUnit(rec.unit) : globalWeightUnit;
+                                      setEditPrUnit(initialUnit);
+                                      if (rec) {
+                                        if (rec.rawValue !== undefined && rec.unit) {
+                                          setEditPrWeight(String(rec.rawValue));
+                                        } else {
+                                          const val = initialUnit === "kg"
+                                            ? convertInputWeight(rec.weightLbs, "lbs", "kg")
+                                            : String(Math.round(rec.weightLbs * 10) / 10);
+                                          setEditPrWeight(val);
+                                        }
+                                      } else {
+                                        setEditPrWeight("");
+                                      }
+                                      setEditPrReps(records.maxWeight?.reps?.toString() ?? "");
+                                    }}
+                                    className="text-[10px] text-yellow-400 font-bold hover:underline"
+                                  >
+                                    แก้ไขสถิติ ✎
+                                  </button>
+                                )}
+                              </p>
+                              <div className="grid grid-cols-2 gap-2">
+                                <div className="rounded-lg bg-zinc-950 p-2">
+                                  <p className="text-[10px] font-bold uppercase text-zinc-500">Max</p>
+                                  <p className="text-xs font-black text-yellow-300 mt-0.5">
+                                    {records.maxWeight ? `${resolveRecordDisplay(records.maxWeight, globalWeightUnit).primaryText} × ${records.maxWeight.reps}` : "—"}
+                                  </p>
+                                </div>
+                                <div className="rounded-lg bg-zinc-950 p-2">
+                                  <p className="text-[10px] font-bold uppercase text-zinc-500">Reps</p>
+                                  <p className="text-xs font-black text-zinc-200 mt-0.5">
+                                    {records.bestReps ? `${resolveRecordDisplay(records.bestReps, globalWeightUnit).primaryText} × ${records.bestReps.reps}` : "—"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* 5. Target Sets & Reps Editor */}
+                            {(mode === "custom" || mode === "preset" || mode === "today") && (
+                              <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5">
+                                <p className="text-xs font-bold text-zinc-400 mb-2">เป้าหมายเซตและจำนวนครั้ง</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <label className="text-[10px] font-bold text-zinc-500 block mb-1">Target Sets</label>
+                                    <div className="flex items-center rounded-xl border border-zinc-700 bg-zinc-950 overflow-hidden">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (mode === "custom") {
+                                            updateCustomExercise(baseExercise.id, { sets: Math.max(1, exercise.sets - 1) });
+                                          } else {
+                                            updatePresetExerciseSets(baseExercise.id, effectiveSets - 1);
+                                          }
+                                        }}
+                                        className="w-7 h-8 flex items-center justify-center text-zinc-400 hover:text-yellow-300 font-bold"
+                                      >−</button>
+                                      <span className="flex-1 text-center font-mono font-bold text-xs text-white">{effectiveSets}</span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (mode === "custom") {
+                                            updateCustomExercise(baseExercise.id, { sets: Math.min(10, exercise.sets + 1) });
+                                          } else {
+                                            updatePresetExerciseSets(baseExercise.id, effectiveSets + 1);
+                                          }
+                                        }}
+                                        className="w-7 h-8 flex items-center justify-center text-zinc-400 hover:text-yellow-300 font-bold"
+                                      >+</button>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="text-[10px] font-bold text-zinc-500 block mb-1">Target Reps</label>
+                                    <input
+                                      value={exercise.reps}
+                                      onChange={(event) => {
+                                        if (mode === "custom") {
+                                          updateCustomExercise(baseExercise.id, { reps: event.target.value });
+                                        }
+                                      }}
+                                      readOnly={mode !== "custom"}
+                                      className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-2.5 h-8 text-xs font-bold text-white text-center outline-none"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 6. RPE Quick Evaluation (6 to 10) */}
+                            <div>
+                              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider mb-1.5">ความหนัก RPE (แตะเพื่อบันทึกและจบเซต)</p>
+                              <div className="grid grid-cols-5 gap-1">
+                                {[
+                                  { val: 6, label: "สบาย", col: "border-zinc-800 text-zinc-400 hover:border-yellow-400" },
+                                  { val: 7, label: "พอดี", col: "border-zinc-800 text-zinc-300 hover:border-yellow-400" },
+                                  { val: 8, label: "เริ่มล้า", col: "border-yellow-500/30 text-yellow-400 hover:border-yellow-400" },
+                                  { val: 9, label: "หนักมาก", col: "border-yellow-500/60 text-yellow-300 hover:border-yellow-400" },
+                                  { val: 10, label: "Max", col: "border-red-500/50 text-red-400 hover:border-red-400" },
+                                ].map((r) => (
+                                  <button
+                                    key={r.val}
+                                    type="button"
+                                    onClick={() => saveAllSets({ ...exercise, id: baseExercise.id, sets: effectiveSets }, currentMachine)}
+                                    className={`rounded-lg border bg-zinc-950 py-1 text-center transition active:scale-95 ${r.col}`}
+                                  >
+                                    <span className="block font-black text-xs font-mono">{r.val}</span>
+                                    <span className="text-[9px] block leading-tight">{r.label}</span>
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        )}
-
-                        {/* Substitute Exercise Action */}
-                        <div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSubstituteModalExercise(baseExercise);
-                              setSubstituteSearch("");
-                              setSubstituteFilter("movement");
-                            }}
-                            className="flex w-full items-center justify-between gap-2 rounded-xl bg-zinc-900 border border-zinc-800 px-3.5 py-3 text-xs font-bold text-zinc-300 transition hover:bg-zinc-800 focus-visible:ring-2 focus-visible:ring-yellow-400"
-                            aria-label={`Substitute ${exercise.name}`}
-                          >
-                            <span className="flex items-center gap-2">
-                              <RotateCcw size={14} className="text-yellow-400 font-bold" />
-                              <span>Substitute Exercise</span>
-                            </span>
-                            <span className="rounded-lg bg-zinc-800 px-2 py-1 text-[11px] text-zinc-400">
-                              {selectedSubstitute ? "Modified" : "Choose"}
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-                    </details>
-
-                    {compactList && (
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setActiveExerciseIndex(Math.max(0, activeExerciseIndex - 1))}
-                          className="rounded-xl bg-zinc-900 border border-zinc-800 px-4 py-2.5 text-xs font-bold text-zinc-300 disabled:opacity-30 transition hover:bg-zinc-800 hover:text-white focus-visible:ring-2 focus-visible:ring-yellow-400 active:scale-95"
-                          disabled={activeExerciseIndex === 0}
-                          aria-label="Go to previous exercise"
-                        >
-                          Previous
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setActiveExerciseIndex(Math.min(day.exercises.length - 1, activeExerciseIndex + 1))}
-                          className="rounded-xl bg-yellow-400 hover:bg-yellow-300 text-black px-4 py-2.5 text-xs font-black uppercase tracking-wider disabled:opacity-30 transition shadow-md shadow-yellow-500/20 focus-visible:ring-2 focus-visible:ring-yellow-400 active:scale-95"
-                          disabled={activeExerciseIndex >= day.exercises.length - 1}
-                          aria-label="Go to next exercise"
-                        >
-                          Next
-                        </button>
-                      </div>
-                    )}
+                        </details>
                       </div>
                     )}
                   </article>
